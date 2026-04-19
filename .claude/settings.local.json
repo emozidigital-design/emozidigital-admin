@@ -1,0 +1,23 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(export GITHUB_TOKEN=\"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\")",
+      "Bash(curl -s -H 'Authorization: Bearer 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' -H 'Accept: application/vnd.github+json' https://api.github.com/user)",
+      "Bash(curl --version)",
+      "Bash(curl -v https://api.github.com)",
+      "Bash(curl -s --ssl-no-revoke -H 'Authorization: Bearer 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' -H 'Accept: application/vnd.github+json' https://api.github.com/user)",
+      "Bash(curl -s --ssl-no-revoke -X POST -H 'Authorization: Bearer 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' -H 'Accept: application/vnd.github+json' https://api.github.com/user/repos -d '{\"name\":\"emozidigital\",\"description\":\"NortheastForU main website and onboarding form\",\"private\":false,\"auto_init\":false}')",
+      "Bash(curl -sI --ssl-no-revoke -H 'Authorization: Bearer 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' https://api.github.com/user)",
+      "Bash(export GITHUB_TOKEN=\"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\")",
+      "Bash(curl -s --ssl-no-revoke -X POST -H 'Authorization: Bearer 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' -H 'Accept: application/vnd.github+json' https://api.github.com/user/repos -d '{\"name\":\"emozidigital\",\"description\":\"NortheastForU main website and onboarding form\",\"private\":false,\"auto_init\":false}')",
+      "Bash(node -e \"let d='';process.stdin.on\\('data',c=>d+=c\\);process.stdin.on\\('end',\\(\\)=>{const r=JSON.parse\\(d\\);console.log\\(r.full_name||r.message\\);}\\)\")",
+      "Bash(curl -s --ssl-no-revoke -X POST -H 'Authorization: Bearer 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' -H 'Accept: application/vnd.github+json' https://api.github.com/user/repos -d '{\"name\":\"emozidigital-admin\",\"description\":\"NortheastForU admin panel\",\"private\":false,\"auto_init\":false}')",
+      "Read(//c/northeastforu/**)",
+      "Bash(npx create-next-app@14 emozidigital --typescript --tailwind --eslint --app --no-src-dir --import-alias \"@/*\" --no-git)",
+      "Bash(npx create-next-app@14 emozidigital-admin --typescript --tailwind --eslint --app --no-src-dir --import-alias \"@/*\" --no-git)",
+      "Bash(curl -s --ssl-no-revoke -H \"Authorization: Bearer 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\" -H \"Accept: application/vnd.github+json\" https://api.github.com/user)",
+      "Bash(node -e \"let d='';process.stdin.on\\('data',c=>d+=c\\);process.stdin.on\\('end',\\(\\)=>{const r=JSON.parse\\(d\\);console.log\\(r.message||r.login\\);}\\)\")",
+      "Bash(node -e \"console.log\\(require\\('crypto'\\).randomBytes\\(32\\).toString\\('hex'\\)\\)\")"
+    ]
+  }
+}
