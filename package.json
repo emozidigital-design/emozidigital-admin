@@ -11,6 +11,7 @@
   "dependencies": {
     "@getbrevo/brevo": "^5.0.4",
     "@notionhq/client": "^5.18.0",
+    "@supabase/supabase-js": "^2.103.3",
     "bcryptjs": "^3.0.3",
     "nanoid": "^5.1.9",
     "next": "14.2.35",
