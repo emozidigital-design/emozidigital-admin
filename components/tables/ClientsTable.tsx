@@ -59,7 +59,7 @@ export default function ClientsTable({ clients }: { clients: Client[] }) {
           </svg>
         </div>
         <h3 className="text-white font-semibold mb-1">No clients yet</h3>
-        <p className="text-zinc-500 text-sm">Once clients complete onboarding, they'll appear here.</p>
+        <p className="text-zinc-500 text-sm">Once clients complete onboarding, they&apos;ll appear here.</p>
       </div>
     )
   }
