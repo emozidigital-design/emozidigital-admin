@@ -23,6 +23,17 @@ const NAV = [
     ),
   },
   {
+    href: "/blog",
+    label: "Blog",
+    icon: (
+      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10l4 4v10a2 2 0 01-2 2z" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M14 2v4a2 2 0 002 2h4" />
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 8h3M7 12h10M7 16h10" />
+      </svg>
+    ),
+  },
+  {
     href: "/content-calendar",
     label: "Content Calendar",
     icon: (
