@@ -1,4 +1,4 @@
-import { supabase } from '../lib/supabase.ts';
+import { supabase } from '../lib/supabase';
 
 async function verifySeed() {
   const { data, error } = await supabase

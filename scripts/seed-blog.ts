@@ -368,7 +368,7 @@ At **Emozi Digital**, we are experts in CRM architecture and workflow design. We
 
 function getPhotoId(category: string) {
   switch (category) {
-    case "AI Automation": return "1485827404703-f3ae2042ad33";
+    case "AI Automation": return "photo-1677442136019-21780ecad995"; // Modern AI visualization
     case "SEO & Content": return "1460925895917-afdab827c52f";
     case "Lead Generation": return "1552664730-d307ca884978";
     case "CRM & Workflow": return "1551288049-bbbda53b5f4a";
