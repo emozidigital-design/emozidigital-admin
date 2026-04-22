@@ -734,7 +734,57 @@ function OnboardingTab({ client }: { client: SupabaseClient }) {
 
 // ─── Tab 5: Content Calendar ──────────────────────────────────────────────────
 
-function CalendarTab({ entries }: { entries: CalendarEntry[] }) {
+function CalendarStatusCell({ entry, onUpdate }: { entry: CalendarEntry; onUpdate: () => void }) {
+  const [loading, setLoading] = useState(false)
+  const OPTIONS = ["draft", "review", "scheduled", "published"]
+  
+  async function handleChange(newStatus: string) {
+    setLoading(true)
+    try {
+      const res = await fetch(`/api/content-calendar/${entry.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus })
+      })
+      if (res.ok) onUpdate()
+    } catch (err) {
+      console.error(err)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const status = entry.status?.toLowerCase() || "draft"
+  const colorCls = 
+    status === "published" ? "bg-[#70BF4B]/15 text-[#70BF4B] border-[#70BF4B]/30" :
+    status === "scheduled" ? "bg-sky-500/15 text-sky-400 border-sky-500/30" :
+    status === "review"    ? "bg-yellow-500/15 text-yellow-400 border-yellow-500/30" :
+                             "bg-zinc-700/30 text-zinc-400 border-zinc-600/30"
+
+  return (
+    <div className="relative">
+      <select
+        value={status}
+        disabled={loading}
+        onChange={(e) => handleChange(e.target.value)}
+        className={`appearance-none px-2.5 py-1 rounded-full text-xs font-medium border cursor-pointer outline-none transition-colors ${colorCls} pr-6`}
+      >
+        {OPTIONS.map(o => <option key={o} value={o}>{o.charAt(0).toUpperCase() + o.slice(1)}</option>)}
+      </select>
+      <div className="absolute right-2 top-1/2 -translate-y-1/2 pointer-events-none">
+        {loading ? (
+          <div className="w-2 h-2 rounded-full bg-[#70BF4B] animate-ping" />
+        ) : (
+          <svg className="w-3 h-3 text-current opacity-50" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+          </svg>
+        )}
+      </div>
+    </div>
+  )
+}
+
+function CalendarTab({ entries, onUpdate }: { entries: CalendarEntry[]; onUpdate: () => void }) {
   if (entries.length === 0) {
     return <EmptyState icon="📅" message="No content calendar entries for this client." />
   }
@@ -755,7 +805,7 @@ function CalendarTab({ entries }: { entries: CalendarEntry[] }) {
                 <td className="px-4 py-3.5 text-white text-sm font-medium max-w-[200px] truncate">{e.title || "—"}</td>
                 <td className="px-4 py-3.5 text-zinc-300 text-sm">{e.type || "—"}</td>
                 <td className="px-4 py-3.5 text-zinc-400 text-sm">{e.platform || "—"}</td>
-                <td className="px-4 py-3.5"><Badge label={e.status} colorMap={{}} /></td>
+                <td className="px-4 py-3.5"><CalendarStatusCell entry={e} onUpdate={onUpdate} /></td>
                 <td className="px-4 py-3.5 text-zinc-500 text-sm font-mono">{e.scheduled_date ?? "—"}</td>
               </tr>
             ))}
@@ -1061,7 +1111,7 @@ const TABS = [
 
 export default function ClientDetailPage({ params }: { params: { id: string } }) {
   const [activeTab, setActiveTab] = useState(0)
-  const { data, isLoading, error } = useSWR<ApiResponse>(`/api/clients/${params.id}`, fetcher)
+  const { data, isLoading, error, mutate } = useSWR<ApiResponse>(`/api/clients/${params.id}`, fetcher)
 
   if (isLoading) {
     return (
@@ -1191,7 +1241,7 @@ export default function ClientDetailPage({ params }: { params: { id: string } })
         {activeTab === 1 && <BrandKitTab client={client} />}
         {activeTab === 2 && <SocialTab client={client} />}
         {activeTab === 3 && <OnboardingTab client={client} />}
-        {activeTab === 4 && <CalendarTab entries={contentCalendar} />}
+        {activeTab === 4 && <CalendarTab entries={contentCalendar} onUpdate={() => mutate()} />}
         {activeTab === 5 && <LegalTab client={client} />}
         {activeTab === 6 && <NotesTab client={client} />}
         {activeTab === 7 && <AccessCredentialsTab client={client} />}
