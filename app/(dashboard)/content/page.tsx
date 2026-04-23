@@ -43,7 +43,7 @@ const STATUS_COLORS: Record<string, string> = {
   posted: "bg-teal-500/20 text-teal-400 border-teal-500/30",
 }
 
-export default function ContentCalendarPage() {
+export default function ContentPage() {
   const [view, setView] = useState<"table" | "calendar">("table")
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [isModalOpen, setIsModalOpen] = useState(false)

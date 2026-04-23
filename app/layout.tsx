@@ -19,6 +19,7 @@ export const metadata: Metadata = {
 };
 
 import { Toaster } from 'react-hot-toast';
+import { Providers } from "@/components/Providers";
 
 export default function RootLayout({
   children,
@@ -30,7 +31,9 @@ export default function RootLayout({
       <body
         className={`${geistSans.variable} ${geistMono.variable} antialiased font-sans`}
       >
-        {children}
+        <Providers>
+          {children}
+        </Providers>
         <Toaster position="bottom-right" />
       </body>
     </html>
