@@ -7,6 +7,7 @@ const COLUMNS = ['Pending', 'In Progress', 'Submitted', 'Completed', 'Blocked'] 
 
 // Map DB status values to Kanban column labels
 const STATUS_MAP: Record<string, string> = {
+  draft:       'Pending',
   pending:     'Pending',
   in_progress: 'In Progress',
   submitted:   'Submitted',
@@ -43,7 +44,8 @@ export async function GET() {
     }
 
     return NextResponse.json({ pipeline })
-  } catch {
+  } catch (err) {
+    console.error('[onboarding] pipeline error:', err)
     return NextResponse.json({
       pipeline: Object.fromEntries(COLUMNS.map((c) => [c, []])),
     })
