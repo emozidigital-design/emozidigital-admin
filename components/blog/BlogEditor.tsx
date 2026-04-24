@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import { useRouter } from "next/navigation"
 import dynamic from "next/dynamic"
+import useSWR from "swr"
 import { format } from "date-fns"
 import { 
   ChevronLeft, 
@@ -50,6 +51,7 @@ interface BlogPost {
   focus_keyword: string
   seo_title: string
   seo_description: string
+  client_id: string | null
 }
 
 interface BlogEditorProps {
@@ -65,6 +67,8 @@ const CATEGORIES = [
   "Chatbots",
   "Performance Marketing"
 ]
+
+const fetcher = (url: string) => fetch(url).then(r => r.json())
 
 export default function BlogEditor({ initialData, isNew = false }: BlogEditorProps) {
   const router = useRouter()
@@ -85,8 +89,12 @@ export default function BlogEditor({ initialData, isNew = false }: BlogEditorPro
     schema_faq: [],
     focus_keyword: "",
     seo_title: "",
-    seo_description: ""
+    seo_description: "",
+    client_id: null,
   })
+
+  const { data: clientsData } = useSWR<{ clients: { id: string; name: string }[] }>('/api/clients', fetcher)
+  const clients = clientsData?.clients ?? []
 
   const [isSaving, setIsSaving] = useState(false)
   const [isSlugEdited, setIsSlugEdited] = useState(false)
@@ -121,6 +129,7 @@ export default function BlogEditor({ initialData, isNew = false }: BlogEditorPro
       ...post,
       status: options.publish ? 'published' : post.status,
       published_at: options.publish ? new Date().toISOString() : post.published_at,
+      client_id: post.client_id || null,
     }
 
     try {
@@ -362,6 +371,18 @@ export default function BlogEditor({ initialData, isNew = false }: BlogEditorPro
             </div>
             
             <div className="bg-[#001a1a] border border-[#003434] rounded-xl p-4 space-y-4">
+              <div>
+                <label className="block text-[10px] text-zinc-600 font-bold uppercase mb-2">Post For</label>
+                <select
+                  value={post.client_id ?? ""}
+                  onChange={(e) => updatePost({ client_id: e.target.value || null })}
+                  className="w-full bg-[#001f1f] border border-[#003434] text-white text-sm rounded-lg px-3 py-2 outline-none focus:border-[#70BF4B]/40"
+                >
+                  <option value="">Emozi Digital (Own)</option>
+                  {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                </select>
+              </div>
+
               <div>
                 <label className="block text-[10px] text-zinc-600 font-bold uppercase mb-2">Category</label>
                 <select

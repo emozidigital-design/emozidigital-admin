@@ -190,6 +190,8 @@ export default function ContentPage() {
           onSave={() => { setIsModalOpen(false); mutate(); }}
         />
       )}
+
+      <BlogActivityPanel />
     </div>
   )
 }
@@ -461,6 +463,90 @@ function PostModal({ entry, clients, onClose, onSave }: { entry: Partial<Entry> 
           </button>
         </div>
       </div>
+    </div>
+  )
+}
+
+type BlogActivityPost = {
+  id: string
+  title: string
+  slug: string
+  category: string
+  published_at: string | null
+  views: number
+  client_id: string | null
+}
+
+function BlogActivityPanel() {
+  const [open, setOpen] = useState(true)
+  const { data } = useSWR<{ posts: BlogActivityPost[] }>('/api/blog?status=published&limit=8', fetcher)
+  const posts = data?.posts ?? []
+
+  return (
+    <div className="bg-[#001f1f] border border-[#003434] rounded-2xl overflow-hidden shadow-sm">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full px-6 py-4 flex items-center justify-between border-b border-[#003434] bg-[#001a1a]/50 transition-colors hover:bg-[#003434]/30"
+      >
+        <div className="flex items-center gap-2.5">
+          <svg className="w-4 h-4 text-[#70BF4B]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10l4 4v10a2 2 0 01-2 2z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 9h3M7 13h10M7 17h10" />
+          </svg>
+          <span className="text-[#70BF4B] text-xs font-bold uppercase tracking-widest">Blog Activity</span>
+          <span className="text-zinc-600 text-xs">({posts.length} recent posts)</span>
+        </div>
+        <svg
+          className={`w-4 h-4 text-zinc-500 transition-transform ${open ? 'rotate-180' : ''}`}
+          fill="none" stroke="currentColor" viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {open && (
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="border-b border-[#003434]/60 bg-[#001a1a]/30">
+                {["Title", "Category", "Published", "Views"].map(h => (
+                  <th key={h} className="px-6 py-3 text-[10px] font-bold uppercase tracking-widest text-zinc-600">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-[#003434]/40">
+              {posts.length === 0 ? (
+                <tr>
+                  <td colSpan={4} className="px-6 py-8 text-center text-zinc-600 text-sm italic">No published blog posts yet.</td>
+                </tr>
+              ) : posts.map(p => (
+                <tr key={p.id} className="hover:bg-[#003434]/20 transition-colors group">
+                  <td className="px-6 py-3">
+                    <a
+                      href={`/blog/${p.id}`}
+                      className="text-white text-sm font-medium truncate max-w-[280px] block group-hover:text-[#70BF4B] transition-colors"
+                    >
+                      {p.title}
+                    </a>
+                    <span className="text-zinc-600 text-[10px] font-mono">/{p.slug}</span>
+                  </td>
+                  <td className="px-6 py-3">
+                    <span className="text-[10px] px-2 py-0.5 rounded-md bg-[#003434] text-zinc-400 uppercase font-bold">
+                      {p.category || "—"}
+                    </span>
+                  </td>
+                  <td className="px-6 py-3 text-zinc-500 text-xs font-mono">
+                    {p.published_at ? format(new Date(p.published_at), 'MMM d, yyyy') : '—'}
+                  </td>
+                  <td className="px-6 py-3 text-zinc-400 text-xs font-mono">
+                    {p.views?.toLocaleString() || 0}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
     </div>
   )
 }

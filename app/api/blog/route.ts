@@ -8,9 +8,12 @@ export async function GET(request: Request) {
   const status = searchParams.get('status');
   const search = searchParams.get('search');
 
+  const clientId = searchParams.get('clientId');
+  const limit    = parseInt(searchParams.get('limit') ?? '200');
+
   let query = supabase
     .from('blog_posts')
-    .select('id, title, slug, category, status, published_at, views, created_at')
+    .select('id, title, slug, category, status, published_at, views, created_at, client_id')
     .order('created_at', { ascending: false });
 
   if (status && status !== 'all') {
@@ -20,6 +23,14 @@ export async function GET(request: Request) {
   if (search) {
     query = query.ilike('title', `%${search}%`);
   }
+
+  if (clientId === 'own') {
+    query = query.is('client_id', null);
+  } else if (clientId && clientId !== 'all') {
+    query = query.eq('client_id', clientId);
+  }
+
+  query = query.limit(limit);
 
   const { data, error } = await query;
 

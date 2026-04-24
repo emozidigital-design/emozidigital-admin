@@ -17,6 +17,7 @@ type BlogPost = {
   published_at: string | null
   views: number
   created_at: string
+  client_id: string | null
 }
 
 const STATUS_COLOR: Record<string, string> = {
@@ -42,9 +43,13 @@ export default function BlogPage() {
   const router = useRouter()
   const [search, setSearch] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
-  
+  const [clientFilter, setClientFilter] = useState("all")
+
+  const { data: clientsData } = useSWR<{ clients: { id: string; name: string }[] }>('/api/clients', fetcher)
+  const clients = clientsData?.clients ?? []
+
   const { data, isLoading, mutate } = useSWR<{ posts: BlogPost[] }>(
-    `/api/blog?status=${statusFilter}&search=${search}`, 
+    `/api/blog?status=${statusFilter}&search=${search}&clientId=${clientFilter}`,
     fetcher
   )
 
@@ -108,6 +113,17 @@ export default function BlogPage() {
           />
         </div>
         <div className="flex gap-2">
+          <select
+            value={clientFilter}
+            onChange={(e) => setClientFilter(e.target.value)}
+            className="bg-[#001f1f] border border-[#003434] text-zinc-300 text-sm rounded-xl px-4 py-2.5 outline-none focus:border-[#70BF4B]/40 transition-all appearance-none cursor-pointer min-w-[160px]"
+          >
+            <option value="all">All Clients</option>
+            <option value="own">Emozi Digital (Own)</option>
+            {clients.map((c) => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
