@@ -6,6 +6,7 @@ import useSWR from "swr"
 import Link from "next/link"
 import { exportToCSV } from "@/lib/exportCSV"
 import { useClientUpdate } from "@/lib/useClientUpdate"
+import OnboardingViewer from "./_components/OnboardingViewer"
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
 
@@ -652,84 +653,7 @@ function SocialTab({ client }: { client: SupabaseClient }) {
 // ─── Tab 4: Onboarding Progress ───────────────────────────────────────────────
 
 function OnboardingTab({ client }: { client: SupabaseClient }) {
-  const SECTIONS = [
-    { key: "section_a", label: "Business Info" },
-    { key: "section_b", label: "Contact Details" },
-    { key: "section_c", label: "Package & Pricing" },
-    { key: "section_d", label: "Brand Voice" },
-    { key: "section_e", label: "Target Audience" },
-    { key: "section_f", label: "Social Goals" },
-    { key: "section_g", label: "Pain Points" },
-    { key: "section_h", label: "Competitors" },
-    { key: "section_i", label: "Content Preferences" },
-    { key: "section_j", label: "Legal & Compliance" },
-    { key: "section_k", label: "Agreement" },
-  ] as const
-
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const completed = SECTIONS.filter(s => client[s.key] && Object.keys(client[s.key] as any).length > 0).length
-  const total = SECTIONS.length
-  const pct = Math.round((completed / total) * 100)
-
-  return (
-    <div className="space-y-4">
-      <div className="bg-[#001f1f] border border-[#003434] rounded-xl p-5 shadow-sm">
-        <div className="flex items-center justify-between mb-3">
-          <div>
-            <p className="text-white font-semibold text-sm">{completed} of {total} sections populated</p>
-            <p className="text-zinc-500 text-xs mt-0.5">{pct}% overall progress</p>
-          </div>
-        </div>
-        <div className="w-full bg-[#003434] rounded-full h-2">
-          <div
-            className="bg-gradient-to-r from-[#003434] via-[#70BF4B] to-[#D0F255] h-2 rounded-full transition-all duration-500"
-            style={{ width: `${pct}%` }}
-          />
-        </div>
-      </div>
-
-      <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-3">
-        {SECTIONS.map(sec => {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const data = (client[sec.key] as Record<string, any>) || {}
-          // eslint-disable-next-line @typescript-eslint/no-unused-vars
-          const entries = Object.entries(data).filter(([_, v]) => v !== undefined && v !== null && v !== "")
-          
-          return (
-            <div key={sec.key} className="bg-[#001f1f] border border-[#003434] rounded-xl overflow-hidden hover:border-[#004d4d] transition-colors relative group">
-              <div className="px-4 py-3 border-b border-[#003434] flex items-center justify-between">
-                <h3 className="text-white text-sm font-semibold">{sec.label}</h3>
-                {entries.length > 0 ? (
-                  <span className="text-[#70BF4B] text-[10px] font-bold uppercase tracking-wider bg-[#70BF4B]/10 px-2 py-0.5 rounded-full">Done</span>
-                ) : (
-                  <span className="text-zinc-600 text-[10px] font-bold uppercase tracking-wider border border-zinc-700 px-2 py-0.5 rounded-full">Pending</span>
-                )}
-              </div>
-              <div className="px-5 py-1">
-                {entries.length > 0 ? (
-                  <dl>
-                    {entries.map(([k, v]) => (
-                      <EditableField
-                        key={k}
-                        clientId={client.id}
-                        label={k.replace(/_/g, " ")}
-                        field={k}
-                        section={sec.key}
-                        value={typeof v === 'boolean' ? String(v) : Array.isArray(v) ? v.join(", ") : String(v ?? '')}
-                        inputType={typeof v === 'boolean' ? 'checkbox' : 'text'}
-                      />
-                    ))}
-                  </dl>
-                ) : (
-                  <p className="text-zinc-600 text-xs text-center py-4">No data collected yet</p>
-                )}
-              </div>
-            </div>
-          )
-        })}
-      </div>
-    </div>
-  )
+  return <OnboardingViewer client={client as any} />
 }
 
 // ─── Tab 5: Content Calendar ──────────────────────────────────────────────────
