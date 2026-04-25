@@ -7,6 +7,12 @@ import { format, startOfMonth, endOfMonth, eachDayOfInterval, startOfWeek, endOf
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
 
+type RevisionHistoryItem = {
+  caption: string
+  timestamp: string
+  reason: string
+}
+
 type Entry = {
   id: string
   title: string
@@ -19,12 +25,15 @@ type Entry = {
   hashtags?: string
   media_url?: string
   notes?: string
+  client_feedback?: string
+  revision_count?: number
+  revision_history?: RevisionHistoryItem[]
   clients?: { legal_name: string }
 }
 
 const PLATFORMS = ["Instagram", "Facebook", "LinkedIn", "Twitter", "YouTube", "Pinterest"]
 const CONTENT_TYPES = ["static", "carousel", "reel", "blog", "story"]
-const STATUS_OPTIONS = ["idea", "writing", "designed", "approved", "posted"]
+const STATUS_OPTIONS = ["idea", "writing", "designed", "approved", "posted", "changes_requested", "rejected"]
 
 const PLATFORM_COLORS: Record<string, string> = {
   Instagram: "bg-pink-500/20 text-pink-400 border-pink-500/30",
@@ -41,14 +50,19 @@ const STATUS_COLORS: Record<string, string> = {
   designed: "bg-blue-500/20 text-blue-400 border-blue-500/30",
   approved: "bg-green-500/20 text-green-400 border-green-500/30",
   posted: "bg-teal-500/20 text-teal-400 border-teal-500/30",
+  changes_requested: "bg-orange-500/20 text-orange-400 border-orange-500/30",
+  rejected: "bg-red-500/20 text-red-400 border-red-500/30",
 }
+
+const NEEDS_REVIEW = (status: string) => status === "changes_requested" || status === "rejected"
 
 export default function ContentPage() {
   const [view, setView] = useState<"table" | "calendar">("table")
   const [currentMonth, setCurrentMonth] = useState(new Date())
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingEntry, setEditingEntry] = useState<Partial<Entry> | null>(null)
-  
+  const [reviewEntry, setReviewEntry] = useState<Entry | null>(null)
+
   // Filters
   const [clientFilter, setClientFilter] = useState("all")
   const [platformFilter, setPlatformFilter] = useState("all")
@@ -95,6 +109,12 @@ export default function ContentPage() {
       }
     } catch (err) {
       toast.error("Failed to update status")
+    }
+  }
+
+  const handleRowClick = (entry: Entry) => {
+    if (NEEDS_REVIEW(entry.status)) {
+      setReviewEntry(entry)
     }
   }
 
@@ -165,22 +185,42 @@ export default function ContentPage() {
           className="bg-[#001414] border border-[#003434] text-zinc-300 text-sm rounded-xl px-3 py-2 outline-none focus:border-[#70BF4B]/30"
         >
           <option value="all">All Statuses</option>
-          {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
+          {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</option>)}
         </select>
       </div>
 
-      {view === "table" ? (
-        <TableView entries={filteredEntries} onEdit={(e) => { setEditingEntry(e); setIsModalOpen(true); }} onDelete={handleDelete} onMarkPosted={handleMarkPosted} />
-      ) : (
-        <CalendarView
-          entries={filteredEntries}
-          currentMonth={currentMonth}
-          onPrev={() => setCurrentMonth(subMonths(currentMonth, 1))}
-          onNext={() => setCurrentMonth(addMonths(currentMonth, 1))}
-          onDateClick={(date) => { setEditingEntry({ scheduled_date: format(date, "yyyy-MM-dd") }); setIsModalOpen(true); }}
-          onEdit={(e) => { setEditingEntry(e); setIsModalOpen(true); }}
-        />
-      )}
+      {/* Main content + review panel side-by-side when review is open */}
+      <div className={`flex gap-6 items-start ${reviewEntry ? 'flex-col xl:flex-row' : ''}`}>
+        <div className={reviewEntry ? 'flex-1 min-w-0' : 'w-full'}>
+          {view === "table" ? (
+            <TableView
+              entries={filteredEntries}
+              onEdit={(e) => { setEditingEntry(e); setIsModalOpen(true); }}
+              onDelete={handleDelete}
+              onMarkPosted={handleMarkPosted}
+              onRowClick={handleRowClick}
+            />
+          ) : (
+            <CalendarView
+              entries={filteredEntries}
+              currentMonth={currentMonth}
+              onPrev={() => setCurrentMonth(subMonths(currentMonth, 1))}
+              onNext={() => setCurrentMonth(addMonths(currentMonth, 1))}
+              onDateClick={(date) => { setEditingEntry({ scheduled_date: format(date, "yyyy-MM-dd") }); setIsModalOpen(true); }}
+              onEdit={(e) => { setEditingEntry(e); setIsModalOpen(true); }}
+            />
+          )}
+        </div>
+
+        {reviewEntry && (
+          <ReviewPanel
+            entry={reviewEntry}
+            onClose={() => setReviewEntry(null)}
+            onSaved={() => { mutate(); setReviewEntry(null); }}
+            onUpdate={(updated) => setReviewEntry(updated)}
+          />
+        )}
+      </div>
 
       {isModalOpen && (
         <PostModal
@@ -196,7 +236,7 @@ export default function ContentPage() {
   )
 }
 
-function TableView({ entries, onEdit, onDelete, onMarkPosted }: { entries: Entry[], onEdit: (e: Entry) => void, onDelete: (id: string) => void, onMarkPosted: (e: Entry) => void }) {
+function TableView({ entries, onEdit, onDelete, onMarkPosted, onRowClick }: { entries: Entry[], onEdit: (e: Entry) => void, onDelete: (id: string) => void, onMarkPosted: (e: Entry) => void, onRowClick: (e: Entry) => void }) {
   return (
     <div className="bg-[#001f1f] border border-[#003434] rounded-2xl overflow-hidden shadow-sm">
       <div className="overflow-x-auto">
@@ -213,43 +253,55 @@ function TableView({ entries, onEdit, onDelete, onMarkPosted }: { entries: Entry
               <tr>
                 <td colSpan={7} className="px-6 py-12 text-center text-zinc-600 text-sm italic">No posts found matching filters.</td>
               </tr>
-            ) : entries.map(e => (
-              <tr key={e.id} className="hover:bg-[#003434]/30 transition-colors group">
-                <td className="px-6 py-4">
-                  <p className="text-white text-sm font-semibold truncate max-w-[200px]">{e.title}</p>
-                </td>
-                <td className="px-6 py-4">
-                  <p className="text-zinc-400 text-xs">{e.clients?.legal_name || "—"}</p>
-                </td>
-                <td className="px-6 py-4">
-                  <span className="text-[10px] px-2 py-0.5 rounded-md bg-[#003434] text-zinc-500 uppercase font-bold">{e.content_type}</span>
-                </td>
-                <td className="px-6 py-4">
-                  <div className="flex flex-wrap gap-1 max-w-[120px]">
-                    {e.platforms?.map(p => (
-                      <div key={p} className={`w-2 h-2 rounded-full ${PLATFORM_COLORS[p]?.split(' ')[0]}`} title={p} />
-                    ))}
-                  </div>
-                </td>
-                <td className="px-6 py-4">
-                  <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase border ${STATUS_COLORS[e.status]}`}>
-                    {e.status}
-                  </span>
-                </td>
-                <td className="px-6 py-4">
-                  <p className="text-zinc-500 text-xs font-mono">{e.scheduled_date || "—"}</p>
-                </td>
-                <td className="px-6 py-4">
-                  <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                    <button onClick={() => onEdit(e)} className="p-1.5 text-zinc-400 hover:text-[#70BF4B] transition-colors"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg></button>
-                    <button onClick={() => onDelete(e.id)} className="p-1.5 text-zinc-400 hover:text-red-400 transition-colors"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
-                    {e.status !== 'posted' && (
-                      <button onClick={() => onMarkPosted(e)} className="text-[10px] font-bold text-[#70BF4B] hover:underline">Mark Posted</button>
-                    )}
-                  </div>
-                </td>
-              </tr>
-            ))}
+            ) : entries.map(e => {
+              const needsReview = NEEDS_REVIEW(e.status)
+              return (
+                <tr
+                  key={e.id}
+                  onClick={() => needsReview && onRowClick(e)}
+                  className={`transition-colors group ${needsReview ? 'cursor-pointer hover:bg-orange-500/5 border-l-2 border-l-orange-500/50' : 'hover:bg-[#003434]/30'}`}
+                >
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-2">
+                      {needsReview && (
+                        <span className="w-1.5 h-1.5 rounded-full bg-orange-400 shrink-0 animate-pulse" />
+                      )}
+                      <p className="text-white text-sm font-semibold truncate max-w-[200px]">{e.title}</p>
+                    </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <p className="text-zinc-400 text-xs">{e.clients?.legal_name || "—"}</p>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className="text-[10px] px-2 py-0.5 rounded-md bg-[#003434] text-zinc-500 uppercase font-bold">{e.content_type}</span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex flex-wrap gap-1 max-w-[120px]">
+                      {e.platforms?.map(p => (
+                        <div key={p} className={`w-2 h-2 rounded-full ${PLATFORM_COLORS[p]?.split(' ')[0]}`} title={p} />
+                      ))}
+                    </div>
+                  </td>
+                  <td className="px-6 py-4">
+                    <span className={`px-2.5 py-1 rounded-full text-[10px] font-bold uppercase border ${STATUS_COLORS[e.status] ?? 'bg-zinc-500/20 text-zinc-400 border-zinc-500/30'}`}>
+                      {e.status.replace(/_/g, ' ')}
+                    </span>
+                  </td>
+                  <td className="px-6 py-4">
+                    <p className="text-zinc-500 text-xs font-mono">{e.scheduled_date || "—"}</p>
+                  </td>
+                  <td className="px-6 py-4">
+                    <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity" onClick={ev => ev.stopPropagation()}>
+                      <button onClick={() => onEdit(e)} className="p-1.5 text-zinc-400 hover:text-[#70BF4B] transition-colors"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg></button>
+                      <button onClick={() => onDelete(e.id)} className="p-1.5 text-zinc-400 hover:text-red-400 transition-colors"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg></button>
+                      {e.status !== 'posted' && (
+                        <button onClick={() => onMarkPosted(e)} className="text-[10px] font-bold text-[#70BF4B] hover:underline">Mark Posted</button>
+                      )}
+                    </div>
+                  </td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>
@@ -463,6 +515,338 @@ function PostModal({ entry, clients, onClose, onSave }: { entry: Partial<Entry> 
           </button>
         </div>
       </div>
+    </div>
+  )
+}
+
+const N8N_REEVALUATE_URL = process.env.NEXT_PUBLIC_N8N_WEBHOOK_BASE
+  ? `${process.env.NEXT_PUBLIC_N8N_WEBHOOK_BASE}/webhook/reevaluate`
+  : "/api/content-calendar/reevaluate"
+
+function ReviewPanel({ entry, onClose, onSaved, onUpdate }: {
+  entry: Entry
+  onClose: () => void
+  onSaved: () => void
+  onUpdate: (e: Entry) => void
+}) {
+  const [aiLoading, setAiLoading] = useState(false)
+  const [aiResult, setAiResult] = useState<string | null>(null)
+  const [editMode, setEditMode] = useState(false)
+  const [editCaption, setEditCaption] = useState(entry.caption ?? "")
+  const [editMediaUrl, setEditMediaUrl] = useState(entry.media_url ?? "")
+  const [overrideModal, setOverrideModal] = useState(false)
+  const [historyOpen, setHistoryOpen] = useState(false)
+  const [saving, setSaving] = useState(false)
+
+  const revisionCount = entry.revision_count ?? 0
+  const history: RevisionHistoryItem[] = (entry.revision_history ?? []).slice(-3).reverse()
+  const maxRevisionsReached = revisionCount >= 3
+
+  async function save(updates: Partial<Entry>) {
+    setSaving(true)
+    try {
+      const res = await fetch("/api/content-calendar", {
+        method: "POST",
+        body: JSON.stringify({ ...entry, ...updates }),
+      })
+      if (!res.ok) throw new Error()
+      return true
+    } catch {
+      toast.error("Failed to save changes")
+      return false
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleReEvaluate() {
+    if (maxRevisionsReached) return
+    setAiLoading(true)
+    setAiResult(null)
+    try {
+      const res = await fetch(N8N_REEVALUATE_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ post_id: entry.id }),
+      })
+      if (res.ok) {
+        const json = await res.json().catch(() => ({}))
+        const newCaption = json.caption ?? aiResult ?? entry.caption ?? ""
+        setAiResult(newCaption)
+        const newHistory: RevisionHistoryItem[] = [
+          ...(entry.revision_history ?? []),
+          { caption: entry.caption ?? "", timestamp: new Date().toISOString(), reason: "AI re-evaluation" },
+        ]
+        const updated: Partial<Entry> = {
+          revision_count: revisionCount + 1,
+          revision_history: newHistory,
+          caption: newCaption,
+          status: "designed",
+        }
+        const ok = await save(updated)
+        if (ok) {
+          onUpdate({ ...entry, ...updated })
+          toast.success("AI re-evaluation complete")
+          onSaved()
+        }
+      } else {
+        toast.error("n8n webhook failed — check your automation")
+      }
+    } catch {
+      toast.error("Could not reach n8n webhook")
+    } finally {
+      setAiLoading(false)
+    }
+  }
+
+  async function handleManualSave() {
+    const newHistory: RevisionHistoryItem[] = [
+      ...(entry.revision_history ?? []),
+      { caption: entry.caption ?? "", timestamp: new Date().toISOString(), reason: "Manual edit" },
+    ]
+    const ok = await save({
+      caption: editCaption,
+      media_url: editMediaUrl,
+      revision_count: revisionCount + 1,
+      revision_history: newHistory,
+      status: "designed",
+    })
+    if (ok) {
+      toast.success("Post updated")
+      onSaved()
+    }
+  }
+
+  async function handleOverrideApprove() {
+    const newHistory: RevisionHistoryItem[] = [
+      ...(entry.revision_history ?? []),
+      { caption: entry.caption ?? "", timestamp: new Date().toISOString(), reason: "Override approved by admin" },
+    ]
+    const ok = await save({ status: "approved", revision_history: newHistory })
+    if (ok) {
+      toast.success("Post approved — status set to approved")
+      setOverrideModal(false)
+      onSaved()
+    }
+  }
+
+  return (
+    <div className="xl:w-[400px] shrink-0 bg-[#001f1f] border border-[#003434] rounded-2xl overflow-hidden shadow-xl flex flex-col">
+      {/* Header */}
+      <div className={`px-5 py-4 border-b border-[#003434] flex items-center justify-between ${entry.status === 'rejected' ? 'bg-red-500/5' : 'bg-orange-500/5'}`}>
+        <div className="flex items-center gap-2.5">
+          <span className={`w-2 h-2 rounded-full ${entry.status === 'rejected' ? 'bg-red-400' : 'bg-orange-400'}`} />
+          <span className="text-white font-bold text-sm">Re-evaluation Panel</span>
+        </div>
+        <button onClick={onClose} className="text-zinc-500 hover:text-white transition-colors">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+        </button>
+      </div>
+
+      <div className="flex-1 overflow-y-auto p-5 space-y-5">
+
+        {/* Max revisions warning */}
+        {maxRevisionsReached && (
+          <div className="flex items-start gap-2.5 bg-red-500/10 border border-red-500/30 rounded-xl px-4 py-3">
+            <svg className="w-4 h-4 text-red-400 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /></svg>
+            <p className="text-red-400 text-xs font-medium">Max revisions reached. Manual takeover required.</p>
+          </div>
+        )}
+
+        {/* 1. Original content */}
+        <div className="space-y-3">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Original Content</p>
+          <div className="bg-[#001414] border border-[#003434] rounded-xl p-4 space-y-3">
+            {entry.media_url && (
+              <div className="rounded-lg overflow-hidden bg-zinc-900 aspect-video flex items-center justify-center">
+                {entry.media_url.match(/\.(mp4|webm|mov)$/i) ? (
+                  <video src={entry.media_url} className="w-full h-full object-cover" controls />
+                ) : (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={entry.media_url} alt="Media" className="w-full h-full object-cover" onError={e => { (e.target as HTMLElement).style.display = 'none' }} />
+                )}
+              </div>
+            )}
+            {entry.caption && (
+              <p className="text-zinc-300 text-xs leading-relaxed line-clamp-4">{entry.caption}</p>
+            )}
+            {!entry.caption && !entry.media_url && (
+              <p className="text-zinc-600 text-xs italic">No caption or media attached.</p>
+            )}
+            <div className="flex flex-wrap gap-1.5 pt-1">
+              {entry.platforms?.map(p => (
+                <span key={p} className={`text-[10px] px-2 py-0.5 rounded-full border font-medium ${PLATFORM_COLORS[p] ?? 'bg-zinc-800 text-zinc-400 border-zinc-700'}`}>{p}</span>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* 2. Client feedback */}
+        <div className="space-y-3">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Client Feedback</p>
+          <div className={`border rounded-xl p-4 space-y-2.5 ${entry.status === 'rejected' ? 'bg-red-500/5 border-red-500/25' : 'bg-orange-500/5 border-orange-500/25'}`}>
+            <p className={`text-sm leading-relaxed ${entry.status === 'rejected' ? 'text-red-300' : 'text-orange-300'}`}>
+              {entry.client_feedback || "No feedback provided."}
+            </p>
+            <div className="flex items-center justify-between pt-1 border-t border-white/5">
+              <div className="flex items-center gap-2">
+                <span className="text-zinc-500 text-[10px]">Client</span>
+                <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold border ${entry.status === 'rejected' ? 'bg-red-500/20 text-red-400 border-red-500/30' : 'bg-orange-500/20 text-orange-400 border-orange-500/30'}`}>
+                  {entry.status === 'rejected' ? 'Rejected' : 'Changes Requested'}
+                </span>
+              </div>
+              <div className="text-zinc-600 text-[10px] font-mono">
+                Round {Math.min(revisionCount + 1, 3)} of 3
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* 3. Action buttons */}
+        <div className="space-y-2.5">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Actions</p>
+
+          {/* Re-evaluate with AI */}
+          <button
+            onClick={handleReEvaluate}
+            disabled={aiLoading || maxRevisionsReached}
+            className="w-full flex items-center justify-center gap-2.5 px-4 py-3 bg-[#70BF4B] hover:bg-[#5faa3e] disabled:opacity-40 disabled:cursor-not-allowed text-[#001a1a] font-bold text-sm rounded-xl transition-all shadow-lg shadow-[#70BF4B]/10"
+          >
+            {aiLoading ? (
+              <>
+                <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" /></svg>
+                AI processing...
+              </>
+            ) : (
+              <>
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                Re-evaluate with AI
+              </>
+            )}
+          </button>
+
+          {/* Edit manually */}
+          {!editMode ? (
+            <button
+              onClick={() => setEditMode(true)}
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-[#001414] hover:bg-[#002626] border border-[#003434] hover:border-[#70BF4B]/30 text-zinc-300 font-medium text-sm rounded-xl transition-all"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+              Edit Manually
+            </button>
+          ) : (
+            <div className="space-y-3 bg-[#001414] border border-[#003434] rounded-xl p-4">
+              <textarea
+                rows={4}
+                value={editCaption}
+                onChange={e => setEditCaption(e.target.value)}
+                placeholder="Rewrite caption..."
+                className="w-full bg-[#001f1f] border border-[#003434] rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-[#70BF4B]/30 resize-none"
+              />
+              <input
+                value={editMediaUrl}
+                onChange={e => setEditMediaUrl(e.target.value)}
+                placeholder="New media URL (optional)..."
+                className="w-full bg-[#001f1f] border border-[#003434] rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-[#70BF4B]/30"
+              />
+              <div className="flex gap-2">
+                <button
+                  onClick={handleManualSave}
+                  disabled={saving}
+                  className="flex-1 px-4 py-2 bg-[#70BF4B] hover:bg-[#5faa3e] disabled:opacity-50 text-[#001a1a] font-bold text-xs rounded-lg transition-all"
+                >
+                  {saving ? "Saving..." : "Save Changes"}
+                </button>
+                <button
+                  onClick={() => setEditMode(false)}
+                  className="px-4 py-2 bg-transparent border border-[#003434] text-zinc-400 hover:text-white text-xs rounded-lg transition-all"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Override + Approve */}
+          <button
+            onClick={() => setOverrideModal(true)}
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-transparent hover:bg-red-500/5 border border-red-500/30 hover:border-red-500/60 text-red-400 font-medium text-sm rounded-xl transition-all"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            Override + Approve
+          </button>
+        </div>
+
+        {/* AI result preview */}
+        {aiResult && (
+          <div className="space-y-2">
+            <p className="text-[10px] font-bold uppercase tracking-widest text-[#70BF4B]">AI New Version</p>
+            <div className="bg-[#70BF4B]/5 border border-[#70BF4B]/20 rounded-xl p-4">
+              <p className="text-zinc-200 text-xs leading-relaxed">{aiResult}</p>
+            </div>
+          </div>
+        )}
+
+        {/* 4. Revision history */}
+        {history.length > 0 && (
+          <div className="space-y-2">
+            <button
+              onClick={() => setHistoryOpen(o => !o)}
+              className="w-full flex items-center justify-between text-[10px] font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-300 transition-colors"
+            >
+              <span>Revision History ({history.length})</span>
+              <svg className={`w-3.5 h-3.5 transition-transform ${historyOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+            </button>
+            {historyOpen && (
+              <div className="space-y-2">
+                {history.map((h, i) => (
+                  <div key={i} className="bg-[#001414] border border-[#003434] rounded-xl p-3 space-y-1.5">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] text-zinc-500 font-medium">{h.reason}</span>
+                      <span className="text-[10px] text-zinc-700 font-mono">
+                        {h.timestamp ? format(new Date(h.timestamp), 'MMM d, HH:mm') : '—'}
+                      </span>
+                    </div>
+                    <p className="text-zinc-400 text-[11px] leading-relaxed line-clamp-3">{h.caption || "—"}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Override confirmation modal */}
+      {overrideModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+          <div className="bg-[#001a1a] border border-red-500/30 rounded-2xl w-full max-w-sm p-6 shadow-2xl space-y-4">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-red-500/10 border border-red-500/30 flex items-center justify-center shrink-0">
+                <svg className="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /></svg>
+              </div>
+              <div>
+                <h4 className="text-white font-bold text-sm">Override Client Feedback?</h4>
+                <p className="text-zinc-500 text-xs mt-0.5">This bypasses client feedback. Are you sure?</p>
+              </div>
+            </div>
+            <div className="flex gap-3 pt-1">
+              <button
+                onClick={handleOverrideApprove}
+                disabled={saving}
+                className="flex-1 px-4 py-2.5 bg-red-500 hover:bg-red-600 disabled:opacity-50 text-white font-bold text-sm rounded-xl transition-all"
+              >
+                {saving ? "Approving..." : "Yes, Approve"}
+              </button>
+              <button
+                onClick={() => setOverrideModal(false)}
+                className="flex-1 px-4 py-2.5 bg-[#003434] hover:bg-[#004444] text-zinc-300 font-medium text-sm rounded-xl transition-all"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
