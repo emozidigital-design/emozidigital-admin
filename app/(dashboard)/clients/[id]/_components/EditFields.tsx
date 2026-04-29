@@ -4,6 +4,21 @@
 import { useState, useRef, useEffect } from "react"
 import { useClientUpdate } from "@/lib/useClientUpdate"
 
+export type Opt = { value: string; label: string }
+
+// Normalize either string[] or Opt[] into a uniform Opt[]
+function normalizeOpts(options: string[] | Opt[]): Opt[] {
+  if (options.length === 0) return []
+  if (typeof options[0] === "string") {
+    return (options as string[]).map(o => ({ value: o, label: o }))
+  }
+  return options as Opt[]
+}
+
+function labelFor(value: string, opts: Opt[]): string {
+  return opts.find(o => o.value === value)?.label ?? value
+}
+
 export function SaveIndicator({ saving, saved, error }: { saving: boolean; saved: boolean; error: boolean }) {
   if (saving) return <span className="text-zinc-500 text-[10px] animate-pulse whitespace-nowrap">Saving…</span>
   if (saved) return <span className="text-[#70BF4B] font-bold text-xs whitespace-nowrap">✓</span>
@@ -76,9 +91,11 @@ export function EField({
 export function ESelect({
   clientId, label, value, field, section, options, onCustomSave,
 }: {
-  clientId: string; label: string; value: string; field: string; section?: string; options: string[];
+  clientId: string; label: string; value: string; field: string; section?: string;
+  options: string[] | Opt[];
   onCustomSave?: (v: string, u: any) => void;
 }) {
+  const opts = normalizeOpts(options)
   const [isEditing, setIsEditing] = useState(false)
   const [local, setLocal] = useState(value)
   const { update, saving, saved, error } = useClientUpdate(clientId)
@@ -102,11 +119,11 @@ export function ESelect({
           <select autoFocus value={local} onChange={e => handleSave(e.target.value)} onBlur={() => setIsEditing(false)}
             className="w-full bg-[#001f1f] text-white text-sm outline-none border border-[#70BF4B]/50 rounded-lg px-2 py-1">
             <option value="">Select…</option>
-            {options.map(o => <option key={o} value={o}>{o}</option>)}
+            {opts.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
           </select>
         ) : (
           <div onClick={() => setIsEditing(true)} className="w-full text-sm text-zinc-200 cursor-pointer hover:bg-white/5 rounded-lg px-2 py-1 -ml-2 transition-colors min-h-[30px] flex items-center">
-            {local || <span className="text-zinc-600 italic text-xs">Click to select</span>}
+            {local ? labelFor(local, opts) : <span className="text-zinc-600 italic text-xs">Click to select</span>}
           </div>
         )}
       </dd>
@@ -173,8 +190,10 @@ export function ETagList({ label, value }: { label: string; value: string[] | st
 export function EMultiSelect({
   clientId, label, value, field, section, options,
 }: {
-  clientId: string; label: string; value: string[] | string; field: string; section?: string; options: string[];
+  clientId: string; label: string; value: string[] | string; field: string; section?: string;
+  options: string[] | Opt[];
 }) {
+  const opts = normalizeOpts(options)
   const [isEditing, setIsEditing] = useState(false)
   const currentTags = Array.isArray(value) ? value : (typeof value === "string" && value ? value.split(",").map(t => t.trim()) : [])
   const { update, saving, saved, error } = useClientUpdate(clientId)
@@ -183,7 +202,7 @@ export function EMultiSelect({
     const newTags = currentTags.includes(tag)
       ? currentTags.filter(t => t !== tag)
       : [...currentTags, tag]
-    
+
     if (section) update(section, { [field]: newTags })
     else update(field, newTags)
   }
@@ -195,35 +214,142 @@ export function EMultiSelect({
         <div className="flex flex-wrap gap-1.5 min-h-[30px] items-center">
           {currentTags.map((t, i) => (
             <span key={i} className="inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium border bg-[#70BF4B]/10 text-[#70BF4B] border-[#70BF4B]/30">
-              {t}
+              {labelFor(t, opts)}
             </span>
           ))}
-          <button 
+          <button
             onClick={() => setIsEditing(!isEditing)}
             className="text-[10px] font-bold uppercase tracking-wider text-zinc-500 hover:text-white transition-colors px-2 py-0.5 rounded border border-dashed border-zinc-700"
           >
             {isEditing ? "Close" : "+ Edit Tags"}
           </button>
         </div>
-        
+
         {isEditing && (
           <div className="mt-3 p-3 bg-[#001f1f] border border-[#003434] rounded-xl flex flex-wrap gap-2 animate-in fade-in slide-in-from-top-2 duration-200">
-            {options.map(o => {
-              const active = currentTags.includes(o)
+            {opts.map(o => {
+              const active = currentTags.includes(o.value)
               return (
                 <button
-                  key={o}
-                  onClick={() => toggleTag(o)}
+                  key={o.value}
+                  onClick={() => toggleTag(o.value)}
                   className={`px-3 py-1 rounded-lg text-xs transition-all ${
-                    active 
-                      ? "bg-[#70BF4B] text-[#001a1a] font-semibold shadow-lg shadow-[#70BF4B]/20" 
+                    active
+                      ? "bg-[#70BF4B] text-[#001a1a] font-semibold shadow-lg shadow-[#70BF4B]/20"
                       : "bg-[#003434] text-zinc-400 border border-transparent hover:border-zinc-700"
                   }`}
                 >
-                  {o}
+                  {o.label}
                 </button>
               )
             })}
+          </div>
+        )}
+      </dd>
+      <div className="absolute right-0 top-3"><SaveIndicator saving={saving} saved={saved} error={error} /></div>
+    </div>
+  )
+}
+
+export function ESlider({
+  clientId, label, value, field, section, min = 1, max = 10, leftLabel, rightLabel,
+}: {
+  clientId: string; label: string; value: number | string; field: string; section?: string;
+  min?: number; max?: number; leftLabel?: string; rightLabel?: string;
+}) {
+  const initial = typeof value === "number" ? value : (parseInt(String(value)) || 5)
+  const [local, setLocal] = useState<number>(initial)
+  const { update, saving, saved, error } = useClientUpdate(clientId)
+
+  useEffect(() => setLocal(initial), [initial])
+
+  function commit(v: number) {
+    if (v === initial) return
+    if (section) update(section, { [field]: v })
+    else update(field, v)
+  }
+
+  return (
+    <div className="flex flex-col gap-1.5 py-3 border-b border-[#003434] last:border-0 relative">
+      <dt className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500">{label}</dt>
+      <dd className="flex-1 min-w-0 pr-6">
+        <div className="flex items-center justify-between text-[10px] text-zinc-500 mb-1">
+          <span>{leftLabel ?? `${min}`}</span>
+          <span className="text-[#70BF4B] font-semibold tabular-nums">{local}/{max}</span>
+          <span>{rightLabel ?? `${max}`}</span>
+        </div>
+        <input
+          type="range"
+          min={min}
+          max={max}
+          value={local}
+          onChange={e => setLocal(Number(e.target.value))}
+          onMouseUp={() => commit(local)}
+          onTouchEnd={() => commit(local)}
+          onKeyUp={() => commit(local)}
+          className="w-full accent-[#70BF4B]"
+        />
+      </dd>
+      <div className="absolute right-0 top-3"><SaveIndicator saving={saving} saved={saved} error={error} /></div>
+    </div>
+  )
+}
+
+export function EUrlPreview({
+  clientId, label, value, field, section,
+}: {
+  clientId: string; label: string; value: string; field: string; section?: string;
+}) {
+  const [isEditing, setIsEditing] = useState(false)
+  const [local, setLocal] = useState(value)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const { update, saving, saved, error } = useClientUpdate(clientId)
+
+  useEffect(() => setLocal(value), [value])
+  useEffect(() => { if (isEditing) inputRef.current?.focus() }, [isEditing])
+
+  function handleSave() {
+    setIsEditing(false)
+    if (String(local) !== String(value)) {
+      if (section) update(section, { [field]: local })
+      else update(field, local)
+    }
+  }
+
+  return (
+    <div className="flex flex-col sm:flex-row gap-1.5 py-3 border-b border-[#003434] last:border-0 relative">
+      <dt className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500 sm:w-40 shrink-0 pt-0.5 mt-[2px]">{label}</dt>
+      <dd className="flex-1 min-w-0 pr-6">
+        {isEditing ? (
+          <input
+            ref={inputRef}
+            type="url"
+            value={local}
+            onChange={e => setLocal(e.target.value)}
+            onBlur={handleSave}
+            onKeyDown={e => { if (e.key === "Enter") handleSave(); if (e.key === "Escape") { setLocal(value); setIsEditing(false) } }}
+            className="w-full bg-[#001f1f] text-white text-sm outline-none border border-[#70BF4B]/50 rounded-lg px-2 py-1"
+            placeholder="https://…"
+          />
+        ) : (
+          <div className="flex items-center gap-2 min-h-[30px]">
+            {local ? (
+              <>
+                <a href={local} target="_blank" rel="noopener noreferrer"
+                   className="text-sm text-[#70BF4B] hover:underline truncate max-w-[260px]">
+                  {local}
+                </a>
+                <button onClick={() => setIsEditing(true)}
+                        className="text-[10px] uppercase tracking-wider text-zinc-500 hover:text-white border border-dashed border-zinc-700 rounded px-1.5 py-0.5">
+                  Edit
+                </button>
+              </>
+            ) : (
+              <div onClick={() => setIsEditing(true)}
+                   className="text-sm text-zinc-600 italic cursor-text hover:text-zinc-300">
+                Click to add URL
+              </div>
+            )}
           </div>
         )}
       </dd>
