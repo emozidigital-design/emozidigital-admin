@@ -26,6 +26,9 @@ type Entry = {
   media_url?: string
   notes?: string
   client_feedback?: string
+  submitted_by?: string        // name of person who left feedback
+  submitted_at?: string        // ISO timestamp of feedback submission
+  feedback_role?: string       // e.g. "Owner", "Manager", "Client"
   revision_count?: number
   revision_history?: RevisionHistoryItem[]
   clients?: { legal_name: string }
@@ -519,9 +522,8 @@ function PostModal({ entry, clients, onClose, onSave }: { entry: Partial<Entry> 
   )
 }
 
-const N8N_REEVALUATE_URL = process.env.NEXT_PUBLIC_N8N_WEBHOOK_BASE
-  ? `${process.env.NEXT_PUBLIC_N8N_WEBHOOK_BASE}/webhook/reevaluate`
-  : "/api/content-calendar/reevaluate"
+// Always route through the server-side proxy so the n8n URL stays secret
+const N8N_REEVALUATE_URL = "/api/content-calendar/reevaluate"
 
 function ReviewPanel({ entry, onClose, onSaved, onUpdate }: {
   entry: Entry
@@ -684,20 +686,50 @@ function ReviewPanel({ entry, onClose, onSaved, onUpdate }: {
         {/* 2. Client feedback */}
         <div className="space-y-3">
           <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Client Feedback</p>
-          <div className={`border rounded-xl p-4 space-y-2.5 ${entry.status === 'rejected' ? 'bg-red-500/5 border-red-500/25' : 'bg-orange-500/5 border-orange-500/25'}`}>
+          <div className={`border rounded-xl p-4 space-y-3 ${entry.status === 'rejected' ? 'bg-red-500/5 border-red-500/25' : 'bg-orange-500/5 border-orange-500/25'}`}>
+            {/* Comment */}
             <p className={`text-sm leading-relaxed ${entry.status === 'rejected' ? 'text-red-300' : 'text-orange-300'}`}>
               {entry.client_feedback || "No feedback provided."}
             </p>
-            <div className="flex items-center justify-between pt-1 border-t border-white/5">
-              <div className="flex items-center gap-2">
-                <span className="text-zinc-500 text-[10px]">Client</span>
-                <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold border ${entry.status === 'rejected' ? 'bg-red-500/20 text-red-400 border-red-500/30' : 'bg-orange-500/20 text-orange-400 border-orange-500/30'}`}>
-                  {entry.status === 'rejected' ? 'Rejected' : 'Changes Requested'}
+
+            {/* Submitted by row */}
+            <div className="flex items-center gap-2 pt-1 border-t border-white/5">
+              <div className="w-6 h-6 rounded-full bg-[#003434] border border-[#004444] flex items-center justify-center shrink-0">
+                <span className="text-[9px] font-bold text-zinc-400">
+                  {(entry.submitted_by ?? entry.clients?.legal_name ?? '?')[0]?.toUpperCase()}
                 </span>
               </div>
-              <div className="text-zinc-600 text-[10px] font-mono">
-                Round {Math.min(revisionCount + 1, 3)} of 3
+              <div className="flex-1 min-w-0">
+                <p className="text-zinc-300 text-xs font-medium truncate">
+                  {entry.submitted_by ?? entry.clients?.legal_name ?? 'Client'}
+                </p>
+                {entry.submitted_at && (
+                  <p className="text-zinc-600 text-[10px] font-mono">
+                    {new Date(entry.submitted_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}
+                  </p>
+                )}
               </div>
+              <div className="flex items-center gap-1.5 shrink-0">
+                {entry.feedback_role && (
+                  <span className="text-[10px] px-2 py-0.5 rounded-full font-bold border bg-zinc-700/40 text-zinc-400 border-zinc-600/40">
+                    {entry.feedback_role}
+                  </span>
+                )}
+                <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold border ${
+                  entry.status === 'rejected'
+                    ? 'bg-red-500/20 text-red-400 border-red-500/30'
+                    : 'bg-orange-500/20 text-orange-400 border-orange-500/30'
+                }`}>
+                  {entry.status === 'rejected' ? 'Rejected' : 'Changes Req.'}
+                </span>
+              </div>
+            </div>
+
+            {/* Revision round */}
+            <div className="flex justify-end">
+              <span className="text-zinc-600 text-[10px] font-mono">
+                Revision round {Math.min(revisionCount + 1, 3)} of 3
+              </span>
             </div>
           </div>
         </div>

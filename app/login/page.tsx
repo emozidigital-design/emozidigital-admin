@@ -3,6 +3,7 @@
 import { useState } from "react"
 import { signIn } from "next-auth/react"
 import { useRouter } from "next/navigation"
+import Image from "next/image"
 
 export default function LoginPage() {
   const router = useRouter()
@@ -36,8 +37,8 @@ export default function LoginPage() {
     <div className="min-h-screen bg-[#0d0d0d] flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-600 to-violet-500 mb-4 shadow-lg shadow-purple-500/25">
-            <span className="text-white font-bold text-2xl">E</span>
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-4 overflow-hidden bg-[#003434] shadow-lg shadow-[#003434]/40">
+            <Image src="/Emozi.png" alt="Emozi Digital" width={64} height={64} priority />
           </div>
           <h1 className="text-white text-2xl font-bold tracking-tight">Emozi Digital</h1>
           <p className="text-zinc-400 text-sm mt-1">Admin Panel</p>

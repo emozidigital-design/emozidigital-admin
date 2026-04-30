@@ -2,6 +2,20 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Emozi Digital Ecosystem Context
+This workspace is part of the Emozi Digital platform, which spans across three main projects. Keep this architecture in mind during interactions:
+- `emozidigital`: Next.js 14 marketing website & client onboarding (multi-step form).
+- `emozidigital-admin`: Next.js 14 admin dashboard for lead management, scheduling, and email automation. (You are here)
+- `Graphify`: Vite/React app for visual documentation & architecture graphs (Mermaid.js).
+
+## General AI Instructions & Coding Standards
+- **Tooling**: Always use built-in specific tools (e.g., `view_file`, `grep_search`, `write_to_file`) over generic bash equivalents.
+- **Context Awareness**: Before introducing new components or dependencies, check if a suitable pattern or UI primitive already exists in the project.
+- **Documentation**: Preserve all existing comments and docstrings unless instructed otherwise. Limit code changes strictly to the user's request.
+- **Styling**: Prioritize high-end aesthetics (deep teal, lime green), use Tailwind CSS utility classes.
+
+---
+
 ## Commands
 
 ```bash
@@ -77,6 +91,4 @@ NEXTAUTH_SECRET
 NEXTAUTH_URL
 ADMIN_EMAIL
 ADMIN_PASSWORD_HASH
-RAZORPAY_KEY_ID
-RAZORPAY_KEY_SECRET
 ```
