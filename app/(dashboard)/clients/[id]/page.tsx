@@ -826,7 +826,7 @@ function AuthorizedUsersCard({ clientId }: { clientId: string }) {
     setBusy(true); setFeedback(null)
     try {
       await sendInvite({ email: email.trim(), full_name: fullName.trim() || undefined, role })
-      setEmail(""); setFullName(""); setRole('member')
+      setEmail(""); setFullName(""); setRole('editor')
       setFeedback({ kind: 'ok', msg: 'Invite sent' })
       mutate()
     } catch (err) {
