@@ -660,7 +660,95 @@ function SocialTab({ client }: { client: SupabaseClient }) {
 // ─── Tab 4: Onboarding Progress ───────────────────────────────────────────────
 
 function OnboardingTab({ client }: { client: SupabaseClient }) {
-  return <OnboardingViewer client={client as any} />
+  function handleExportCsv() {
+    const onboardingData = {
+      section_a: client.section_a,
+      section_b: client.section_b,
+      section_c: client.section_c,
+      section_d: client.section_d,
+      section_e: client.section_e,
+      section_f: client.section_f,
+      section_g: client.section_g,
+      section_h: client.section_h,
+      section_i: client.section_i,
+      section_j: client.section_j,
+      section_k: client.section_k,
+    };
+
+    const row: Record<string, string> = {
+      client_id: client.id,
+      client_email: client.email,
+    };
+
+    for (const [section, data] of Object.entries(onboardingData)) {
+      if (data && typeof data === 'object') {
+        for (const [k, v] of Object.entries(data)) {
+          if (typeof v === 'object') row[`${section}_${k}`] = JSON.stringify(v);
+          else row[`${section}_${k}`] = String(v ?? '');
+        }
+      }
+    }
+
+    const cleanName = (client.legal_name || client.email || client.id).replace(/[^a-z0-9]/gi, '_').toLowerCase();
+    const filename = `onboarding_${cleanName}_${todayStr()}.csv`;
+    exportToCSV([row], filename);
+  }
+
+  function handleExportJson() {
+    const onboardingData = {
+      client_info: {
+        id: client.id,
+        email: client.email,
+        legal_name: client.legal_name,
+      },
+      section_a: client.section_a,
+      section_b: client.section_b,
+      section_c: client.section_c,
+      section_d: client.section_d,
+      section_e: client.section_e,
+      section_f: client.section_f,
+      section_g: client.section_g,
+      section_h: client.section_h,
+      section_i: client.section_i,
+      section_j: client.section_j,
+      section_k: client.section_k,
+    };
+
+    const blob = new Blob([JSON.stringify(onboardingData, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    const cleanName = (client.legal_name || client.email || client.id).replace(/[^a-z0-9]/gi, '_').toLowerCase();
+    a.download = `onboarding_${cleanName}_${todayStr()}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex justify-end gap-2">
+        <button
+          onClick={handleExportCsv}
+          className="flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-xl border border-[#003434] bg-[#001a1a] text-zinc-400 hover:text-white hover:border-[#70BF4B]/40 transition-all shadow-sm"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+          </svg>
+          Export CSV (Team)
+        </button>
+        <button
+          onClick={handleExportJson}
+          className="flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-xl border border-[#003434] bg-[#001a1a] text-zinc-400 hover:text-white hover:border-[#70BF4B]/40 transition-all shadow-sm"
+        >
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+          </svg>
+          Export JSON (AI)
+        </button>
+      </div>
+      <OnboardingViewer client={client as any} />
+    </div>
+  )
 }
 
 // ─── Tab 5: Content Calendar ──────────────────────────────────────────────────
