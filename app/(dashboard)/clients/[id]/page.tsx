@@ -2004,6 +2004,10 @@ const TABS = [
 
 export default function ClientDetailPage({ params }: { params: { id: string } }) {
   const [activeTab, setActiveTab] = useState(0)
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [deleteConfirmText, setDeleteConfirmText] = useState('')
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
   const { data, isLoading, error, mutate } = useSWR<ApiResponse>(`/api/clients/${params.id}`, fetcher)
 
   if (isLoading) {
@@ -2036,11 +2040,6 @@ export default function ClientDetailPage({ params }: { params: { id: string } })
 
   const { client, contentCalendar } = data
   const mrr = client.section_m?.monthly_value
-
-  const [showDeleteModal, setShowDeleteModal] = useState(false)
-  const [deleteConfirmText, setDeleteConfirmText] = useState('')
-  const [deleting, setDeleting] = useState(false)
-  const [deleteError, setDeleteError] = useState('')
   const clientLabel = client.legal_name || client.email || client.id
 
   async function handleDeleteClient() {
