@@ -153,3 +153,36 @@ export async function PATCH(
     return NextResponse.json({ success: false, error: String(e) }, { status: 500 })
   }
 }
+
+export async function DELETE(
+  _req: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const id = params.id
+
+    // 1. Get client_user IDs for this client
+    const { data: clientUsers } = await supabase
+      .from('client_users')
+      .select('id')
+      .eq('client_id', id)
+
+    // 2. Delete auth_tokens for those users
+    if (clientUsers && clientUsers.length > 0) {
+      const userIds = clientUsers.map(u => u.id)
+      await supabase.from('auth_tokens').delete().in('user_id', userIds)
+    }
+
+    // 3. Delete rows that don't cascade from clients
+    await supabase.from('content_calendar').delete().eq('client_id', id)
+    await supabase.from('client_users').delete().eq('client_id', id)
+
+    // 4. Delete the client itself
+    const { error } = await supabase.from('clients').delete().eq('id', id)
+    if (error) throw new Error(error.message)
+
+    return NextResponse.json({ success: true })
+  } catch (e) {
+    return NextResponse.json({ success: false, error: e instanceof Error ? e.message : String(e) }, { status: 500 })
+  }
+}

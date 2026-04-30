@@ -2037,6 +2037,26 @@ export default function ClientDetailPage({ params }: { params: { id: string } })
   const { client, contentCalendar } = data
   const mrr = client.section_m?.monthly_value
 
+  const [showDeleteModal, setShowDeleteModal] = useState(false)
+  const [deleteConfirmText, setDeleteConfirmText] = useState('')
+  const [deleting, setDeleting] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
+  const clientLabel = client.legal_name || client.email || client.id
+
+  async function handleDeleteClient() {
+    setDeleting(true)
+    setDeleteError('')
+    try {
+      const res = await fetch(`/api/clients/${client.id}`, { method: 'DELETE' })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json?.error || `Failed (${res.status})`)
+      window.location.href = '/clients'
+    } catch (e) {
+      setDeleteError(e instanceof Error ? e.message : String(e))
+      setDeleting(false)
+    }
+  }
+
   function handleExportCsv() {
     if (!client) return
     const row: Record<string, string> = {
@@ -2080,16 +2100,78 @@ export default function ClientDetailPage({ params }: { params: { id: string } })
           </svg>
           Clients
         </Link>
-        <button
-          onClick={handleExportCsv}
-          className="flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-xl border border-[#003434] bg-[#001a1a] text-zinc-400 hover:text-white hover:border-[#70BF4B]/40 transition-all shadow-sm"
-        >
-          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-          </svg>
-          Export Details
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleExportCsv}
+            className="flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-xl border border-[#003434] bg-[#001a1a] text-zinc-400 hover:text-white hover:border-[#70BF4B]/40 transition-all shadow-sm"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+            </svg>
+            Export Details
+          </button>
+          <button
+            onClick={() => { setShowDeleteModal(true); setDeleteConfirmText(''); setDeleteError('') }}
+            className="flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-xl border border-red-900/50 bg-[#001a1a] text-red-500 hover:text-red-400 hover:border-red-700/60 transition-all shadow-sm"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+            Delete Client
+          </button>
+        </div>
       </div>
+
+      {/* Delete confirmation modal */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm px-4">
+          <div className="bg-[#0d1a1a] border border-red-900/40 rounded-2xl p-6 w-full max-w-md shadow-2xl">
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-10 h-10 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center shrink-0">
+                <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-white font-semibold text-sm">Delete client permanently</h3>
+                <p className="text-zinc-500 text-xs mt-0.5">This will remove all data including content, credentials, and portal access.</p>
+              </div>
+            </div>
+
+            <p className="text-zinc-400 text-xs mb-3">
+              Type <span className="font-mono text-white bg-[#001a1a] px-1.5 py-0.5 rounded border border-[#003434]">{clientLabel}</span> to confirm.
+            </p>
+            <input
+              type="text"
+              value={deleteConfirmText}
+              onChange={e => setDeleteConfirmText(e.target.value)}
+              placeholder={clientLabel}
+              className="w-full bg-[#001a1a] text-white text-sm border border-[#003434] focus:border-red-700/60 outline-none rounded-xl px-3 py-2 mb-4"
+            />
+
+            {deleteError && (
+              <p className="text-red-400 text-xs mb-3">{deleteError}</p>
+            )}
+
+            <div className="flex gap-2 justify-end">
+              <button
+                onClick={() => setShowDeleteModal(false)}
+                disabled={deleting}
+                className="px-4 py-2 text-xs font-medium text-zinc-400 hover:text-white border border-[#003434] rounded-xl transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDeleteClient}
+                disabled={deleteConfirmText !== clientLabel || deleting}
+                className="px-4 py-2 text-xs font-semibold bg-red-600 hover:bg-red-500 disabled:opacity-40 disabled:cursor-not-allowed text-white rounded-xl transition-colors"
+              >
+                {deleting ? 'Deleting…' : 'Delete permanently'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Hero */}
       <div className="bg-[#001f1f] border border-[#003434] rounded-2xl p-6 shadow-sm relative">
