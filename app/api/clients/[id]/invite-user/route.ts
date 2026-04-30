@@ -5,7 +5,7 @@ import { signInviteToken } from '@/lib/invite-token'
 
 export const dynamic = 'force-dynamic'
 
-const VALID_ROLES = ['admin', 'member', 'viewer'] as const
+const VALID_ROLES = ['admin', 'editor', 'viewer'] as const
 type Role = (typeof VALID_ROLES)[number]
 
 const PORTAL_URL = process.env.NEXT_PUBLIC_CLIENT_PORTAL_URL ?? 'https://emozidigital.com'
@@ -36,7 +36,7 @@ export async function POST(
     const body = await req.json()
     const email: string | undefined = body?.email?.toLowerCase?.().trim()
     const fullName: string | undefined = body?.full_name?.trim() || undefined
-    const role: Role = VALID_ROLES.includes(body?.role) ? body.role : 'member'
+    const role: Role = VALID_ROLES.includes(body?.role) ? body.role : 'editor'
 
     if (!email) {
       return NextResponse.json({ error: 'Email is required' }, { status: 400 })
@@ -78,7 +78,7 @@ export async function POST(
           updated_at: new Date().toISOString(),
         })
         .eq('id', userId)
-      if (updErr) throw updErr
+      if (updErr) throw new Error(updErr.message)
     } else {
       const { data: inserted, error: insErr } = await supabase
         .from('client_users')
@@ -91,7 +91,7 @@ export async function POST(
         })
         .select('id')
         .single()
-      if (insErr || !inserted) throw insErr ?? new Error('Failed to insert user')
+      if (insErr || !inserted) throw new Error(insErr?.message ?? 'Failed to insert user')
       userId = inserted.id
     }
 
@@ -104,10 +104,11 @@ export async function POST(
     const { error: tokErr } = await supabase.from('auth_tokens').insert({
       user_id: userId,
       token,
+      token_hash: token,
       type: 'invite',
       expires_at: expiresAt.toISOString(),
     })
-    if (tokErr) throw tokErr
+    if (tokErr) throw new Error(tokErr.message)
 
     const setupLink = `${PORTAL_URL}/client/setup?token=${encodeURIComponent(token)}`
     const greetingName = fullName || 'there'
@@ -142,6 +143,8 @@ export async function POST(
 
     return NextResponse.json({ success: true, userId, expiresAt: expiresAt.toISOString() })
   } catch (e) {
-    return NextResponse.json({ success: false, error: String(e) }, { status: 500 })
+    const msg = e instanceof Error ? e.message : JSON.stringify(e) ?? String(e)
+    console.error('[invite-user] Error:', e)
+    return NextResponse.json({ success: false, error: msg }, { status: 500 })
   }
 }

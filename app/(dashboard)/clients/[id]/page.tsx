@@ -789,7 +789,7 @@ type ClientUser = {
   id: string
   email: string
   full_name: string | null
-  role: 'admin' | 'member' | 'viewer'
+  role: 'admin' | 'editor' | 'viewer'
   status: 'invited' | 'active' | 'suspended'
   password_set_at: string | null
   created_at: string
@@ -804,7 +804,7 @@ function AuthorizedUsersCard({ clientId }: { clientId: string }) {
 
   const [email, setEmail] = useState("")
   const [fullName, setFullName] = useState("")
-  const [role, setRole] = useState<ClientUser['role']>('member')
+  const [role, setRole] = useState<ClientUser['role']>('editor')
   const [busy, setBusy] = useState(false)
   const [feedback, setFeedback] = useState<{ kind: 'ok' | 'err'; msg: string } | null>(null)
   const [resendingId, setResendingId] = useState<string | null>(null)
@@ -933,7 +933,7 @@ function AuthorizedUsersCard({ clientId }: { clientId: string }) {
               value={role} onChange={e => setRole(e.target.value as ClientUser['role'])}
               className="w-full bg-[#001a1a] text-white text-sm border border-[#003434] focus:border-[#70BF4B]/60 outline-none rounded px-2 py-1.5"
             >
-              <option value="member">Member</option>
+              <option value="editor">Editor</option>
               <option value="admin">Admin</option>
               <option value="viewer">Viewer</option>
             </select>
