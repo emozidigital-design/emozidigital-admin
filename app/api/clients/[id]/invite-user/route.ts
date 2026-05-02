@@ -17,9 +17,9 @@ export async function GET(
   try {
     const { data, error } = await supabase
       .from('client_users')
-      .select('id, email, full_name, role, status, password_set_at, created_at')
+      .select('id, email, full_name, role, status, password_set_at, invited_at')
       .eq('client_id', params.id)
-      .order('created_at', { ascending: true })
+      .order('invited_at', { ascending: true })
 
     if (error) throw error
     return NextResponse.json({ users: data ?? [] })

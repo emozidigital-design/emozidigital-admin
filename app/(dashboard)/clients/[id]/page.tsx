@@ -908,6 +908,43 @@ function AuthorizedUsersCard({ clientId }: { clientId: string }) {
     return json
   }
 
+  async function handleUpdate(userId: string, patch: Partial<ClientUser>) {
+    setBusy(true); setFeedback(null)
+    try {
+      const res = await fetch(`/api/clients/${clientId}/invite-user/${userId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json?.error || 'Update failed')
+      mutate()
+      setFeedback({ kind: 'ok', msg: 'User updated' })
+    } catch (err) {
+      setFeedback({ kind: 'err', msg: err instanceof Error ? err.message : String(err) })
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function handleDelete(userId: string) {
+    if (!confirm('Are you sure you want to remove this user? They will lose all portal access immediately.')) return
+    setBusy(true); setFeedback(null)
+    try {
+      const res = await fetch(`/api/clients/${clientId}/invite-user/${userId}`, {
+        method: 'DELETE',
+      })
+      const json = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(json?.error || 'Delete failed')
+      mutate()
+      setFeedback({ kind: 'ok', msg: 'User removed' })
+    } catch (err) {
+      setFeedback({ kind: 'err', msg: err instanceof Error ? err.message : String(err) })
+    } finally {
+      setBusy(false)
+    }
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!email.trim()) return
@@ -938,8 +975,8 @@ function AuthorizedUsersCard({ clientId }: { clientId: string }) {
   }
 
   function statusLabel(u: ClientUser) {
-    if (u.password_set_at) return { text: 'Active', cls: 'bg-[#70BF4B]/15 text-[#70BF4B] border-[#70BF4B]/30' }
     if (u.status === 'suspended') return { text: 'Suspended', cls: 'bg-red-500/15 text-red-400 border-red-500/30' }
+    if (u.password_set_at) return { text: 'Active', cls: 'bg-[#70BF4B]/15 text-[#70BF4B] border-[#70BF4B]/30' }
     return { text: 'Invited', cls: 'bg-amber-500/15 text-amber-300 border-amber-500/30' }
   }
 
@@ -961,8 +998,8 @@ function AuthorizedUsersCard({ clientId }: { clientId: string }) {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-[#003434]">
-                  {["Email", "Name", "Role", "Status", ""].map(h => (
-                    <th key={h} className="text-left text-[10px] font-semibold text-zinc-500 uppercase tracking-widest py-2 pr-3">{h}</th>
+                  {["Email", "Name", "Role", "Status", "Actions"].map(h => (
+                    <th key={h} className={`text-left text-[10px] font-semibold text-zinc-500 uppercase tracking-widest py-2 pr-3 ${h === 'Actions' ? 'text-right' : ''}`}>{h}</th>
                   ))}
                 </tr>
               </thead>
@@ -972,23 +1009,54 @@ function AuthorizedUsersCard({ clientId }: { clientId: string }) {
                   const canResend = !u.password_set_at && u.status !== 'suspended'
                   return (
                     <tr key={u.id}>
-                      <td className="py-2 pr-3 text-white">{u.email}</td>
-                      <td className="py-2 pr-3 text-zinc-300">{u.full_name || <span className="text-zinc-600">—</span>}</td>
-                      <td className="py-2 pr-3 text-zinc-300 capitalize">{u.role}</td>
-                      <td className="py-2 pr-3">
+                      <td className="py-3 pr-3 text-white max-w-[150px] truncate" title={u.email}>{u.email}</td>
+                      <td className="py-3 pr-3 text-zinc-300">{u.full_name || <span className="text-zinc-600">—</span>}</td>
+                      <td className="py-3 pr-3">
+                        <select
+                          value={u.role}
+                          onChange={(e) => handleUpdate(u.id, { role: e.target.value as any })}
+                          disabled={busy}
+                          className="bg-transparent text-zinc-300 capitalize outline-none cursor-pointer hover:text-white"
+                        >
+                          <option value="admin">Admin</option>
+                          <option value="editor">Editor</option>
+                          <option value="viewer">Viewer</option>
+                        </select>
+                      </td>
+                      <td className="py-3 pr-3">
                         <span className={`inline-block text-[10px] font-semibold uppercase tracking-wider px-2 py-0.5 rounded border ${s.cls}`}>{s.text}</span>
                       </td>
-                      <td className="py-2 pr-3 text-right">
-                        {canResend && (
+                      <td className="py-3 pr-3 text-right">
+                        <div className="flex items-center justify-end gap-3">
+                          {canResend && (
+                            <button
+                              type="button"
+                              disabled={resendingId === u.id || busy}
+                              onClick={() => handleResend(u)}
+                              className="text-xs text-[#70BF4B] hover:text-[#D0F255] disabled:opacity-50"
+                            >
+                              {resendingId === u.id ? 'Sending…' : 'Resend'}
+                            </button>
+                          )}
+                          
                           <button
                             type="button"
-                            disabled={resendingId === u.id}
-                            onClick={() => handleResend(u)}
-                            className="text-xs text-[#70BF4B] hover:text-[#D0F255] disabled:opacity-50"
+                            disabled={busy}
+                            onClick={() => handleUpdate(u.id, { status: u.status === 'suspended' ? 'active' : 'suspended' })}
+                            className="text-xs text-zinc-500 hover:text-zinc-300 disabled:opacity-50"
                           >
-                            {resendingId === u.id ? 'Sending…' : 'Resend invite'}
+                            {u.status === 'suspended' ? 'Activate' : 'Suspend'}
                           </button>
-                        )}
+
+                          <button
+                            type="button"
+                            disabled={busy}
+                            onClick={() => handleDelete(u.id)}
+                            className="text-xs text-red-500/70 hover:text-red-400 disabled:opacity-50"
+                          >
+                            Remove
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   )
@@ -1029,7 +1097,7 @@ function AuthorizedUsersCard({ clientId }: { clientId: string }) {
           <button
             type="submit"
             disabled={busy}
-            className="bg-[#70BF4B] hover:bg-[#D0F255] text-[#003434] text-sm font-semibold px-4 py-1.5 rounded disabled:opacity-50"
+            className="bg-[#70BF4B] hover:bg-[#D0F255] text-[#003434] text-sm font-semibold px-4 py-1.5 rounded disabled:opacity-50 h-[34px]"
           >
             {busy ? 'Sending…' : 'Send invite'}
           </button>
