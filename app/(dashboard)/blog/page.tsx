@@ -21,9 +21,9 @@ type BlogPost = {
 }
 
 const STATUS_COLOR: Record<string, string> = {
-  draft: "bg-zinc-700/30 text-zinc-400 border-zinc-600/30",
-  published: "bg-[#70BF4B]/15 text-[#70BF4B] border-[#70BF4B]/30",
-  archived: "bg-red-500/15 text-red-400 border-red-500/30",
+  draft: "bg-zinc-100 text-zinc-600 border-zinc-200",
+  published: "bg-emerald-50 text-emerald-600 border-emerald-100",
+  archived: "bg-red-50 text-red-600 border-red-100",
 }
 
 function Badge({ label, status }: { label: string; status: string }) {
@@ -36,7 +36,7 @@ function Badge({ label, status }: { label: string; status: string }) {
 }
 
 function Skeleton({ className }: { className?: string }) {
-  return <div className={`animate-pulse rounded bg-white/5 ${className}`} />
+  return <div className={`animate-pulse rounded bg-zinc-100 ${className}`} />
 }
 
 export default function BlogPage() {
@@ -86,14 +86,14 @@ export default function BlogPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-white text-2xl font-bold tracking-tight">Blog Management</h1>
+          <h1 className="text-zinc-900 text-2xl font-bold tracking-tight">Blog Management</h1>
           <p className="text-zinc-500 text-sm mt-1">
             {isLoading ? "Loading posts..." : `Manage your content (${posts.length} posts)`}
           </p>
         </div>
         <button
           onClick={() => router.push('/blog/new')}
-          className="flex items-center justify-center gap-2 bg-[#70BF4B] hover:bg-[#5faa3e] text-[#001a1a] font-bold text-sm px-5 py-2.5 rounded-xl transition-all shadow-lg shadow-[#70BF4B]/10 active:scale-95"
+          className="flex items-center justify-center gap-2 bg-[#003434] hover:bg-[#004d4d] text-white font-bold text-sm px-5 py-2.5 rounded-xl transition-all shadow-sm active:scale-95"
         >
           <Plus className="w-4 h-4" />
           New Post
@@ -103,20 +103,20 @@ export default function BlogPage() {
       {/* Filters & Search */}
       <div className="flex flex-col md:flex-row gap-3">
         <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" />
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" />
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by title..."
-            className="w-full bg-[#001f1f] border border-[#003434] focus:border-[#70BF4B]/40 text-white text-sm rounded-xl pl-10 pr-4 py-2.5 outline-none transition-all placeholder-zinc-600"
+            className="w-full bg-white border border-zinc-200 focus:border-[#70BF4B] text-zinc-900 text-sm rounded-xl pl-10 pr-4 py-2.5 outline-none transition-all placeholder-zinc-400"
           />
         </div>
         <div className="flex gap-2">
           <select
             value={clientFilter}
             onChange={(e) => setClientFilter(e.target.value)}
-            className="bg-[#001f1f] border border-[#003434] text-zinc-300 text-sm rounded-xl px-4 py-2.5 outline-none focus:border-[#70BF4B]/40 transition-all appearance-none cursor-pointer min-w-[160px]"
+            className="bg-white border border-zinc-200 text-zinc-700 text-sm rounded-xl px-4 py-2.5 outline-none focus:border-[#70BF4B] transition-all appearance-none cursor-pointer min-w-[160px]"
           >
             <option value="all">All Clients</option>
             <option value="own">Emozi Digital (Own)</option>
@@ -127,7 +127,7 @@ export default function BlogPage() {
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="bg-[#001f1f] border border-[#003434] text-zinc-300 text-sm rounded-xl px-4 py-2.5 outline-none focus:border-[#70BF4B]/40 transition-all appearance-none cursor-pointer min-w-[140px]"
+            className="bg-white border border-zinc-200 text-zinc-700 text-sm rounded-xl px-4 py-2.5 outline-none focus:border-[#70BF4B] transition-all appearance-none cursor-pointer min-w-[140px]"
           >
             <option value="all">All Status</option>
             <option value="draft">Draft</option>
@@ -138,20 +138,20 @@ export default function BlogPage() {
       </div>
 
       {/* Table */}
-      <div className="bg-[#001f1f] border border-[#003434] rounded-2xl overflow-hidden shadow-sm">
+      <div className="bg-white border border-zinc-200 rounded-2xl overflow-hidden shadow-sm">
         <div className="overflow-x-auto">
           <table className="w-full border-collapse">
             <thead>
-              <tr className="border-b border-[#003434] bg-[#001a1a]/50">
-                <th className="text-left text-[11px] font-bold text-zinc-500 uppercase tracking-widest px-6 py-4">Title</th>
-                <th className="text-left text-[11px] font-bold text-zinc-500 uppercase tracking-widest px-6 py-4">Category</th>
-                <th className="text-left text-[11px] font-bold text-zinc-500 uppercase tracking-widest px-6 py-4">Status</th>
-                <th className="text-left text-[11px] font-bold text-zinc-500 uppercase tracking-widest px-6 py-4">Published</th>
-                <th className="text-left text-[11px] font-bold text-zinc-500 uppercase tracking-widest px-6 py-4 text-center">Views</th>
-                <th className="text-right text-[11px] font-bold text-zinc-500 uppercase tracking-widest px-6 py-4">Actions</th>
+              <tr className="border-b border-zinc-100 bg-zinc-50">
+                <th className="text-left text-[11px] font-bold text-zinc-400 uppercase tracking-widest px-6 py-4">Title</th>
+                <th className="text-left text-[11px] font-bold text-zinc-400 uppercase tracking-widest px-6 py-4">Category</th>
+                <th className="text-left text-[11px] font-bold text-zinc-400 uppercase tracking-widest px-6 py-4">Status</th>
+                <th className="text-left text-[11px] font-bold text-zinc-400 uppercase tracking-widest px-6 py-4">Published</th>
+                <th className="text-left text-[11px] font-bold text-zinc-400 uppercase tracking-widest px-6 py-4 text-center">Views</th>
+                <th className="text-right text-[11px] font-bold text-zinc-400 uppercase tracking-widest px-6 py-4">Actions</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#003434]/50">
+            <tbody className="divide-y divide-zinc-100">
               {isLoading ? (
                 [...Array(5)].map((_, i) => (
                   <tr key={i}>
@@ -175,10 +175,10 @@ export default function BlogPage() {
                 </tr>
               ) : (
                 posts.map((post) => (
-                  <tr key={post.id} className="hover:bg-[#003434]/20 transition-colors group">
+                  <tr key={post.id} className="hover:bg-zinc-50 transition-colors group">
                     <td className="px-6 py-5">
                       <div className="flex flex-col">
-                        <span className="text-white font-semibold text-sm line-clamp-1 group-hover:text-[#70BF4B] transition-colors">
+                        <span className="text-zinc-900 font-semibold text-sm line-clamp-1 group-hover:text-[#003434] transition-colors">
                           {post.title}
                         </span>
                         <span className="text-zinc-500 text-[11px] mt-0.5 font-mono">
@@ -187,7 +187,7 @@ export default function BlogPage() {
                       </div>
                     </td>
                     <td className="px-6 py-5">
-                      <span className="text-zinc-300 text-xs px-2.5 py-1 rounded-md bg-zinc-800/50 border border-zinc-700/30">
+                      <span className="text-zinc-600 text-xs px-2.5 py-1 rounded-md bg-zinc-100 border border-zinc-200">
                         {post.category || "Uncategorized"}
                       </span>
                     </td>
@@ -198,7 +198,7 @@ export default function BlogPage() {
                       {post.published_at ? format(new Date(post.published_at), 'MMM d, yyyy') : '—'}
                     </td>
                     <td className="px-6 py-5 text-center">
-                      <span className="text-zinc-300 text-xs font-mono">
+                      <span className="text-zinc-500 text-xs font-mono">
                         {post.views?.toLocaleString() || 0}
                       </span>
                     </td>
@@ -206,7 +206,7 @@ export default function BlogPage() {
                       <div className="flex items-center justify-end gap-2">
                         <button
                           onClick={() => router.push(`/blog/${post.id}`)}
-                          className="p-2 text-zinc-400 hover:text-white hover:bg-zinc-800 rounded-lg transition-all"
+                          className="p-2 text-zinc-400 hover:text-zinc-900 hover:bg-zinc-100 rounded-lg transition-all"
                           title="Edit"
                         >
                           <Edit2 className="w-4 h-4" />

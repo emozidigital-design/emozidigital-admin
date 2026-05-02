@@ -48,13 +48,13 @@ const PLATFORM_COLORS: Record<string, string> = {
 }
 
 const STATUS_COLORS: Record<string, string> = {
-  idea: "bg-zinc-500/20 text-zinc-400 border-zinc-500/30",
-  writing: "bg-yellow-500/20 text-yellow-400 border-yellow-500/30",
-  designed: "bg-blue-500/20 text-blue-400 border-blue-500/30",
-  approved: "bg-green-500/20 text-green-400 border-green-500/30",
-  posted: "bg-teal-500/20 text-teal-400 border-teal-500/30",
-  changes_requested: "bg-orange-500/20 text-orange-400 border-orange-500/30",
-  rejected: "bg-red-500/20 text-red-400 border-red-500/30",
+  idea: "bg-zinc-100 text-zinc-600 border-zinc-200",
+  writing: "bg-amber-50 text-amber-600 border-amber-100",
+  designed: "bg-blue-50 text-blue-600 border-blue-100",
+  approved: "bg-emerald-50 text-emerald-600 border-emerald-100",
+  posted: "bg-teal-50 text-teal-600 border-teal-100",
+  changes_requested: "bg-orange-50 text-orange-600 border-orange-100",
+  rejected: "bg-red-50 text-red-600 border-red-100",
 }
 
 const NEEDS_REVIEW = (status: string) => status === "changes_requested" || status === "rejected"
@@ -126,27 +126,27 @@ export default function ContentPage() {
       {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-white text-2xl font-bold tracking-tight">Content Calendar</h1>
+          <h1 className="text-zinc-900 text-2xl font-bold tracking-tight">Content Calendar</h1>
           <p className="text-zinc-500 text-sm mt-1">Manage cross-platform content strategy</p>
         </div>
         <div className="flex items-center gap-3">
-          <div className="flex bg-[#001f1f] border border-[#003434] rounded-xl p-1">
+          <div className="flex bg-zinc-100 border border-zinc-200 rounded-xl p-1">
             <button
               onClick={() => setView("table")}
-              className={`px-4 py-1.5 rounded-lg text-xs font-medium transition-all ${view === "table" ? "bg-[#003434] text-[#D0F255] shadow-sm" : "text-zinc-500 hover:text-zinc-300"}`}
+              className={`px-4 py-1.5 rounded-lg text-xs font-medium transition-all ${view === "table" ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-500 hover:text-zinc-700"}`}
             >
               Table
             </button>
             <button
               onClick={() => setView("calendar")}
-              className={`px-4 py-1.5 rounded-lg text-xs font-medium transition-all ${view === "calendar" ? "bg-[#003434] text-[#D0F255] shadow-sm" : "text-zinc-500 hover:text-zinc-300"}`}
+              className={`px-4 py-1.5 rounded-lg text-xs font-medium transition-all ${view === "calendar" ? "bg-white text-zinc-900 shadow-sm" : "text-zinc-500 hover:text-zinc-700"}`}
             >
               Calendar
             </button>
           </div>
           <button
             onClick={() => { setEditingEntry(null); setIsModalOpen(true); }}
-            className="flex items-center gap-2 px-4 py-2 bg-[#70BF4B] hover:bg-[#5faa3e] text-[#001a1a] font-semibold text-sm rounded-xl transition-all shadow-lg shadow-[#70BF4B]/10"
+            className="flex items-center gap-2 px-4 py-2 bg-[#003434] hover:bg-[#004d4d] text-white font-semibold text-sm rounded-xl transition-all shadow-sm"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
             New Post
@@ -155,21 +155,21 @@ export default function ContentPage() {
       </div>
 
       {/* Filter Bar */}
-      <div className="bg-[#001f1f] border border-[#003434] rounded-2xl p-4 flex flex-wrap items-center gap-4">
+      <div className="bg-white border border-zinc-200 rounded-2xl p-4 flex flex-wrap items-center gap-4 shadow-sm">
         <div className="relative flex-1 min-w-[200px]">
-          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
           <input
             type="text"
             placeholder="Search posts or clients..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="w-full bg-[#001414] border border-[#003434] rounded-xl pl-10 pr-4 py-2 text-sm text-white placeholder-zinc-600 outline-none focus:border-[#70BF4B]/30 transition-all"
+            className="w-full bg-white border border-zinc-200 rounded-xl pl-10 pr-4 py-2 text-sm text-zinc-900 placeholder-zinc-400 outline-none focus:border-[#70BF4B] transition-all"
           />
         </div>
         <select
           value={clientFilter}
           onChange={(e) => setClientFilter(e.target.value)}
-          className="bg-[#001414] border border-[#003434] text-zinc-300 text-sm rounded-xl px-3 py-2 outline-none focus:border-[#70BF4B]/30"
+          className="bg-white border border-zinc-200 text-zinc-700 text-sm rounded-xl px-3 py-2 outline-none focus:border-[#70BF4B]"
         >
           <option value="all">All Clients</option>
           {clients.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -177,7 +177,7 @@ export default function ContentPage() {
         <select
           value={platformFilter}
           onChange={(e) => setPlatformFilter(e.target.value)}
-          className="bg-[#001414] border border-[#003434] text-zinc-300 text-sm rounded-xl px-3 py-2 outline-none focus:border-[#70BF4B]/30"
+          className="bg-white border border-zinc-200 text-zinc-700 text-sm rounded-xl px-3 py-2 outline-none focus:border-[#70BF4B]"
         >
           <option value="all">All Platforms</option>
           {PLATFORMS.map(p => <option key={p} value={p}>{p}</option>)}
@@ -185,7 +185,7 @@ export default function ContentPage() {
         <select
           value={statusFilter}
           onChange={(e) => setStatusFilter(e.target.value)}
-          className="bg-[#001414] border border-[#003434] text-zinc-300 text-sm rounded-xl px-3 py-2 outline-none focus:border-[#70BF4B]/30"
+          className="bg-white border border-zinc-200 text-zinc-700 text-sm rounded-xl px-3 py-2 outline-none focus:border-[#70BF4B]"
         >
           <option value="all">All Statuses</option>
           {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}</option>)}
@@ -241,17 +241,17 @@ export default function ContentPage() {
 
 function TableView({ entries, onEdit, onDelete, onMarkPosted, onRowClick }: { entries: Entry[], onEdit: (e: Entry) => void, onDelete: (id: string) => void, onMarkPosted: (e: Entry) => void, onRowClick: (e: Entry) => void }) {
   return (
-    <div className="bg-[#001f1f] border border-[#003434] rounded-2xl overflow-hidden shadow-sm">
+    <div className="bg-white border border-zinc-200 rounded-2xl overflow-hidden shadow-sm">
       <div className="overflow-x-auto">
         <table className="w-full text-left border-collapse">
           <thead>
-            <tr className="border-b border-[#003434] bg-[#001a1a]/50">
+            <tr className="border-b border-zinc-100 bg-zinc-50">
               {["Title", "Client", "Type", "Platforms", "Status", "Scheduled", "Actions"].map(h => (
-                <th key={h} className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-zinc-500">{h}</th>
+                <th key={h} className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-zinc-400">{h}</th>
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-[#003434]/50">
+          <tbody className="divide-y divide-zinc-100">
             {entries.length === 0 ? (
               <tr>
                 <td colSpan={7} className="px-6 py-12 text-center text-zinc-600 text-sm italic">No posts found matching filters.</td>
@@ -259,24 +259,24 @@ function TableView({ entries, onEdit, onDelete, onMarkPosted, onRowClick }: { en
             ) : entries.map(e => {
               const needsReview = NEEDS_REVIEW(e.status)
               return (
-                <tr
-                  key={e.id}
-                  onClick={() => needsReview && onRowClick(e)}
-                  className={`transition-colors group ${needsReview ? 'cursor-pointer hover:bg-orange-500/5 border-l-2 border-l-orange-500/50' : 'hover:bg-[#003434]/30'}`}
-                >
-                  <td className="px-6 py-4">
-                    <div className="flex items-center gap-2">
-                      {needsReview && (
-                        <span className="w-1.5 h-1.5 rounded-full bg-orange-400 shrink-0 animate-pulse" />
-                      )}
-                      <p className="text-white text-sm font-semibold truncate max-w-[200px]">{e.title}</p>
-                    </div>
-                  </td>
+                  <tr
+                    key={e.id}
+                    onClick={() => needsReview && onRowClick(e)}
+                    className={`transition-colors group ${needsReview ? 'cursor-pointer hover:bg-orange-50 border-l-2 border-l-orange-500' : 'hover:bg-zinc-50'}`}
+                  >
+                    <td className="px-6 py-4">
+                      <div className="flex items-center gap-2">
+                        {needsReview && (
+                          <span className="w-1.5 h-1.5 rounded-full bg-orange-400 shrink-0 animate-pulse" />
+                        )}
+                        <p className="text-zinc-900 text-sm font-semibold truncate max-w-[200px]">{e.title}</p>
+                      </div>
+                    </td>
                   <td className="px-6 py-4">
                     <p className="text-zinc-400 text-xs">{e.clients?.legal_name || "—"}</p>
                   </td>
                   <td className="px-6 py-4">
-                    <span className="text-[10px] px-2 py-0.5 rounded-md bg-[#003434] text-zinc-500 uppercase font-bold">{e.content_type}</span>
+                    <span className="text-[10px] px-2 py-0.5 rounded-md bg-zinc-100 text-zinc-500 uppercase font-bold">{e.content_type}</span>
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex flex-wrap gap-1 max-w-[120px]">
@@ -291,7 +291,7 @@ function TableView({ entries, onEdit, onDelete, onMarkPosted, onRowClick }: { en
                     </span>
                   </td>
                   <td className="px-6 py-4">
-                    <p className="text-zinc-500 text-xs font-mono">{e.scheduled_date || "—"}</p>
+                    <p className="text-zinc-400 text-xs font-mono">{e.scheduled_date || "—"}</p>
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity" onClick={ev => ev.stopPropagation()}>
@@ -321,17 +321,17 @@ function CalendarView({ entries, currentMonth, onPrev, onNext, onDateClick, onEd
   const days = eachDayOfInterval({ start: calendarStart, end: calendarEnd })
 
   return (
-    <div className="bg-[#001f1f] border border-[#003434] rounded-2xl overflow-hidden shadow-sm flex flex-col h-[700px]">
-      <div className="px-6 py-4 border-b border-[#003434] flex items-center justify-between bg-[#001a1a]/50">
-        <h2 className="text-white font-bold text-lg">{format(currentMonth, "MMMM yyyy")}</h2>
+    <div className="bg-white border border-zinc-200 rounded-2xl overflow-hidden shadow-sm flex flex-col h-[700px]">
+      <div className="px-6 py-4 border-b border-zinc-100 flex items-center justify-between bg-zinc-50">
+        <h2 className="text-zinc-900 font-bold text-lg">{format(currentMonth, "MMMM yyyy")}</h2>
         <div className="flex gap-2">
-          <button onClick={onPrev} className="p-2 text-zinc-500 hover:text-white bg-[#003434] rounded-lg transition-colors"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg></button>
-          <button onClick={onNext} className="p-2 text-zinc-500 hover:text-white bg-[#003434] rounded-lg transition-colors"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg></button>
+          <button onClick={onPrev} className="p-2 text-zinc-400 hover:text-zinc-900 bg-white border border-zinc-200 rounded-lg transition-colors"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg></button>
+          <button onClick={onNext} className="p-2 text-zinc-400 hover:text-zinc-900 bg-white border border-zinc-200 rounded-lg transition-colors"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg></button>
         </div>
       </div>
-      <div className="grid grid-cols-7 border-b border-[#003434] bg-[#001a1a]/30">
+      <div className="grid grid-cols-7 border-b border-zinc-100 bg-zinc-50/50">
         {["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].map(d => (
-          <div key={d} className="px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-zinc-500 text-center border-r border-[#003434] last:border-0">{d}</div>
+          <div key={d} className="px-4 py-2 text-[10px] font-bold uppercase tracking-widest text-zinc-400 text-center border-r border-zinc-100 last:border-0">{d}</div>
         ))}
       </div>
       <div className="flex-1 grid grid-cols-7 grid-rows-5 sm:grid-rows-6">
@@ -344,11 +344,11 @@ function CalendarView({ entries, currentMonth, onPrev, onNext, onDateClick, onEd
             <div
               key={i}
               onClick={() => onDateClick(day)}
-              className={`min-h-[100px] border-r border-b border-[#003434] p-2 transition-colors cursor-pointer hover:bg-[#70BF4B]/5 ${!isCurrentMonth ? 'opacity-25' : ''} ${isToday ? 'bg-[#70BF4B]/5' : ''}`}
+              className={`min-h-[100px] border-r border-b border-zinc-100 p-2 transition-colors cursor-pointer hover:bg-zinc-50 ${!isCurrentMonth ? 'bg-zinc-50/50 opacity-25' : ''} ${isToday ? 'bg-emerald-50/30' : ''}`}
             >
               <div className="flex justify-between items-start mb-2">
-                <span className={`text-xs font-mono ${isToday ? 'text-[#D0F255] font-bold' : 'text-zinc-500'}`}>{format(day, "d")}</span>
-                {dayEntries.length > 0 && <span className="text-[9px] text-[#70BF4B] font-bold">{dayEntries.length} posts</span>}
+                <span className={`text-xs font-mono ${isToday ? 'text-emerald-600 font-bold' : 'text-zinc-400'}`}>{format(day, "d")}</span>
+                {dayEntries.length > 0 && <span className="text-[9px] text-emerald-600 font-bold">{dayEntries.length} posts</span>}
               </div>
               <div className="space-y-1 overflow-y-auto max-h-[80px] scrollbar-hide">
                 {dayEntries.map(e => (
@@ -421,35 +421,35 @@ function PostModal({ entry, clients, onClose, onSave }: { entry: Partial<Entry> 
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-300">
-      <div className="bg-[#001a1a] border border-[#003434] rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
-        <div className="px-6 py-4 border-b border-[#003434] flex items-center justify-between">
-          <h3 className="text-white font-bold text-lg">{formData.id ? 'Edit Post' : 'New Content Entry'}</h3>
-          <button onClick={onClose} className="text-zinc-500 hover:text-white transition-colors"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
+      <div className="bg-white border border-zinc-200 rounded-2xl w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col shadow-2xl">
+        <div className="px-6 py-4 border-b border-zinc-100 flex items-center justify-between">
+          <h3 className="text-zinc-900 font-bold text-lg">{formData.id ? 'Edit Post' : 'New Content Entry'}</h3>
+          <button onClick={onClose} className="text-zinc-400 hover:text-zinc-900 transition-colors"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>
         </div>
         
         <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-5 scrollbar-hide">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div className="space-y-1.5">
               <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Post Title *</label>
-              <input value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} className="w-full bg-[#002626] border border-[#003434] rounded-xl px-4 py-2 text-sm text-white outline-none focus:border-[#70BF4B]/30" placeholder="Main hook or topic..." />
+              <input value={formData.title} onChange={e => setFormData({ ...formData, title: e.target.value })} className="w-full bg-white border border-zinc-200 rounded-xl px-4 py-2 text-sm text-zinc-900 outline-none focus:border-[#70BF4B]" placeholder="Main hook or topic..." />
             </div>
             <div className="space-y-1.5">
               <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Client *</label>
-              <select value={formData.client_id} onChange={e => setFormData({ ...formData, client_id: e.target.value })} className="w-full bg-[#002626] border border-[#003434] rounded-xl px-4 py-2 text-sm text-white outline-none focus:border-[#70BF4B]/30">
+              <select value={formData.client_id} onChange={e => setFormData({ ...formData, client_id: e.target.value })} className="w-full bg-white border border-zinc-200 rounded-xl px-4 py-2 text-sm text-zinc-900 outline-none focus:border-[#70BF4B]">
                 <option value="">Select a client...</option>
                 {clients.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </div>
             <div className="space-y-1.5">
               <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Content Type</label>
-              <select value={formData.content_type} onChange={e => setFormData({ ...formData, content_type: e.target.value })} className="w-full bg-[#002626] border border-[#003434] rounded-xl px-4 py-2 text-sm text-white outline-none focus:border-[#70BF4B]/30">
+              <select value={formData.content_type} onChange={e => setFormData({ ...formData, content_type: e.target.value })} className="w-full bg-white border border-zinc-200 rounded-xl px-4 py-2 text-sm text-zinc-900 outline-none focus:border-[#70BF4B]">
                 {CONTENT_TYPES.map(t => <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>)}
               </select>
             </div>
             <div className="space-y-1.5">
               <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Scheduled Date</label>
-              <input type="date" value={formData.scheduled_date} onChange={e => setFormData({ ...formData, scheduled_date: e.target.value })} className="w-full bg-[#002626] border border-[#003434] rounded-xl px-4 py-2 text-sm text-white outline-none focus:border-[#70BF4B]/30" />
+              <input type="date" value={formData.scheduled_date} onChange={e => setFormData({ ...formData, scheduled_date: e.target.value })} className="w-full bg-white border border-zinc-200 rounded-xl px-4 py-2 text-sm text-zinc-900 outline-none focus:border-[#70BF4B]" />
             </div>
           </div>
 
@@ -461,7 +461,7 @@ function PostModal({ entry, clients, onClose, onSave }: { entry: Partial<Entry> 
                   key={p}
                   type="button"
                   onClick={() => togglePlatform(p)}
-                  className={`px-3 py-1.5 rounded-xl text-[11px] font-bold transition-all border ${formData.platforms.includes(p) ? 'bg-[#70BF4B] text-[#001a1a] border-[#70BF4B]' : 'bg-transparent text-zinc-500 border-[#003434] hover:border-zinc-700'}`}
+                  className={`px-3 py-1.5 rounded-xl text-[11px] font-bold transition-all border ${formData.platforms.includes(p) ? 'bg-[#003434] text-white border-[#003434]' : 'bg-transparent text-zinc-500 border-zinc-200 hover:border-zinc-400'}`}
                 >
                   {p}
                 </button>
@@ -477,7 +477,7 @@ function PostModal({ entry, clients, onClose, onSave }: { entry: Partial<Entry> 
                   key={s}
                   type="button"
                   onClick={() => setFormData({ ...formData, status: s })}
-                  className={`px-2 py-2 rounded-xl text-[10px] font-bold uppercase transition-all border ${formData.status === s ? STATUS_COLORS[s] : 'bg-transparent text-zinc-500 border-[#003434] hover:border-zinc-700'}`}
+                  className={`px-2 py-2 rounded-xl text-[10px] font-bold uppercase transition-all border ${formData.status === s ? STATUS_COLORS[s] : 'bg-transparent text-zinc-400 border-zinc-200 hover:border-zinc-400'}`}
                 >
                   {s}
                 </button>
@@ -487,32 +487,32 @@ function PostModal({ entry, clients, onClose, onSave }: { entry: Partial<Entry> 
 
           <div className="space-y-1.5">
             <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Caption</label>
-            <textarea rows={4} value={formData.caption} onChange={e => setFormData({ ...formData, caption: e.target.value })} className="w-full bg-[#002626] border border-[#003434] rounded-xl px-4 py-2 text-sm text-white outline-none focus:border-[#70BF4B]/30 resize-none" placeholder="Write post caption here..." />
+            <textarea rows={4} value={formData.caption} onChange={e => setFormData({ ...formData, caption: e.target.value })} className="w-full bg-white border border-zinc-200 rounded-xl px-4 py-2 text-sm text-zinc-900 outline-none focus:border-[#70BF4B] resize-none" placeholder="Write post caption here..." />
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
             <div className="space-y-1.5">
               <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Hashtags</label>
-              <input value={formData.hashtags} onChange={e => setFormData({ ...formData, hashtags: e.target.value })} className="w-full bg-[#002626] border border-[#003434] rounded-xl px-4 py-2 text-sm text-white outline-none focus:border-[#70BF4B]/30" placeholder="#ai #marketing..." />
+              <input value={formData.hashtags} onChange={e => setFormData({ ...formData, hashtags: e.target.value })} className="w-full bg-white border border-zinc-200 rounded-xl px-4 py-2 text-sm text-zinc-900 outline-none focus:border-[#70BF4B]" placeholder="#ai #marketing..." />
             </div>
             <div className="space-y-1.5">
               <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Media URL</label>
-              <input value={formData.media_url} onChange={e => setFormData({ ...formData, media_url: e.target.value })} className="w-full bg-[#002626] border border-[#003434] rounded-xl px-4 py-2 text-sm text-white outline-none focus:border-[#70BF4B]/30" placeholder="https://drive.google.com/..." />
+              <input value={formData.media_url} onChange={e => setFormData({ ...formData, media_url: e.target.value })} className="w-full bg-white border border-zinc-200 rounded-xl px-4 py-2 text-sm text-zinc-900 outline-none focus:border-[#70BF4B]" placeholder="https://drive.google.com/..." />
             </div>
           </div>
 
           <div className="space-y-1.5">
             <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Internal Notes</label>
-            <textarea rows={2} value={formData.notes} onChange={e => setFormData({ ...formData, notes: e.target.value })} className="w-full bg-[#002626] border border-[#003434] rounded-xl px-4 py-2 text-sm text-white outline-none focus:border-[#70BF4B]/30 resize-none" placeholder="Feedback, ideas, or links..." />
+            <textarea rows={2} value={formData.notes} onChange={e => setFormData({ ...formData, notes: e.target.value })} className="w-full bg-white border border-zinc-200 rounded-xl px-4 py-2 text-sm text-zinc-900 outline-none focus:border-[#70BF4B] resize-none" placeholder="Feedback, ideas, or links..." />
           </div>
         </form>
 
-        <div className="px-6 py-4 border-t border-[#003434] flex items-center justify-end gap-3 bg-[#001a1a]">
-          <button onClick={onClose} className="px-4 py-2 text-zinc-400 hover:text-white text-sm font-medium transition-colors">Cancel</button>
+        <div className="px-6 py-4 border-t border-zinc-100 flex items-center justify-end gap-3 bg-zinc-50">
+          <button onClick={onClose} className="px-4 py-2 text-zinc-500 hover:text-zinc-900 text-sm font-medium transition-colors">Cancel</button>
           <button
             onClick={handleSubmit}
             disabled={loading}
-            className="px-6 py-2 bg-[#70BF4B] hover:bg-[#5faa3e] disabled:opacity-50 text-[#001a1a] font-bold text-sm rounded-xl transition-all shadow-lg shadow-[#70BF4B]/10"
+            className="px-6 py-2 bg-[#003434] hover:bg-[#004d4d] disabled:opacity-50 text-white font-bold text-sm rounded-xl transition-all shadow-sm"
           >
             {loading ? "Saving..." : (formData.id ? "Update Post" : "Create Post")}
           </button>
@@ -633,14 +633,14 @@ function ReviewPanel({ entry, onClose, onSaved, onUpdate }: {
   }
 
   return (
-    <div className="xl:w-[400px] shrink-0 bg-[#001f1f] border border-[#003434] rounded-2xl overflow-hidden shadow-xl flex flex-col">
+    <div className="xl:w-[400px] shrink-0 bg-white border border-zinc-200 rounded-2xl overflow-hidden shadow-xl flex flex-col">
       {/* Header */}
-      <div className={`px-5 py-4 border-b border-[#003434] flex items-center justify-between ${entry.status === 'rejected' ? 'bg-red-500/5' : 'bg-orange-500/5'}`}>
+      <div className={`px-5 py-4 border-b border-zinc-100 flex items-center justify-between ${entry.status === 'rejected' ? 'bg-red-50' : 'bg-orange-50'}`}>
         <div className="flex items-center gap-2.5">
-          <span className={`w-2 h-2 rounded-full ${entry.status === 'rejected' ? 'bg-red-400' : 'bg-orange-400'}`} />
-          <span className="text-white font-bold text-sm">Re-evaluation Panel</span>
+          <span className={`w-2 h-2 rounded-full ${entry.status === 'rejected' ? 'bg-red-500' : 'bg-orange-500'}`} />
+          <span className="text-zinc-900 font-bold text-sm">Re-evaluation Panel</span>
         </div>
-        <button onClick={onClose} className="text-zinc-500 hover:text-white transition-colors">
+        <button onClick={onClose} className="text-zinc-400 hover:text-zinc-900 transition-colors">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
         </button>
       </div>
@@ -657,8 +657,8 @@ function ReviewPanel({ entry, onClose, onSaved, onUpdate }: {
 
         {/* 1. Original content */}
         <div className="space-y-3">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Original Content</p>
-          <div className="bg-[#001414] border border-[#003434] rounded-xl p-4 space-y-3">
+          <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Original Content</p>
+          <div className="bg-zinc-50 border border-zinc-100 rounded-xl p-4 space-y-3">
             {entry.media_url && (
               <div className="rounded-lg overflow-hidden bg-zinc-900 aspect-video flex items-center justify-center">
                 {entry.media_url.match(/\.(mp4|webm|mov)$/i) ? (
@@ -670,7 +670,7 @@ function ReviewPanel({ entry, onClose, onSaved, onUpdate }: {
               </div>
             )}
             {entry.caption && (
-              <p className="text-zinc-300 text-xs leading-relaxed line-clamp-4">{entry.caption}</p>
+              <p className="text-zinc-600 text-xs leading-relaxed line-clamp-4">{entry.caption}</p>
             )}
             {!entry.caption && !entry.media_url && (
               <p className="text-zinc-600 text-xs italic">No caption or media attached.</p>
@@ -685,22 +685,22 @@ function ReviewPanel({ entry, onClose, onSaved, onUpdate }: {
 
         {/* 2. Client feedback */}
         <div className="space-y-3">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Client Feedback</p>
-          <div className={`border rounded-xl p-4 space-y-3 ${entry.status === 'rejected' ? 'bg-red-500/5 border-red-500/25' : 'bg-orange-500/5 border-orange-500/25'}`}>
+          <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Client Feedback</p>
+          <div className={`border rounded-xl p-4 space-y-3 ${entry.status === 'rejected' ? 'bg-red-50 border-red-100' : 'bg-orange-50 border-orange-100'}`}>
             {/* Comment */}
-            <p className={`text-sm leading-relaxed ${entry.status === 'rejected' ? 'text-red-300' : 'text-orange-300'}`}>
+            <p className={`text-sm leading-relaxed ${entry.status === 'rejected' ? 'text-red-700' : 'text-orange-700'}`}>
               {entry.client_feedback || "No feedback provided."}
             </p>
 
             {/* Submitted by row */}
-            <div className="flex items-center gap-2 pt-1 border-t border-white/5">
-              <div className="w-6 h-6 rounded-full bg-[#003434] border border-[#004444] flex items-center justify-center shrink-0">
-                <span className="text-[9px] font-bold text-zinc-400">
+            <div className="flex items-center gap-2 pt-1 border-t border-black/5">
+              <div className="w-6 h-6 rounded-full bg-zinc-200 border border-zinc-300 flex items-center justify-center shrink-0">
+                <span className="text-[9px] font-bold text-zinc-500">
                   {(entry.submitted_by ?? entry.clients?.legal_name ?? '?')[0]?.toUpperCase()}
                 </span>
               </div>
               <div className="flex-1 min-w-0">
-                <p className="text-zinc-300 text-xs font-medium truncate">
+                <p className="text-zinc-900 text-xs font-medium truncate">
                   {entry.submitted_by ?? entry.clients?.legal_name ?? 'Client'}
                 </p>
                 {entry.submitted_at && (
@@ -711,14 +711,14 @@ function ReviewPanel({ entry, onClose, onSaved, onUpdate }: {
               </div>
               <div className="flex items-center gap-1.5 shrink-0">
                 {entry.feedback_role && (
-                  <span className="text-[10px] px-2 py-0.5 rounded-full font-bold border bg-zinc-700/40 text-zinc-400 border-zinc-600/40">
+                  <span className="text-[10px] px-2 py-0.5 rounded-full font-bold border bg-zinc-100 text-zinc-500 border-zinc-200">
                     {entry.feedback_role}
                   </span>
                 )}
                 <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold border ${
                   entry.status === 'rejected'
-                    ? 'bg-red-500/20 text-red-400 border-red-500/30'
-                    : 'bg-orange-500/20 text-orange-400 border-orange-500/30'
+                    ? 'bg-red-100 text-red-600 border-red-200'
+                    : 'bg-orange-100 text-orange-600 border-orange-200'
                 }`}>
                   {entry.status === 'rejected' ? 'Rejected' : 'Changes Req.'}
                 </span>
@@ -736,13 +736,13 @@ function ReviewPanel({ entry, onClose, onSaved, onUpdate }: {
 
         {/* 3. Action buttons */}
         <div className="space-y-2.5">
-          <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Actions</p>
+          <p className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Actions</p>
 
           {/* Re-evaluate with AI */}
           <button
             onClick={handleReEvaluate}
             disabled={aiLoading || maxRevisionsReached}
-            className="w-full flex items-center justify-center gap-2.5 px-4 py-3 bg-[#70BF4B] hover:bg-[#5faa3e] disabled:opacity-40 disabled:cursor-not-allowed text-[#001a1a] font-bold text-sm rounded-xl transition-all shadow-lg shadow-[#70BF4B]/10"
+            className="w-full flex items-center justify-center gap-2.5 px-4 py-3 bg-[#003434] hover:bg-[#004d4d] disabled:opacity-40 disabled:cursor-not-allowed text-white font-bold text-sm rounded-xl transition-all shadow-sm"
           >
             {aiLoading ? (
               <>
@@ -761,37 +761,37 @@ function ReviewPanel({ entry, onClose, onSaved, onUpdate }: {
           {!editMode ? (
             <button
               onClick={() => setEditMode(true)}
-              className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-[#001414] hover:bg-[#002626] border border-[#003434] hover:border-[#70BF4B]/30 text-zinc-300 font-medium text-sm rounded-xl transition-all"
+              className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-white hover:bg-zinc-50 border border-zinc-200 hover:border-zinc-300 text-zinc-700 font-medium text-sm rounded-xl transition-all"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
               Edit Manually
             </button>
           ) : (
-            <div className="space-y-3 bg-[#001414] border border-[#003434] rounded-xl p-4">
+            <div className="space-y-3 bg-zinc-50 border border-zinc-100 rounded-xl p-4">
               <textarea
                 rows={4}
                 value={editCaption}
                 onChange={e => setEditCaption(e.target.value)}
                 placeholder="Rewrite caption..."
-                className="w-full bg-[#001f1f] border border-[#003434] rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-[#70BF4B]/30 resize-none"
+                className="w-full bg-white border border-zinc-200 rounded-lg px-3 py-2 text-sm text-zinc-900 outline-none focus:border-[#70BF4B] resize-none"
               />
               <input
                 value={editMediaUrl}
                 onChange={e => setEditMediaUrl(e.target.value)}
                 placeholder="New media URL (optional)..."
-                className="w-full bg-[#001f1f] border border-[#003434] rounded-lg px-3 py-2 text-sm text-white outline-none focus:border-[#70BF4B]/30"
+                className="w-full bg-white border border-zinc-200 rounded-lg px-3 py-2 text-sm text-zinc-900 outline-none focus:border-[#70BF4B]"
               />
               <div className="flex gap-2">
                 <button
                   onClick={handleManualSave}
                   disabled={saving}
-                  className="flex-1 px-4 py-2 bg-[#70BF4B] hover:bg-[#5faa3e] disabled:opacity-50 text-[#001a1a] font-bold text-xs rounded-lg transition-all"
+                  className="flex-1 px-4 py-2 bg-[#003434] hover:bg-[#004d4d] disabled:opacity-50 text-white font-bold text-xs rounded-lg transition-all"
                 >
                   {saving ? "Saving..." : "Save Changes"}
                 </button>
                 <button
                   onClick={() => setEditMode(false)}
-                  className="px-4 py-2 bg-transparent border border-[#003434] text-zinc-400 hover:text-white text-xs rounded-lg transition-all"
+                  className="px-4 py-2 bg-transparent border border-zinc-200 text-zinc-500 hover:text-zinc-900 text-xs rounded-lg transition-all"
                 >
                   Cancel
                 </button>
@@ -802,7 +802,7 @@ function ReviewPanel({ entry, onClose, onSaved, onUpdate }: {
           {/* Override + Approve */}
           <button
             onClick={() => setOverrideModal(true)}
-            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-transparent hover:bg-red-500/5 border border-red-500/30 hover:border-red-500/60 text-red-400 font-medium text-sm rounded-xl transition-all"
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-transparent hover:bg-red-50 border border-red-100 hover:border-red-200 text-red-600 font-medium text-sm rounded-xl transition-all"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
             Override + Approve
@@ -812,9 +812,9 @@ function ReviewPanel({ entry, onClose, onSaved, onUpdate }: {
         {/* AI result preview */}
         {aiResult && (
           <div className="space-y-2">
-            <p className="text-[10px] font-bold uppercase tracking-widest text-[#70BF4B]">AI New Version</p>
-            <div className="bg-[#70BF4B]/5 border border-[#70BF4B]/20 rounded-xl p-4">
-              <p className="text-zinc-200 text-xs leading-relaxed">{aiResult}</p>
+            <p className="text-[10px] font-bold uppercase tracking-widest text-[#003434]">AI New Version</p>
+            <div className="bg-emerald-50 border border-emerald-100 rounded-xl p-4">
+              <p className="text-zinc-700 text-xs leading-relaxed">{aiResult}</p>
             </div>
           </div>
         )}
@@ -824,7 +824,7 @@ function ReviewPanel({ entry, onClose, onSaved, onUpdate }: {
           <div className="space-y-2">
             <button
               onClick={() => setHistoryOpen(o => !o)}
-              className="w-full flex items-center justify-between text-[10px] font-bold uppercase tracking-widest text-zinc-500 hover:text-zinc-300 transition-colors"
+              className="w-full flex items-center justify-between text-[10px] font-bold uppercase tracking-widest text-zinc-400 hover:text-zinc-600 transition-colors"
             >
               <span>Revision History ({history.length})</span>
               <svg className={`w-3.5 h-3.5 transition-transform ${historyOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
@@ -832,14 +832,14 @@ function ReviewPanel({ entry, onClose, onSaved, onUpdate }: {
             {historyOpen && (
               <div className="space-y-2">
                 {history.map((h, i) => (
-                  <div key={i} className="bg-[#001414] border border-[#003434] rounded-xl p-3 space-y-1.5">
+                  <div key={i} className="bg-zinc-50 border border-zinc-100 rounded-xl p-3 space-y-1.5">
                     <div className="flex items-center justify-between">
                       <span className="text-[10px] text-zinc-500 font-medium">{h.reason}</span>
-                      <span className="text-[10px] text-zinc-700 font-mono">
+                      <span className="text-[10px] text-zinc-300 font-mono">
                         {h.timestamp ? format(new Date(h.timestamp), 'MMM d, HH:mm') : '—'}
                       </span>
                     </div>
-                    <p className="text-zinc-400 text-[11px] leading-relaxed line-clamp-3">{h.caption || "—"}</p>
+                    <p className="text-zinc-600 text-[11px] leading-relaxed line-clamp-3">{h.caption || "—"}</p>
                   </div>
                 ))}
               </div>
@@ -850,14 +850,14 @@ function ReviewPanel({ entry, onClose, onSaved, onUpdate }: {
 
       {/* Override confirmation modal */}
       {overrideModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-          <div className="bg-[#001a1a] border border-red-500/30 rounded-2xl w-full max-w-sm p-6 shadow-2xl space-y-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white border border-red-100 rounded-2xl w-full max-w-sm p-6 shadow-2xl space-y-4">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-red-500/10 border border-red-500/30 flex items-center justify-center shrink-0">
-                <svg className="w-5 h-5 text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /></svg>
+              <div className="w-10 h-10 rounded-xl bg-red-50 border border-red-100 flex items-center justify-center shrink-0">
+                <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /></svg>
               </div>
               <div>
-                <h4 className="text-white font-bold text-sm">Override Client Feedback?</h4>
+                <h4 className="text-zinc-900 font-bold text-sm">Override Client Feedback?</h4>
                 <p className="text-zinc-500 text-xs mt-0.5">This bypasses client feedback. Are you sure?</p>
               </div>
             </div>
@@ -871,7 +871,7 @@ function ReviewPanel({ entry, onClose, onSaved, onUpdate }: {
               </button>
               <button
                 onClick={() => setOverrideModal(false)}
-                className="flex-1 px-4 py-2.5 bg-[#003434] hover:bg-[#004444] text-zinc-300 font-medium text-sm rounded-xl transition-all"
+                className="flex-1 px-4 py-2.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 font-medium text-sm rounded-xl transition-all"
               >
                 Cancel
               </button>
@@ -899,18 +899,18 @@ function BlogActivityPanel() {
   const posts = data?.posts ?? []
 
   return (
-    <div className="bg-[#001f1f] border border-[#003434] rounded-2xl overflow-hidden shadow-sm">
+    <div className="bg-white border border-zinc-200 rounded-2xl overflow-hidden shadow-sm">
       <button
         onClick={() => setOpen(o => !o)}
-        className="w-full px-6 py-4 flex items-center justify-between border-b border-[#003434] bg-[#001a1a]/50 transition-colors hover:bg-[#003434]/30"
+        className="w-full px-6 py-4 flex items-center justify-between border-b border-zinc-100 bg-zinc-50 transition-colors hover:bg-zinc-100/50"
       >
         <div className="flex items-center gap-2.5">
-          <svg className="w-4 h-4 text-[#70BF4B]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-4 h-4 text-[#003434]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10l4 4v10a2 2 0 01-2 2z" />
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 9h3M7 13h10M7 17h10" />
           </svg>
-          <span className="text-[#70BF4B] text-xs font-bold uppercase tracking-widest">Blog Activity</span>
-          <span className="text-zinc-600 text-xs">({posts.length} recent posts)</span>
+          <span className="text-[#003434] text-xs font-bold uppercase tracking-widest">Blog Activity</span>
+          <span className="text-zinc-400 text-xs">({posts.length} recent posts)</span>
         </div>
         <svg
           className={`w-4 h-4 text-zinc-500 transition-transform ${open ? 'rotate-180' : ''}`}
@@ -924,30 +924,30 @@ function BlogActivityPanel() {
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="border-b border-[#003434]/60 bg-[#001a1a]/30">
+              <tr className="border-b border-zinc-100 bg-zinc-50/50">
                 {["Title", "Category", "Published", "Views"].map(h => (
-                  <th key={h} className="px-6 py-3 text-[10px] font-bold uppercase tracking-widest text-zinc-600">{h}</th>
+                  <th key={h} className="px-6 py-3 text-[10px] font-bold uppercase tracking-widest text-zinc-400">{h}</th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#003434]/40">
+            <tbody className="divide-y divide-zinc-100">
               {posts.length === 0 ? (
                 <tr>
                   <td colSpan={4} className="px-6 py-8 text-center text-zinc-600 text-sm italic">No published blog posts yet.</td>
                 </tr>
               ) : posts.map(p => (
-                <tr key={p.id} className="hover:bg-[#003434]/20 transition-colors group">
+                <tr key={p.id} className="hover:bg-zinc-50 transition-colors group">
                   <td className="px-6 py-3">
                     <a
                       href={`/blog/${p.id}`}
-                      className="text-white text-sm font-medium truncate max-w-[280px] block group-hover:text-[#70BF4B] transition-colors"
+                      className="text-zinc-900 text-sm font-medium truncate max-w-[280px] block group-hover:text-[#003434] transition-colors"
                     >
                       {p.title}
                     </a>
-                    <span className="text-zinc-600 text-[10px] font-mono">/{p.slug}</span>
+                    <span className="text-zinc-400 text-[10px] font-mono">/{p.slug}</span>
                   </td>
                   <td className="px-6 py-3">
-                    <span className="text-[10px] px-2 py-0.5 rounded-md bg-[#003434] text-zinc-400 uppercase font-bold">
+                    <span className="text-[10px] px-2 py-0.5 rounded-md bg-zinc-100 text-zinc-500 uppercase font-bold">
                       {p.category || "—"}
                     </span>
                   </td>

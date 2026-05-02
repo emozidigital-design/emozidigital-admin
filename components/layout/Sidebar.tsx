@@ -83,20 +83,18 @@ export default function Sidebar() {
   return (
     <>
       {/* Desktop sidebar */}
-      <aside className="hidden lg:flex flex-col w-56 bg-[#001a1a] border-r border-[#003434] shrink-0">
+      <aside className="hidden lg:flex flex-col w-56 bg-white border-r border-zinc-200 shrink-0">
         {/* Brand */}
-        <div className="h-14 flex items-center px-4 border-b border-[#003434]">
-          <div className="flex items-center gap-2.5">
-            <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-[#003434] to-[#70BF4B] flex items-center justify-center shrink-0 shadow shadow-[#70BF4B]/20">
-              <span className="text-[#D0F255] font-bold text-xs">E</span>
-            </div>
-            <span className="text-white font-semibold text-sm tracking-tight">Emozi Admin</span>
-          </div>
+        <div className="h-14 flex items-center px-4 border-b border-zinc-200">
+          <Link href="/dashboard" className="flex items-center gap-2.5">
+            <img src="/Emozi.png" alt="Emozi Logo" className="w-8 h-8 object-contain" />
+            <span className="text-[#003434] font-semibold text-sm tracking-tight">Emozi Admin</span>
+          </Link>
         </div>
 
         {/* Nav */}
         <nav className="flex-1 p-3 space-y-0.5">
-          <p className="text-[#70BF4B]/40 text-[9px] font-bold uppercase tracking-[0.15em] px-2 mb-2 mt-1">
+          <p className="text-zinc-500 text-[9px] font-bold uppercase tracking-[0.15em] px-2 mb-2 mt-1">
             Navigation
           </p>
           {NAV.map((item) => {
@@ -105,13 +103,13 @@ export default function Sidebar() {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-medium transition-all ${
+                className={`flex items-center gap-2.5 px-3 py-2 rounded-lg text-[13px] font-semibold transition-all ${
                   active
-                    ? "bg-[#003434] text-[#D0F255] border border-[#70BF4B]/25"
-                    : "text-zinc-500 hover:text-zinc-200 hover:bg-[#003434]/50 border border-transparent"
+                    ? "bg-[#003434] text-white border border-[#003434] shadow-sm shadow-[#003434]/20"
+                    : "text-zinc-700 hover:text-zinc-900 hover:bg-zinc-100 border border-transparent"
                 }`}
               >
-                <span className={active ? "text-[#70BF4B]" : ""}>{item.icon}</span>
+                <span className={active ? "text-emerald-400" : ""}>{item.icon}</span>
                 {item.label}
               </Link>
             )
@@ -119,13 +117,13 @@ export default function Sidebar() {
         </nav>
 
         {/* Footer */}
-        <div className="p-4 border-t border-[#003434]">
-          <p className="text-[#70BF4B]/20 text-[10px] text-center font-mono">© 2025 Emozi Digital</p>
+        <div className="p-4 border-t border-zinc-100">
+          <p className="text-zinc-400 text-[10px] text-center font-mono">© 2025 Emozi Digital</p>
         </div>
       </aside>
 
       {/* Mobile bottom nav */}
-      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-20 bg-[#001a1a] border-t border-[#003434] flex">
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-20 bg-white border-t border-zinc-200 flex">
         {MOBILE_NAV.map((item) => {
           const active = isActive(item.href)
           return (
@@ -133,7 +131,7 @@ export default function Sidebar() {
               key={item.href}
               href={item.href}
               className={`flex-1 flex flex-col items-center gap-1 py-3 text-[10px] font-medium transition-colors ${
-                active ? "text-[#D0F255]" : "text-zinc-600"
+                active ? "text-[#003434]" : "text-zinc-400"
               }`}
             >
               <span className={active ? "text-[#70BF4B]" : ""}>{item.icon}</span>

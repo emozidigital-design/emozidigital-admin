@@ -73,29 +73,26 @@ export default function OnboardingViewer({ client }: { client: SupabaseClient })
   const isDone = (data: any) => data && Object.keys(data).length > 0
   const id = client.id
 
-  // Determine which platforms to render in Section D — show selected ones first,
-  // and show every platform when none are selected (so admin can populate any).
   const selectedPlatforms: string[] = Array.isArray(sD.platforms) ? sD.platforms : []
   const platformKeysToRender = selectedPlatforms.length > 0
     ? Array.from(new Set([...selectedPlatforms, ...ALL_PLATFORM_KEYS]))
     : ALL_PLATFORM_KEYS
 
-  // Legacy admin-only Section B fields (predates client form sync) — render only if present
   const hasLegacyB = sB.core_services || sB.hq_location || sB.regions
 
   return (
     <div className="space-y-6">
       {/* Progress Bar */}
-      <div className="bg-[#001f1f] border border-[#003434] rounded-xl p-5 shadow-sm">
+      <div className="bg-white border border-zinc-200 rounded-xl p-5 shadow-sm">
         <div className="flex items-center justify-between mb-3">
           <div>
-            <p className="text-white font-semibold text-sm">{completed} of {total} sections populated</p>
+            <p className="text-zinc-900 font-semibold text-sm">{completed} of {total} sections populated</p>
             <p className="text-zinc-500 text-xs mt-0.5">{pct}% overall progress</p>
           </div>
         </div>
-        <div className="w-full bg-[#003434] rounded-full h-2">
+        <div className="w-full bg-zinc-100 rounded-full h-2 overflow-hidden">
           <div
-            className="bg-gradient-to-r from-[#70BF4B] to-[#D0F255] h-2 rounded-full transition-all duration-500"
+            className="bg-gradient-to-r from-emerald-500 to-[#70BF4B] h-2 rounded-full transition-all duration-700"
             style={{ width: `${pct}%` }}
           />
         </div>
@@ -175,7 +172,7 @@ export default function OnboardingViewer({ client }: { client: SupabaseClient })
                    value={sB.additional_notes || ""} />
 
         {hasLegacyB && (
-          <div className="mt-4 pt-4 border-t border-[#003434]">
+          <div className="mt-4 pt-4 border-t border-zinc-100">
             <p className="text-[10px] uppercase tracking-widest text-zinc-500 mb-2">Legacy Fields (admin-only)</p>
             <ETextarea clientId={id} section="section_b" field="core_services" label="Core Services"
                        value={sB.core_services || ""} />
@@ -274,16 +271,18 @@ export default function OnboardingViewer({ client }: { client: SupabaseClient })
         <ETextarea clientId={id} section="section_d" field="social_risks" label="Known Risks / Sensitivities"
                    value={sD.social_risks || ""} />
 
-        <div className="mt-4 pt-4 border-t border-[#003434] space-y-2">
-          <p className="text-[10px] uppercase tracking-widest text-zinc-500">Per-Platform Modules</p>
-          {platformKeysToRender.map(key => (
-            <PlatformModuleCard
-              key={key}
-              clientId={id}
-              platformKey={key}
-              platformData={sD[key] || {}}
-            />
-          ))}
+        <div className="mt-4 pt-4 border-t border-zinc-100 space-y-3">
+          <p className="text-[10px] uppercase tracking-widest text-zinc-500 font-bold mb-2">Per-Platform Modules</p>
+          <div className="grid grid-cols-1 gap-3">
+            {platformKeysToRender.map(key => (
+              <PlatformModuleCard
+                key={key}
+                clientId={id}
+                platformKey={key}
+                platformData={sD[key] || {}}
+              />
+            ))}
+          </div>
         </div>
       </SectionCard>
 
@@ -418,8 +417,8 @@ export default function OnboardingViewer({ client }: { client: SupabaseClient })
       {/* ── Section H — Competitive Landscape ──────────────────────────── */}
       <SectionCard title="Step H: Competitive Landscape" accent="#D0F255" isDone={isDone(sH)}>
         {[1, 2, 3].map(n => (
-          <div key={n} className="bg-[#001f1f] rounded-xl p-3 mb-3 border border-[#003434]">
-            <p className="text-[10px] uppercase tracking-widest text-zinc-500 mb-1">Competitor {n}</p>
+          <div key={n} className="bg-zinc-50 rounded-xl p-4 mb-3 border border-zinc-100">
+            <p className="text-[10px] uppercase tracking-widest text-zinc-400 font-bold mb-2">Competitor {n}</p>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8">
               <EField clientId={id} section="section_h" field={`competitor_${n}_name`} label="Name"
                       value={sH[`competitor_${n}_name`] || ""} />

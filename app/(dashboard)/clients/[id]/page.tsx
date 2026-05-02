@@ -72,24 +72,24 @@ type ApiResponse = {
 // ─── Shared helpers ───────────────────────────────────────────────────────────
 
 function Skeleton({ className }: { className?: string }) {
-  return <div className={`animate-pulse rounded bg-white/5 ${className}`} />
+  return <div className={`animate-pulse rounded bg-zinc-100 ${className}`} />
 }
 
 const STATUS_COLOR: Record<string, string> = {
-  active:   "bg-[#70BF4B]/15 text-[#70BF4B] border-[#70BF4B]/30",
-  inactive: "bg-zinc-700/30 text-zinc-400 border-zinc-600/30",
-  pending:  "bg-yellow-500/15 text-yellow-400 border-yellow-500/30",
-  completed:"bg-sky-500/15 text-sky-400 border-sky-500/30",
+  active:   "bg-emerald-50 text-emerald-600 border-emerald-100",
+  inactive: "bg-zinc-100 text-zinc-500 border-zinc-200",
+  pending:  "bg-amber-50 text-amber-600 border-amber-100",
+  completed:"bg-blue-50 text-blue-600 border-blue-100",
 }
 const RISK_COLOR: Record<string, string> = {
-  Green: "bg-[#70BF4B]/15 text-[#70BF4B] border-[#70BF4B]/30",
-  Amber: "bg-yellow-500/15 text-yellow-400 border-yellow-500/30",
-  Red:   "bg-red-500/15 text-red-400 border-red-500/30",
+  Green: "bg-emerald-50 text-emerald-600 border-emerald-100",
+  Amber: "bg-amber-50 text-amber-600 border-amber-100",
+  Red:   "bg-red-50 text-red-600 border-red-100",
 }
 
 function Badge({ label, colorMap }: { label: string; colorMap: Record<string, string> }) {
-  if (!label) return <span className="text-zinc-600">—</span>
-  const cls = colorMap[label] ?? colorMap[label.toLowerCase()] ?? "bg-zinc-700/30 text-zinc-400 border-zinc-600/30"
+  if (!label) return <span className="text-zinc-400">—</span>
+  const cls = colorMap[label] ?? colorMap[label.toLowerCase()] ?? "bg-zinc-100 text-zinc-500 border-zinc-200"
   return <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium border ${cls}`}>{label}</span>
 }
 
@@ -134,7 +134,7 @@ function EditableField({
   }
 
   return (
-    <div className="flex flex-col sm:flex-row gap-1.5 py-3 border-b border-[#003434] last:border-0 relative">
+    <div className="flex flex-col sm:flex-row gap-1.5 py-3 border-b border-zinc-100 last:border-0 relative">
       <dt className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500 sm:w-36 shrink-0 pt-0.5 mt-[2px]">
         {label}
       </dt>
@@ -162,12 +162,12 @@ function EditableField({
             onChange={e => setLocal(e.target.value)}
             onBlur={handleSave}
             onKeyDown={handleKeyDown}
-            className={`w-full bg-[#001f1f] text-white text-sm outline-none border border-[#70BF4B]/50 rounded-lg px-2 py-1 ${inputType === 'color' ? 'h-8 cursor-pointer' : ''}`}
+            className={`w-full bg-white text-zinc-900 text-sm outline-none border border-zinc-200 focus:border-[#70BF4B] rounded-lg px-2 py-1 ${inputType === 'color' ? 'h-8 cursor-pointer' : ''}`}
           />
         ) : (
           <div 
              onClick={() => setIsEditing(true)}
-             className="w-full text-sm text-zinc-200 cursor-text hover:bg-white/5 rounded-lg border border-transparent px-2 py-1 -ml-2 transition-colors min-h-[30px] flex items-center"
+             className="w-full text-sm text-zinc-700 cursor-text hover:bg-zinc-50 rounded-lg border border-transparent px-2 py-1 -ml-2 transition-colors min-h-[30px] flex items-center"
           >
              {inputType === "color" && local ? (
                 <div className="w-4 h-4 rounded-full border border-white/20 mr-2 shrink-0" style={{ backgroundColor: local }} />
@@ -205,7 +205,7 @@ function EditableSelect({
   }
 
   return (
-    <div className="flex flex-col sm:flex-row gap-1.5 py-3 border-b border-[#003434] last:border-0 relative">
+    <div className="flex flex-col sm:flex-row gap-1.5 py-3 border-b border-zinc-100 last:border-0 relative">
       <dt className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500 sm:w-36 shrink-0 pt-0.5 mt-[2px]">
         {label}
       </dt>
@@ -216,13 +216,13 @@ function EditableSelect({
             value={local}
             onChange={e => handleSave(e.target.value)}
             onBlur={() => setIsEditing(false)}
-            className="w-full bg-[#001f1f] text-white text-sm outline-none border border-[#70BF4B]/50 rounded-lg px-2 py-1"
+            className="w-full bg-white text-zinc-900 text-sm outline-none border border-zinc-200 focus:border-[#70BF4B] rounded-lg px-2 py-1"
           >
             <option value="" disabled>Select...</option>
             {options.map(o => <option key={o} value={o}>{o}</option>)}
           </select>
         ) : (
-          <div onClick={() => setIsEditing(true)} className="w-full text-sm text-zinc-200 cursor-pointer hover:bg-white/5 rounded-lg px-2 py-1 -ml-2 transition-colors min-h-[30px] flex items-center">
+          <div onClick={() => setIsEditing(true)} className="w-full text-sm text-zinc-700 cursor-pointer hover:bg-zinc-50 rounded-lg px-2 py-1 -ml-2 transition-colors min-h-[30px] flex items-center">
             {local || <span className="text-zinc-600 italic text-xs">Click to select</span>}
           </div>
         )}
@@ -267,13 +267,13 @@ function EditableTextarea({
           rows={5}
           onChange={e => setLocal(e.target.value)}
           onBlur={handleSave}
-          className="w-full bg-[#001f1f] border border-[#70BF4B]/50 text-zinc-200 text-sm rounded-xl px-4 py-3 outline-none transition-colors resize-none placeholder-zinc-700 shadow-inner"
+          className="w-full bg-white border border-zinc-200 focus:border-[#70BF4B] text-zinc-900 text-sm rounded-xl px-4 py-3 outline-none transition-colors resize-none placeholder-zinc-400 shadow-sm"
           placeholder={placeholder || "Type here…"}
         />
       ) : (
         <div 
           onClick={() => setIsEditing(true)}
-          className="w-full bg-transparent border border-transparent hover:border-[#003434] hover:bg-white/5 text-zinc-200 text-sm rounded-xl px-4 py-3 outline-none transition-colors cursor-text min-h-[100px] whitespace-pre-wrap"
+          className="w-full bg-transparent border border-transparent hover:border-zinc-200 hover:bg-zinc-50 text-zinc-700 text-sm rounded-xl px-4 py-3 outline-none transition-colors cursor-text min-h-[100px] whitespace-pre-wrap"
         >
           {local || <span className="text-zinc-600 italic">Click to add notes…</span>}
         </div>
@@ -290,10 +290,10 @@ function OverviewTab({ client }: { client: SupabaseClient }) {
 
   return (
     <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-      <div className="bg-[#001f1f] border border-[#003434] rounded-xl overflow-hidden shadow-sm">
-        <div className="px-5 py-3 border-b border-[#003434] flex items-center gap-2">
+      <div className="bg-white border border-zinc-200 rounded-xl overflow-hidden shadow-sm">
+        <div className="px-5 py-3 border-b border-zinc-100 flex items-center gap-2">
           <div className="w-1 h-4 rounded-full bg-[#70BF4B]" />
-          <h3 className="text-white text-sm font-semibold">Business Info</h3>
+          <h3 className="text-zinc-900 text-sm font-semibold">Business Info</h3>
         </div>
         <dl className="px-5 py-1">
           <EditableField clientId={client.id} label="Legal Name" field="legal_name" value={client.legal_name || ''} />
@@ -303,10 +303,10 @@ function OverviewTab({ client }: { client: SupabaseClient }) {
         </dl>
       </div>
 
-      <div className="bg-[#001f1f] border border-[#003434] rounded-xl overflow-hidden shadow-sm">
-        <div className="px-5 py-3 border-b border-[#003434] flex items-center gap-2">
+      <div className="bg-white border border-zinc-200 rounded-xl overflow-hidden shadow-sm">
+        <div className="px-5 py-3 border-b border-zinc-100 flex items-center gap-2">
           <div className="w-1 h-4 rounded-full bg-[#70BF4B]" />
-          <h3 className="text-white text-sm font-semibold">Status</h3>
+          <h3 className="text-zinc-900 text-sm font-semibold">Status</h3>
         </div>
         <dl className="px-5 py-1">
           <EditableSelect clientId={client.id} label="Status" field="status" value={client.status || ''} options={['active', 'inactive', 'pending', 'completed']} />
@@ -356,12 +356,12 @@ function LogoUploadBlock({
   }
 
   return (
-    <div className="bg-[#001f1f] border border-[#003434] rounded-xl p-4 flex flex-col items-center gap-3 relative overflow-hidden group">
+    <div className="bg-white border border-zinc-200 rounded-xl p-4 flex flex-col items-center gap-3 relative overflow-hidden group">
       <div className="absolute top-2 right-2 flex items-center gap-2">
          <SaveIndicator saving={saving} saved={saved} error={error} />
       </div>
       <h4 className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest">{label}</h4>
-      <div className="w-full aspect-video bg-[#001a1a] border border-dashed border-[#003434] rounded-lg flex items-center justify-center overflow-hidden relative">
+      <div className="w-full aspect-video bg-zinc-50 border border-dashed border-zinc-200 rounded-lg flex items-center justify-center overflow-hidden relative">
         {currentUrl ? (
           <>
             <img src={currentUrl} alt={label} className="object-contain w-full h-full p-2" />
@@ -401,12 +401,12 @@ function BrandColorPicker({
   }
 
   return (
-    <div className="flex flex-col sm:flex-row gap-1.5 py-3 border-b border-[#003434] last:border-0 relative">
+    <div className="flex flex-col sm:flex-row gap-1.5 py-3 border-b border-zinc-100 last:border-0 relative">
       <dt className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500 sm:w-36 shrink-0 pt-1.5">
         {label}
       </dt>
       <dd className="flex-1 min-w-0 flex items-center gap-3">
-        <div className="flex items-center gap-2 bg-[#001f1f] rounded-lg p-1.5 border border-[#003434] focus-within:border-[#70BF4B]/50 transition-colors">
+        <div className="flex items-center gap-2 bg-white rounded-lg p-1.5 border border-zinc-200 focus-within:border-[#70BF4B] transition-colors">
           <input 
             type="color" 
             value={local || '#000000'} 
@@ -420,7 +420,7 @@ function BrandColorPicker({
             onChange={e => setLocal(e.target.value)} 
             onBlur={() => handleSave(local)} 
             onKeyDown={e => e.key === 'Enter' && handleSave(local)} 
-            className="w-24 bg-transparent text-white text-sm outline-none uppercase tracking-wider" 
+            className="w-24 bg-transparent text-zinc-900 text-sm outline-none uppercase tracking-wider" 
             placeholder="#HEX" 
           />
         </div>
@@ -452,9 +452,9 @@ function AdditionalColorPicker({
   }
 
   return (
-    <div className="flex items-center gap-2 bg-[#001f1f] rounded-lg p-1.5 border border-[#003434] focus-within:border-[#70BF4B]/50 transition-colors w-fit">
+    <div className="flex items-center gap-2 bg-white rounded-lg p-1.5 border border-zinc-200 focus-within:border-[#70BF4B] transition-colors w-fit">
       <input type="color" value={local || '#000000'} onChange={e => setLocal(e.target.value)} onBlur={() => handleSave(local)} className="w-5 h-5 rounded cursor-pointer border-0 p-0" />
-      <input type="text" value={local} onChange={e => setLocal(e.target.value)} onBlur={() => handleSave(local)} onKeyDown={e => e.key === 'Enter' && handleSave(local)} className="w-20 bg-transparent text-zinc-300 text-xs outline-none uppercase" placeholder="#HEX" />
+      <input type="text" value={local} onChange={e => setLocal(e.target.value)} onBlur={() => handleSave(local)} onKeyDown={e => e.key === 'Enter' && handleSave(local)} className="w-20 bg-transparent text-zinc-900 text-xs outline-none uppercase" placeholder="#HEX" />
       <div className="w-8 flex justify-center"><SaveIndicator saving={saving} saved={saved} error={error} /></div>
     </div>
   )
@@ -476,8 +476,8 @@ function BrandKitTab({ client }: { client: SupabaseClient }) {
   return (
     <div className="space-y-4">
       {/* Logos Section */}
-      <div className="bg-[#001a1a]/80 border border-[#003434] rounded-xl p-5 shadow-sm">
-        <h3 className="text-white text-sm font-semibold mb-4 flex items-center gap-2">
+      <div className="bg-white border border-zinc-200 rounded-xl p-5 shadow-sm">
+        <h3 className="text-zinc-900 text-sm font-semibold mb-4 flex items-center gap-2">
           <div className="w-1 h-4 rounded-full bg-[#D0F255]" /> Logos
         </h3>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -491,10 +491,10 @@ function BrandKitTab({ client }: { client: SupabaseClient }) {
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
         {/* Colors Section */}
-        <div className="bg-[#001a1a]/80 border border-[#003434] rounded-xl overflow-hidden shadow-sm h-fit">
-          <div className="px-5 py-3 border-b border-[#003434] flex items-center gap-2 bg-[#001f1f]">
+        <div className="bg-white border border-zinc-200 rounded-xl overflow-hidden shadow-sm h-fit">
+          <div className="px-5 py-3 border-b border-zinc-100 flex items-center gap-2">
             <div className="w-1 h-4 rounded-full bg-[#70BF4B]" /> 
-            <h3 className="text-white text-sm font-semibold">Color System</h3>
+            <h3 className="text-zinc-900 text-sm font-semibold">Color System</h3>
           </div>
           <dl className="px-5 py-2">
             <BrandColorPicker clientId={client.id} label="Primary Color" value={colors.primary || ''} topKey="colors" valKey="primary" dataObj={sC} />
@@ -515,10 +515,10 @@ function BrandKitTab({ client }: { client: SupabaseClient }) {
         </div>
 
         {/* Typography & Tone */}
-        <div className="bg-[#001a1a]/80 border border-[#003434] rounded-xl overflow-hidden shadow-sm h-fit">
-          <div className="px-5 py-3 border-b border-[#003434] flex items-center gap-2 bg-[#001f1f]">
+        <div className="bg-white border border-zinc-200 rounded-xl overflow-hidden shadow-sm h-fit">
+          <div className="px-5 py-3 border-b border-zinc-100 flex items-center gap-2">
             <div className="w-1 h-4 rounded-full bg-[#70BF4B]" /> 
-            <h3 className="text-white text-sm font-semibold">Typography & Tone</h3>
+            <h3 className="text-zinc-900 text-sm font-semibold">Typography & Tone</h3>
           </div>
           <dl className="px-5 py-2">
             <EditableField clientId={client.id} label="Primary Font" field="primary_font" value={typo.primary_font || ''} onCustomSave={(v, u) => saveNested(u, 'typography', 'primary_font', v)} />
@@ -530,10 +530,10 @@ function BrandKitTab({ client }: { client: SupabaseClient }) {
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
         {/* Brand Voice */}
-        <div className="bg-[#001a1a]/80 border border-[#003434] rounded-xl overflow-hidden shadow-sm h-fit">
-          <div className="px-5 py-3 border-b border-[#003434] flex items-center gap-2 bg-[#001f1f]">
+        <div className="bg-white border border-zinc-200 rounded-xl overflow-hidden shadow-sm h-fit">
+          <div className="px-5 py-3 border-b border-zinc-100 flex items-center gap-2">
             <div className="w-1 h-4 rounded-full bg-[#D0F255]" /> 
-            <h3 className="text-white text-sm font-semibold">Brand Voice</h3>
+            <h3 className="text-zinc-900 text-sm font-semibold">Brand Voice</h3>
           </div>
           <dl className="px-5 py-2 space-y-2">
              <EditableTextarea clientId={client.id} label="Words to Use" field="words_to_use" value={voice.words_to_use || ''} onCustomSave={(v, u) => saveNested(u, 'voice', 'words_to_use', v)} />
@@ -542,10 +542,10 @@ function BrandKitTab({ client }: { client: SupabaseClient }) {
         </div>
 
         {/* Brand Story */}
-        <div className="bg-[#001a1a]/80 border border-[#003434] rounded-xl overflow-hidden shadow-sm h-fit">
-          <div className="px-5 py-3 border-b border-[#003434] flex items-center gap-2 bg-[#001f1f]">
+        <div className="bg-white border border-zinc-200 rounded-xl overflow-hidden shadow-sm h-fit">
+          <div className="px-5 py-3 border-b border-zinc-100 flex items-center gap-2">
             <div className="w-1 h-4 rounded-full bg-[#D0F255]" /> 
-            <h3 className="text-white text-sm font-semibold">Brand Story</h3>
+            <h3 className="text-zinc-900 text-sm font-semibold">Brand Story</h3>
           </div>
           <dl className="px-5 py-2">
             <EditableTextarea clientId={client.id} label="Story & Positioning" field="brand_story" value={String(sC.brand_story || '')} placeholder="Describe brand story, positioning, mission…" onCustomSave={(v, u) => u("section_c", { ...sC, brand_story: v })} />
@@ -601,11 +601,11 @@ function InlineTableCell({
       onChange={e => setLocal(e.target.value)}
       onBlur={handleSave}
       onKeyDown={handleKeyDown}
-      className="w-full bg-[#001a1a] text-white text-sm outline-none border border-[#70BF4B]/50 rounded px-2 py-1"
+      className="w-full bg-white text-zinc-900 text-sm outline-none border border-[#70BF4B] rounded px-2 py-1"
       placeholder={placeholder}
     />
   ) : (
-    <div onClick={() => setIsEditing(true)} className="cursor-text hover:bg-white/5 px-2 py-1 -ml-2 rounded transition-colors text-sm min-h-[28px] flex items-center">
+    <div onClick={() => setIsEditing(true)} className="cursor-text hover:bg-zinc-50 px-2 py-1 -ml-2 rounded transition-colors text-sm min-h-[28px] flex items-center">
       {local || <span className="text-zinc-600 italic text-xs">edit</span>}
     </div>
   )
@@ -624,22 +624,22 @@ function SocialTab({ client }: { client: SupabaseClient }) {
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead>
-            <tr className="border-b border-[#003434]">
+            <tr className="border-b border-zinc-100 bg-zinc-50">
               {["Platform", "Handle", "URL", "Status", "Ad Account ID"].map(h => (
                 <th key={h} className="text-left text-[10px] font-semibold text-zinc-500 uppercase tracking-widest px-4 py-3.5">{h}</th>
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-[#003434]/50">
+          <tbody className="divide-y divide-zinc-100">
             {accounts.map((a, i) => (
-              <tr key={i} className="hover:bg-[#003434]/30 transition-colors">
-                <td className="px-4 py-2 text-white font-medium">
+              <tr key={i} className="hover:bg-zinc-50 transition-colors">
+                <td className="px-4 py-2 text-zinc-900 font-medium">
                   <InlineTableCell clientId={client.id} section="section_d" currentArray={accounts} index={i} field="platform" value={a.platform || ''} />
                 </td>
-                <td className="px-4 py-2 text-zinc-300 font-mono">
+                <td className="px-4 py-2 text-zinc-600 font-mono">
                   <InlineTableCell clientId={client.id} section="section_d" currentArray={accounts} index={i} field="handle" value={a.handle || ''} placeholder="@handle" />
                 </td>
-                <td className="px-4 py-2 text-zinc-300">
+                <td className="px-4 py-2 text-zinc-600">
                   <InlineTableCell clientId={client.id} section="section_d" currentArray={accounts} index={i} field="url" value={a.url || ''} placeholder="https://" />
                 </td>
                 <td className="px-4 py-2">
@@ -729,7 +729,7 @@ function OnboardingTab({ client }: { client: SupabaseClient }) {
       <div className="flex justify-end gap-2">
         <button
           onClick={handleExportCsv}
-          className="flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-xl border border-[#003434] bg-[#001a1a] text-zinc-400 hover:text-white hover:border-[#70BF4B]/40 transition-all shadow-sm"
+          className="flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-xl border border-zinc-200 bg-white text-zinc-600 hover:text-zinc-900 hover:border-zinc-300 transition-all shadow-sm"
         >
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -738,7 +738,7 @@ function OnboardingTab({ client }: { client: SupabaseClient }) {
         </button>
         <button
           onClick={handleExportJson}
-          className="flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-xl border border-[#003434] bg-[#001a1a] text-zinc-400 hover:text-white hover:border-[#70BF4B]/40 transition-all shadow-sm"
+          className="flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-xl border border-zinc-200 bg-white text-zinc-600 hover:text-zinc-900 hover:border-zinc-300 transition-all shadow-sm"
         >
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -775,10 +775,10 @@ function CalendarStatusCell({ entry, onUpdate }: { entry: CalendarEntry; onUpdat
 
   const status = entry.status?.toLowerCase() || "draft"
   const colorCls = 
-    status === "published" ? "bg-[#70BF4B]/15 text-[#70BF4B] border-[#70BF4B]/30" :
-    status === "scheduled" ? "bg-sky-500/15 text-sky-400 border-sky-500/30" :
-    status === "review"    ? "bg-yellow-500/15 text-yellow-400 border-yellow-500/30" :
-                             "bg-zinc-700/30 text-zinc-400 border-zinc-600/30"
+    status === "published" ? "bg-emerald-50 text-emerald-600 border-emerald-100" :
+    status === "scheduled" ? "bg-blue-50 text-blue-600 border-blue-100" :
+    status === "review"    ? "bg-amber-50 text-amber-600 border-amber-100" :
+                             "bg-zinc-100 text-zinc-500 border-zinc-200"
 
   return (
     <div className="relative">
@@ -808,20 +808,20 @@ function CalendarTab({ entries, onUpdate }: { entries: CalendarEntry[]; onUpdate
     return <EmptyState icon="📅" message="No content calendar entries for this client." />
   }
   return (
-    <div className="bg-[#001f1f] border border-[#003434] rounded-xl overflow-hidden shadow-sm">
+    <div className="bg-white border border-zinc-200 rounded-xl overflow-hidden shadow-sm">
       <div className="overflow-x-auto">
         <table className="w-full">
           <thead>
-            <tr className="border-b border-[#003434]">
+            <tr className="border-b border-zinc-100">
               {["Title", "Type", "Platform", "Status", "Scheduled Date"].map(h => (
                 <th key={h} className="text-left text-[10px] font-semibold text-zinc-500 uppercase tracking-widest px-4 py-3.5">{h}</th>
               ))}
             </tr>
           </thead>
-          <tbody className="divide-y divide-[#003434]/50">
+          <tbody className="divide-y divide-zinc-100">
             {entries.map(e => (
-              <tr key={e.id} className="hover:bg-[#003434]/30 transition-colors">
-                <td className="px-4 py-3.5 text-white text-sm font-medium max-w-[200px] truncate">{e.title || "—"}</td>
+              <tr key={e.id} className="hover:bg-zinc-50 transition-colors">
+                <td className="px-4 py-3.5 text-zinc-900 text-sm font-medium max-w-[200px] truncate">{e.title || "—"}</td>
                 <td className="px-4 py-3.5 text-zinc-300 text-sm">{e.type || "—"}</td>
                 <td className="px-4 py-3.5 text-zinc-400 text-sm">{e.platform || "—"}</td>
                 <td className="px-4 py-3.5"><CalendarStatusCell entry={e} onUpdate={onUpdate} /></td>
@@ -841,10 +841,10 @@ function LegalTab({ client }: { client: SupabaseClient }) {
   const sI = client.section_i ?? {}
   return (
     <div className="space-y-4">
-      <div className="bg-[#001f1f] border border-[#003434] rounded-xl overflow-hidden shadow-sm">
-        <div className="px-5 py-3 border-b border-[#003434] flex items-center gap-2">
+      <div className="bg-white border border-zinc-200 rounded-xl overflow-hidden shadow-sm">
+        <div className="px-5 py-3 border-b border-zinc-100 flex items-center gap-2">
           <div className="w-1 h-4 rounded-full bg-red-400" />
-          <h3 className="text-white text-sm font-semibold">Regulatory Flags</h3>
+          <h3 className="text-zinc-900 text-sm font-semibold">Regulatory Flags</h3>
         </div>
         <dl className="px-5 py-1">
           <EditableField clientId={client.id} label="Regulated Industry" field="regulated_industry" section="section_i" value={String(sI.regulated_industry || '')} inputType="checkbox" />
@@ -861,7 +861,7 @@ function LegalTab({ client }: { client: SupabaseClient }) {
 function NotesTab({ client }: { client: SupabaseClient }) {
   return (
     <div className="space-y-4">
-      <div className="bg-[#001f1f] border border-[#003434] rounded-xl p-5 shadow-sm">
+      <div className="bg-white border border-zinc-200 rounded-xl p-5 shadow-sm">
         <EditableTextarea clientId={client.id} label="Internal Notes" field="section_notes" value={client.section_notes || ''} />
       </div>
       <p className="text-zinc-700 text-xs text-center">Data autosaves after 500ms on blur or enter.</p>
@@ -981,10 +981,10 @@ function AuthorizedUsersCard({ clientId }: { clientId: string }) {
   }
 
   return (
-    <div className="bg-[#001f1f] border border-[#003434] rounded-xl overflow-hidden shadow-sm">
-      <div className="px-5 py-3 border-b border-[#003434] flex items-center gap-2">
+    <div className="bg-white border border-zinc-200 rounded-xl overflow-hidden shadow-sm">
+      <div className="px-5 py-3 border-b border-zinc-100 flex items-center gap-2">
         <div className="w-1 h-4 rounded-full bg-[#70BF4B]" />
-        <h3 className="text-white text-sm font-semibold">Authorized Users</h3>
+        <h3 className="text-zinc-900 text-sm font-semibold">Authorized Users</h3>
         <span className="text-[10px] text-zinc-500 ml-auto">Client portal access</span>
       </div>
 
@@ -997,19 +997,19 @@ function AuthorizedUsersCard({ clientId }: { clientId: string }) {
           <div className="overflow-x-auto -mx-5 px-5">
             <table className="w-full text-sm">
               <thead>
-                <tr className="border-b border-[#003434]">
+                <tr className="border-b border-zinc-100">
                   {["Email", "Name", "Role", "Status", "Actions"].map(h => (
                     <th key={h} className={`text-left text-[10px] font-semibold text-zinc-500 uppercase tracking-widest py-2 pr-3 ${h === 'Actions' ? 'text-right' : ''}`}>{h}</th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#003434]/50">
+              <tbody className="divide-y divide-zinc-100">
                 {users.map(u => {
                   const s = statusLabel(u)
                   const canResend = !u.password_set_at && u.status !== 'suspended'
                   return (
-                    <tr key={u.id}>
-                      <td className="py-3 pr-3 text-white max-w-[150px] truncate" title={u.email}>{u.email}</td>
+                    <tr key={u.id} className="hover:bg-zinc-50 transition-colors">
+                      <td className="py-3 pr-3 text-zinc-900 max-w-[150px] truncate" title={u.email}>{u.email}</td>
                       <td className="py-3 pr-3 text-zinc-300">{u.full_name || <span className="text-zinc-600">—</span>}</td>
                       <td className="py-3 pr-3">
                         <select
@@ -1066,13 +1066,13 @@ function AuthorizedUsersCard({ clientId }: { clientId: string }) {
           </div>
         )}
 
-        <form onSubmit={handleSubmit} className="mt-5 pt-4 border-t border-[#003434]/60 grid grid-cols-1 md:grid-cols-[1.4fr_1fr_0.7fr_auto] gap-2 items-end">
+        <form onSubmit={handleSubmit} className="mt-5 pt-4 border-t border-zinc-100 grid grid-cols-1 md:grid-cols-[1.4fr_1fr_0.7fr_auto] gap-2 items-end">
           <div>
             <label className="block text-[10px] uppercase tracking-widest text-zinc-500 mb-1">Email</label>
             <input
               type="email" required value={email} onChange={e => setEmail(e.target.value)}
               placeholder="user@example.com"
-              className="w-full bg-[#001a1a] text-white text-sm border border-[#003434] focus:border-[#70BF4B]/60 outline-none rounded px-2 py-1.5"
+              className="w-full bg-white text-zinc-900 text-sm border border-zinc-200 focus:border-[#70BF4B] outline-none rounded px-2 py-1.5"
             />
           </div>
           <div>
@@ -1080,14 +1080,14 @@ function AuthorizedUsersCard({ clientId }: { clientId: string }) {
             <input
               type="text" value={fullName} onChange={e => setFullName(e.target.value)}
               placeholder="Jane Doe"
-              className="w-full bg-[#001a1a] text-white text-sm border border-[#003434] focus:border-[#70BF4B]/60 outline-none rounded px-2 py-1.5"
+              className="w-full bg-white text-zinc-900 text-sm border border-zinc-200 focus:border-[#70BF4B] outline-none rounded px-2 py-1.5"
             />
           </div>
           <div>
             <label className="block text-[10px] uppercase tracking-widest text-zinc-500 mb-1">Role</label>
             <select
               value={role} onChange={e => setRole(e.target.value as ClientUser['role'])}
-              className="w-full bg-[#001a1a] text-white text-sm border border-[#003434] focus:border-[#70BF4B]/60 outline-none rounded px-2 py-1.5"
+              className="w-full bg-white text-zinc-900 text-sm border border-zinc-200 focus:border-[#70BF4B] outline-none rounded px-2 py-1.5"
             >
               <option value="editor">Editor</option>
               <option value="admin">Admin</option>
@@ -1172,11 +1172,11 @@ function AccessCredentialsTab({ client }: { client: SupabaseClient }) {
         onChange={e => setLocal(e.target.value)}
         onBlur={handleSave}
         onKeyDown={e => e.key === "Enter" && handleSave()}
-        className="w-full bg-[#001a1a] text-white text-sm outline-none border border-[#70BF4B]/50 rounded px-2 py-1"
+        className="w-full bg-white text-zinc-900 text-sm outline-none border border-[#70BF4B] rounded px-2 py-1"
         placeholder={`${field}...`}
       />
     ) : (
-      <div onClick={() => setIsEditing(true)} className="cursor-text hover:bg-white/5 px-2 py-1 -ml-2 rounded transition-colors text-sm min-h-[28px] flex items-center">
+      <div onClick={() => setIsEditing(true)} className="cursor-text hover:bg-zinc-50 px-2 py-1 -ml-2 rounded transition-colors text-sm min-h-[28px] flex items-center">
         {local || <span className="text-zinc-600 border-b border-dashed border-zinc-600/50">Add {field}</span>}
       </div>
     )
@@ -1189,10 +1189,10 @@ function AccessCredentialsTab({ client }: { client: SupabaseClient }) {
         <p className="text-red-400 text-sm font-medium">Credentials visible to admin only.</p>
       </div>
 
-      <div className="bg-[#001f1f] border border-[#003434] rounded-xl overflow-hidden shadow-sm">
-        <div className="px-5 py-3 border-b border-[#003434] flex items-center gap-2">
+      <div className="bg-white border border-zinc-200 rounded-xl overflow-hidden shadow-sm">
+        <div className="px-5 py-3 border-b border-zinc-100 flex items-center gap-2">
           <div className="w-1 h-4 rounded-full bg-[#70BF4B]" />
-          <h3 className="text-white text-sm font-semibold">General Access</h3>
+          <h3 className="text-zinc-900 text-sm font-semibold">General Access</h3>
         </div>
         <dl className="px-5 py-1">
           <EditableField clientId={client.id} label="Vault ID" field="vault_id" section="section_l" value={String(sL.vault_id || '')} />
@@ -1206,10 +1206,10 @@ function AccessCredentialsTab({ client }: { client: SupabaseClient }) {
 
       <AuthorizedUsersCard clientId={client.id} />
 
-      <div className="bg-[#001f1f] border border-[#003434] rounded-xl overflow-hidden shadow-sm">
-        <div className="px-5 py-3 border-b border-[#003434] flex items-center gap-2">
+      <div className="bg-white border border-zinc-200 rounded-xl overflow-hidden shadow-sm">
+        <div className="px-5 py-3 border-b border-zinc-100 flex items-center gap-2">
           <div className="w-1 h-4 rounded-full bg-[#70BF4B]" />
-          <h3 className="text-white text-sm font-semibold">Toggles</h3>
+          <h3 className="text-zinc-900 text-sm font-semibold">Toggles</h3>
         </div>
         <dl className="px-5 py-1 grid grid-cols-1 sm:grid-cols-3">
           <EditableField clientId={client.id} label="Domain Registrar" field="domain_registrar_access" section="section_l" value={String(sL.domain_registrar_access || '')} inputType="checkbox" />
@@ -1218,24 +1218,24 @@ function AccessCredentialsTab({ client }: { client: SupabaseClient }) {
         </dl>
       </div>
 
-      <div className="bg-[#001f1f] border border-[#003434] rounded-xl overflow-hidden shadow-sm">
-        <div className="px-5 py-3 border-b border-[#003434] flex items-center gap-2">
+      <div className="bg-white border border-zinc-200 rounded-xl overflow-hidden shadow-sm">
+        <div className="px-5 py-3 border-b border-zinc-100 flex items-center gap-2">
           <div className="w-1 h-4 rounded-full bg-[#70BF4B]" />
-          <h3 className="text-white text-sm font-semibold">Platform Credentials</h3>
+          <h3 className="text-zinc-900 text-sm font-semibold">Platform Credentials</h3>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead>
-              <tr className="border-b border-[#003434]">
+              <tr className="border-b border-zinc-100">
                 {["Platform", "Login Email", "Password Saved", "2FA", "Notes"].map(h => (
                   <th key={h} className="text-left text-[10px] font-semibold text-zinc-500 uppercase tracking-widest px-4 py-3.5">{h}</th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#003434]/50">
+            <tbody className="divide-y divide-zinc-50">
               {PLATFORMS.map(p => (
-                <tr key={p}>
-                  <td className="px-4 py-2 text-white text-sm font-medium">{p}</td>
+                <tr key={p} className="hover:bg-zinc-50 transition-colors">
+                  <td className="px-4 py-2 text-zinc-900 text-sm font-medium">{p}</td>
                   <td className="px-4 py-2"><InlineCredInput platform={p} field="login_email" val={getCred(p, 'login_email')} /></td>
                   <td className="px-4 py-2"><InlineCredInput platform={p} field="password_saved" val={getCred(p, 'password_saved')} type="checkbox" /></td>
                   <td className="px-4 py-2"><InlineCredInput platform={p} field="two_fa" val={getCred(p, 'two_fa')} type="checkbox" /></td>
@@ -1247,7 +1247,7 @@ function AccessCredentialsTab({ client }: { client: SupabaseClient }) {
         </div>
       </div>
 
-      <div className="bg-[#001f1f] border border-[#003434] rounded-xl p-5 shadow-sm">
+      <div className="bg-white border border-zinc-200 rounded-xl p-5 shadow-sm">
         <EditableTextarea clientId={client.id} label="Internal Notes (Access)" field="internal_notes" section="section_l" value={String(sL.internal_notes || '')} />
       </div>
     </div>
@@ -1273,10 +1273,10 @@ function PackageTab({ client }: { client: SupabaseClient }) {
     <div className="space-y-4">
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
         {/* Core Package Details */}
-        <div className="bg-[#001f1f] border border-[#003434] rounded-xl overflow-hidden shadow-sm">
-          <div className="px-5 py-3 border-b border-[#003434] flex items-center gap-2">
+        <div className="bg-white border border-zinc-200 rounded-xl overflow-hidden shadow-sm">
+          <div className="px-5 py-3 border-b border-zinc-100 flex items-center gap-2">
             <div className="w-1 h-4 rounded-full bg-[#70BF4B]" />
-            <h3 className="text-white text-sm font-semibold">Package Details</h3>
+            <h3 className="text-zinc-900 text-sm font-semibold">Package Details</h3>
           </div>
           <dl className="px-5 py-1">
             <EditableSelect clientId={client.id} label="Package" field="package" section="section_m" value={String(sM.package || '')} options={['AI Automation', 'Website', 'SEO', 'Social', 'Consulting', 'Bundle']} />
@@ -1286,10 +1286,10 @@ function PackageTab({ client }: { client: SupabaseClient }) {
         </div>
 
         {/* Status & Risk */}
-        <div className="bg-[#001f1f] border border-[#003434] rounded-xl overflow-hidden shadow-sm">
-          <div className="px-5 py-3 border-b border-[#003434] flex items-center gap-2">
+        <div className="bg-white border border-zinc-200 rounded-xl overflow-hidden shadow-sm">
+          <div className="px-5 py-3 border-b border-zinc-100 flex items-center gap-2">
             <div className="w-1 h-4 rounded-full bg-[#70BF4B]" />
-            <h3 className="text-white text-sm font-semibold">Status & Risk</h3>
+            <h3 className="text-zinc-900 text-sm font-semibold">Status & Risk</h3>
           </div>
           <dl className="px-5 py-1">
             <EditableSelect clientId={client.id} label="Onboarding" field="onboarding_status" section="section_m" value={String(sM.onboarding_status || '')} options={['Not Started', 'In Progress', 'Submitted', 'Completed', 'Blocked']} />
@@ -1305,20 +1305,20 @@ function PackageTab({ client }: { client: SupabaseClient }) {
       </div>
 
       {/* Timeline */}
-      <div className="bg-[#001f1f] border border-[#003434] rounded-xl overflow-hidden shadow-sm">
-        <div className="px-5 py-3 border-b border-[#003434] flex items-center gap-2">
+      <div className="bg-white border border-zinc-200 rounded-xl overflow-hidden shadow-sm">
+        <div className="px-5 py-3 border-b border-zinc-100 flex items-center gap-2">
           <div className="w-1 h-4 rounded-full bg-[#70BF4B]" />
-          <h3 className="text-white text-sm font-semibold">Timeline & Contracts</h3>
+          <h3 className="text-zinc-900 text-sm font-semibold">Timeline & Contracts</h3>
         </div>
         <dl className="px-5 py-1 grid grid-cols-1 sm:grid-cols-2">
           <EditableField clientId={client.id} label="Contract Start" field="contract_start" section="section_m" inputType="date" value={String(sM.contract_start || '')} />
           <EditableField clientId={client.id} label="Contract End" field="contract_end" section="section_m" inputType="date" value={String(sM.contract_end || '')} />
           
-          <div className="flex flex-col sm:flex-row gap-1.5 py-3 border-b border-[#003434] last:border-0 sm:col-span-2">
+          <div className="flex flex-col sm:flex-row gap-1.5 py-3 border-b border-zinc-100 last:border-0 sm:col-span-2">
             <dt className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500 sm:w-36 shrink-0 pt-0.5 mt-[2px]">
               Renewal Date (Auto)
             </dt>
-            <dd className="flex-1 min-w-0 flex items-center gap-3 text-zinc-400 text-sm px-2">
+            <dd className="flex-1 min-w-0 flex items-center gap-3 text-zinc-600 text-sm px-2">
               {renewalDate || "—"}
             </dd>
           </div>
@@ -1326,10 +1326,10 @@ function PackageTab({ client }: { client: SupabaseClient }) {
       </div>
 
       {/* Operations & Links */}
-      <div className="bg-[#001f1f] border border-[#003434] rounded-xl overflow-hidden shadow-sm">
-        <div className="px-5 py-3 border-b border-[#003434] flex items-center gap-2">
+      <div className="bg-white border border-zinc-200 rounded-xl overflow-hidden shadow-sm">
+        <div className="px-5 py-3 border-b border-zinc-100 flex items-center gap-2">
           <div className="w-1 h-4 rounded-full bg-[#70BF4B]" />
-          <h3 className="text-white text-sm font-semibold">Operations</h3>
+          <h3 className="text-zinc-900 text-sm font-semibold">Operations</h3>
         </div>
         <dl className="px-5 py-1 grid grid-cols-1 sm:grid-cols-2">
           <EditableField clientId={client.id} label="Assigned AM" field="assigned_am" section="section_m" value={String(sM.assigned_am || '')} />
@@ -1342,10 +1342,10 @@ function PackageTab({ client }: { client: SupabaseClient }) {
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-        <div className="bg-[#001f1f] border border-[#003434] rounded-xl p-5 shadow-sm">
+        <div className="bg-white border border-zinc-200 rounded-xl p-5 shadow-sm">
           <EditableTextarea clientId={client.id} label="Risk Notes" field="risk_notes" section="section_m" value={String(sM.risk_notes || '')} />
         </div>
-        <div className="bg-[#001f1f] border border-[#003434] rounded-xl p-5 shadow-sm">
+        <div className="bg-white border border-zinc-200 rounded-xl p-5 shadow-sm">
           <EditableTextarea clientId={client.id} label="Special Instructions" field="special_instructions" section="section_m" value={String(sM.special_instructions || '')} />
         </div>
       </div>
@@ -1393,7 +1393,7 @@ function MixSlider({
         <span className="text-xs font-medium text-zinc-400">{label}</span>
         <span className="text-xs font-mono text-zinc-300 tabular-nums w-9 text-right">{value}%</span>
       </div>
-      <div className="relative h-2 bg-[#003434] rounded-full overflow-hidden">
+      <div className="relative h-2 bg-zinc-100 rounded-full overflow-hidden">
         <div
           className="absolute inset-y-0 left-0 rounded-full transition-all"
           style={{ width: `${value}%`, backgroundColor: color }}
@@ -1516,9 +1516,9 @@ function ContentGeneratorTab({ client }: { client: SupabaseClient }) {
       {/* Mode toggles */}
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {/* Reeval Mode toggle */}
-        <div className="bg-[#001f1f] border border-[#003434] rounded-xl p-4 flex items-center justify-between gap-4">
+        <div className="bg-white border border-zinc-200 rounded-xl p-4 flex items-center justify-between gap-4">
           <div>
-            <p className="text-white text-sm font-semibold">Review Mode</p>
+            <p className="text-zinc-900 text-sm font-semibold">Review Mode</p>
             <p className="text-zinc-500 text-xs mt-0.5">Review posts before publishing vs. auto-approve</p>
           </div>
           <button
@@ -1530,21 +1530,21 @@ function ContentGeneratorTab({ client }: { client: SupabaseClient }) {
             className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 transition-colors ${
               reevalMode === 'Review Mode'
                 ? 'border-[#70BF4B] bg-[#70BF4B]/20'
-                : 'border-zinc-600 bg-zinc-800'
+                : 'border-zinc-200 bg-zinc-100'
             }`}
           >
             <span className={`inline-block h-4 w-4 rounded-full mt-0.5 transition-transform ${
               reevalMode === 'Review Mode'
                 ? 'translate-x-5 bg-[#70BF4B]'
-                : 'translate-x-0.5 bg-zinc-500'
+                : 'translate-x-0.5 bg-zinc-400'
             }`} />
           </button>
         </div>
 
         {/* Auto Generate toggle */}
-        <div className="bg-[#001f1f] border border-[#003434] rounded-xl p-4 flex items-center justify-between gap-4">
+        <div className="bg-white border border-zinc-200 rounded-xl p-4 flex items-center justify-between gap-4">
           <div>
-            <p className="text-white text-sm font-semibold">Auto-generate Weekly</p>
+            <p className="text-zinc-900 text-sm font-semibold">Auto-generate Weekly</p>
             <p className="text-zinc-500 text-xs mt-0.5">Automatically generate every Monday at 6 AM</p>
           </div>
           <button
@@ -1556,22 +1556,22 @@ function ContentGeneratorTab({ client }: { client: SupabaseClient }) {
             className={`relative inline-flex h-6 w-11 shrink-0 rounded-full border-2 transition-colors ${
               autoGen
                 ? 'border-[#70BF4B] bg-[#70BF4B]/20'
-                : 'border-zinc-600 bg-zinc-800'
+                : 'border-zinc-200 bg-zinc-100'
             }`}
           >
             <span className={`inline-block h-4 w-4 rounded-full mt-0.5 transition-transform ${
-              autoGen ? 'translate-x-5 bg-[#70BF4B]' : 'translate-x-0.5 bg-zinc-500'
+              autoGen ? 'translate-x-5 bg-[#70BF4B]' : 'translate-x-0.5 bg-zinc-400'
             }`} />
           </button>
         </div>
       </div>
 
       {/* Platform multi-select */}
-      <div className="bg-[#001f1f] border border-[#003434] rounded-xl overflow-hidden">
-        <div className="px-5 py-3 border-b border-[#003434] flex items-center justify-between">
+      <div className="bg-white border border-zinc-200 rounded-xl overflow-hidden">
+        <div className="px-5 py-3 border-b border-zinc-100 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="w-1 h-4 rounded-full bg-[#70BF4B]" />
-            <h3 className="text-white text-sm font-semibold">Platforms</h3>
+            <h3 className="text-zinc-900 text-sm font-semibold">Platforms</h3>
           </div>
           {settingsSaved && <span className="text-[#70BF4B] text-xs font-bold">✓ Saved</span>}
         </div>
@@ -1584,8 +1584,8 @@ function ContentGeneratorTab({ client }: { client: SupabaseClient }) {
                 onClick={() => togglePlatform(id)}
                 className={`px-3.5 py-1.5 rounded-lg text-sm font-medium border transition-all ${
                   active
-                    ? 'bg-[#70BF4B]/15 border-[#70BF4B]/50 text-[#D0F255]'
-                    : 'bg-transparent border-[#003434] text-zinc-500 hover:border-zinc-500 hover:text-zinc-300'
+                    ? 'bg-[#70BF4B]/10 border-[#70BF4B]/50 text-[#70BF4B]'
+                    : 'bg-transparent border-zinc-200 text-zinc-500 hover:border-zinc-400 hover:text-zinc-700'
                 }`}
               >
                 {label}
@@ -1597,30 +1597,30 @@ function ContentGeneratorTab({ client }: { client: SupabaseClient }) {
 
       {/* Posts per week (only active platforms) */}
       {platforms.length > 0 && (
-        <div className="bg-[#001f1f] border border-[#003434] rounded-xl overflow-hidden">
-          <div className="px-5 py-3 border-b border-[#003434] flex items-center gap-2">
+        <div className="bg-white border border-zinc-200 rounded-xl overflow-hidden">
+          <div className="px-5 py-3 border-b border-zinc-100 flex items-center gap-2">
             <div className="w-1 h-4 rounded-full bg-[#D0F255]" />
-            <h3 className="text-white text-sm font-semibold">Posts Per Week</h3>
+            <h3 className="text-zinc-900 text-sm font-semibold">Posts Per Week</h3>
           </div>
           <div className="p-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
             {platforms.map(pid => {
               const platform = CONTENT_PLATFORMS.find(p => p.id === pid)
               return (
-                <div key={pid} className="bg-[#001a1a] border border-[#003434] rounded-lg p-3 space-y-2">
+                <div key={pid} className="bg-zinc-50 border border-zinc-100 rounded-lg p-3 space-y-2">
                   <p className="text-zinc-500 text-[10px] font-semibold uppercase tracking-widest">
                     {platform?.label ?? pid}
                   </p>
                   <div className="flex items-center gap-2">
                     <button
                       onClick={() => updatePostsPerWeek(pid, Math.max(0, (postsPerWeek[pid] ?? DEFAULT_POSTS_PER_WEEK[pid] ?? 3) - 1))}
-                      className="w-6 h-6 rounded-md bg-[#003434] text-zinc-400 hover:text-white flex items-center justify-center text-sm font-bold transition-colors"
+                      className="w-6 h-6 rounded-md bg-zinc-200 text-zinc-600 hover:bg-zinc-300 flex items-center justify-center text-sm font-bold transition-colors"
                     >−</button>
-                    <span className="flex-1 text-center text-white font-mono text-sm">
+                    <span className="flex-1 text-center text-zinc-900 font-mono text-sm">
                       {postsPerWeek[pid] ?? DEFAULT_POSTS_PER_WEEK[pid] ?? 3}
                     </span>
                     <button
                       onClick={() => updatePostsPerWeek(pid, Math.min(14, (postsPerWeek[pid] ?? DEFAULT_POSTS_PER_WEEK[pid] ?? 3) + 1))}
-                      className="w-6 h-6 rounded-md bg-[#003434] text-zinc-400 hover:text-white flex items-center justify-center text-sm font-bold transition-colors"
+                      className="w-6 h-6 rounded-md bg-zinc-200 text-zinc-600 hover:bg-zinc-300 flex items-center justify-center text-sm font-bold transition-colors"
                     >+</button>
                   </div>
                 </div>
@@ -1631,11 +1631,11 @@ function ContentGeneratorTab({ client }: { client: SupabaseClient }) {
       )}
 
       {/* Content mix sliders */}
-      <div className="bg-[#001f1f] border border-[#003434] rounded-xl overflow-hidden">
-        <div className="px-5 py-3 border-b border-[#003434] flex items-center justify-between">
+      <div className="bg-white border border-zinc-200 rounded-xl overflow-hidden">
+        <div className="px-5 py-3 border-b border-zinc-100 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="w-1 h-4 rounded-full bg-[#38bdf8]" />
-            <h3 className="text-white text-sm font-semibold">Content Mix</h3>
+            <h3 className="text-zinc-900 text-sm font-semibold">Content Mix</h3>
           </div>
           <span className={`text-xs font-mono ${
             mixTotal === 100 ? 'text-[#70BF4B]' : 'text-yellow-400'
@@ -1672,8 +1672,8 @@ function ContentGeneratorTab({ client }: { client: SupabaseClient }) {
         disabled={generating || platforms.length === 0}
         className={`w-full py-4 rounded-xl text-sm font-bold flex items-center justify-center gap-3 transition-all border ${
           generating || platforms.length === 0
-            ? 'bg-zinc-800 border-zinc-700 text-zinc-500 cursor-not-allowed'
-            : 'bg-[#70BF4B]/10 border-[#70BF4B]/50 text-[#D0F255] hover:bg-[#70BF4B]/20 hover:border-[#70BF4B] shadow-lg shadow-[#70BF4B]/5 active:scale-[0.99]'
+            ? 'bg-zinc-100 border-zinc-200 text-zinc-400 cursor-not-allowed'
+            : 'bg-[#70BF4B] text-white hover:bg-[#70BF4B]/90 shadow-lg shadow-[#70BF4B]/20 active:scale-[0.99]'
         }`}
       >
         {generating ? (
@@ -1707,11 +1707,11 @@ function ContentGeneratorTab({ client }: { client: SupabaseClient }) {
       )}
 
       {/* Last 5 generation logs */}
-      <div className="bg-[#001f1f] border border-[#003434] rounded-xl overflow-hidden">
-        <div className="px-5 py-3 border-b border-[#003434] flex items-center gap-2">
-          <div className="w-1 h-4 rounded-full bg-zinc-500" />
-          <h3 className="text-white text-sm font-semibold">Generation Log</h3>
-          <span className="text-zinc-600 text-xs ml-auto">Last 5 runs</span>
+      <div className="bg-white border border-zinc-200 rounded-xl overflow-hidden">
+        <div className="px-5 py-3 border-b border-zinc-100 flex items-center gap-2">
+          <div className="w-1 h-4 rounded-full bg-zinc-400" />
+          <h3 className="text-zinc-900 text-sm font-semibold">Generation Log</h3>
+          <span className="text-zinc-500 text-xs ml-auto">Last 5 runs</span>
         </div>
         {logsLoading ? (
           <div className="px-5 py-6 flex items-center gap-2 text-zinc-600">
@@ -1727,16 +1727,16 @@ function ContentGeneratorTab({ client }: { client: SupabaseClient }) {
           <div className="overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-[#003434]/60">
+                <tr className="border-b border-zinc-100">
                   {['Date', 'Posts', 'Platforms', 'Status', 'Errors'].map(h => (
                     <th key={h} className="text-left text-[10px] font-semibold text-zinc-500 uppercase tracking-widest px-4 py-3">{h}</th>
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#003434]/40">
+              <tbody className="divide-y divide-zinc-50">
                 {logs.map(log => (
-                  <tr key={log.id} className="hover:bg-[#003434]/20 transition-colors">
-                    <td className="px-4 py-3 text-zinc-300 text-sm font-mono whitespace-nowrap">
+                  <tr key={log.id} className="hover:bg-zinc-50 transition-colors">
+                    <td className="px-4 py-3 text-zinc-700 text-sm font-mono whitespace-nowrap">
                       {new Date(log.generated_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}
                     </td>
                     <td className="px-4 py-3 text-zinc-400 text-sm">
@@ -1745,7 +1745,7 @@ function ContentGeneratorTab({ client }: { client: SupabaseClient }) {
                     <td className="px-4 py-3">
                       <div className="flex flex-wrap gap-1">
                         {(log.platforms ?? []).map(p => (
-                          <span key={p} className="px-1.5 py-0.5 rounded text-[10px] bg-[#003434] text-zinc-400">{p}</span>
+                          <span key={p} className="px-1.5 py-0.5 rounded text-[10px] bg-zinc-100 text-zinc-600">{p}</span>
                         ))}
                       </div>
                     </td>
@@ -1785,14 +1785,14 @@ function AccordionSection({ title, color, content }: ContextSection) {
   const entries = Object.entries(content).filter(([, v]) => v !== null && v !== undefined && v !== '')
 
   return (
-    <div className="bg-[#001a1a] border border-[#003434] rounded-xl overflow-hidden">
+    <div className="bg-zinc-50 border border-zinc-100 rounded-xl overflow-hidden">
       <button
         onClick={() => setOpen(o => !o)}
         className="w-full px-5 py-3.5 flex items-center justify-between text-left hover:bg-[#003434]/30 transition-colors"
       >
         <div className="flex items-center gap-2">
           <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: color }} />
-          <span className="text-white text-sm font-semibold">{title}</span>
+          <span className="text-zinc-900 text-sm font-semibold">{title}</span>
           {entries.length > 0 && (
             <span className="text-[10px] text-zinc-600 font-mono">{entries.length} fields</span>
           )}
@@ -1806,7 +1806,7 @@ function AccordionSection({ title, color, content }: ContextSection) {
       </button>
 
       {open && (
-        <div className="border-t border-[#003434] px-5 py-4 space-y-2">
+        <div className="border-t border-zinc-100 px-5 py-4 space-y-2">
           {entries.length === 0 ? (
             <p className="text-zinc-600 text-xs italic">No data in this section yet.</p>
           ) : (
@@ -1815,7 +1815,7 @@ function AccordionSection({ title, color, content }: ContextSection) {
                 <dt className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500 sm:w-44 shrink-0 pt-0.5">
                   {key.replace(/_/g, ' ')}
                 </dt>
-                <dd className="text-sm text-zinc-300 flex-1 min-w-0 break-words">
+                <dd className="text-sm text-zinc-700 flex-1 min-w-0 break-words">
                   {typeof val === 'object' ? JSON.stringify(val, null, 2) : String(val)}
                 </dd>
               </div>
@@ -1982,7 +1982,7 @@ function ContextPackTab({ client }: { client: SupabaseClient }) {
     <div className="space-y-4">
 
       {/* Status + primary actions */}
-      <div className="bg-[#001f1f] border border-[#003434] rounded-xl p-5">
+      <div className="bg-white border border-zinc-200 rounded-xl p-5">
         <div className="flex flex-col sm:flex-row sm:items-center gap-4">
           <div className="flex-1">
             <p className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500 mb-1">Status</p>
@@ -1999,8 +1999,8 @@ function ContextPackTab({ client }: { client: SupabaseClient }) {
             disabled={generating}
             className={`flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold border transition-all shrink-0 ${
               generating
-                ? 'bg-zinc-800 border-zinc-700 text-zinc-500 cursor-not-allowed'
-                : 'bg-[#70BF4B]/10 border-[#70BF4B]/50 text-[#D0F255] hover:bg-[#70BF4B]/20 hover:border-[#70BF4B]'
+                ? 'bg-zinc-100 border-zinc-200 text-zinc-400 cursor-not-allowed'
+                : 'bg-[#70BF4B] text-white border-[#70BF4B] hover:bg-[#70BF4B]/90'
             }`}
           >
             {generating ? (
@@ -2045,7 +2045,7 @@ function ContextPackTab({ client }: { client: SupabaseClient }) {
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
         <button
           onClick={handleDownloadMarkdown}
-          className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold border border-[#003434] bg-[#001a1a] text-zinc-300 hover:text-white hover:border-zinc-500 transition-all"
+          className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold border border-zinc-200 bg-white text-zinc-600 hover:text-zinc-900 hover:border-zinc-400 transition-all"
         >
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -2057,8 +2057,8 @@ function ContextPackTab({ client }: { client: SupabaseClient }) {
           onClick={handleCopyJson}
           className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold border transition-all ${
             copied
-              ? 'border-[#70BF4B]/50 bg-[#70BF4B]/10 text-[#70BF4B]'
-              : 'border-[#003434] bg-[#001a1a] text-zinc-300 hover:text-white hover:border-zinc-500'
+              ? 'border-[#70BF4B] bg-[#70BF4B]/10 text-[#70BF4B]'
+              : 'border-zinc-200 bg-white text-zinc-600 hover:text-zinc-900 hover:border-zinc-400'
           }`}
         >
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2070,7 +2070,7 @@ function ContextPackTab({ client }: { client: SupabaseClient }) {
         <button
           onClick={handleGenerate}
           disabled={generating}
-          className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold border border-[#003434] bg-[#001a1a] text-zinc-300 hover:text-white hover:border-zinc-500 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+          className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold border border-zinc-200 bg-white text-zinc-600 hover:text-zinc-900 hover:border-zinc-400 transition-all disabled:opacity-40 disabled:cursor-not-allowed"
         >
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
@@ -2082,8 +2082,8 @@ function ContextPackTab({ client }: { client: SupabaseClient }) {
           onClick={() => setHistoryOpen(h => !h)}
           className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-xs font-semibold border transition-all ${
             historyOpen
-              ? 'border-[#70BF4B]/40 bg-[#003434] text-[#D0F255]'
-              : 'border-[#003434] bg-[#001a1a] text-zinc-300 hover:text-white hover:border-zinc-500'
+              ? 'border-[#70BF4B] bg-[#70BF4B]/10 text-[#70BF4B]'
+              : 'border-zinc-200 bg-white text-zinc-600 hover:text-zinc-900 hover:border-zinc-400'
           }`}
         >
           <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2114,10 +2114,10 @@ function ContextPackHistory({ clientId }: { clientId: string }) {
   }, [clientId])
 
   return (
-    <div className="bg-[#001f1f] border border-[#003434] rounded-xl overflow-hidden">
-      <div className="px-5 py-3 border-b border-[#003434] flex items-center gap-2">
-        <div className="w-1 h-4 rounded-full bg-zinc-500" />
-        <h3 className="text-white text-sm font-semibold">Generation History</h3>
+    <div className="bg-white border border-zinc-200 rounded-xl overflow-hidden">
+      <div className="px-5 py-3 border-b border-zinc-100 flex items-center gap-2">
+        <div className="w-1 h-4 rounded-full bg-zinc-400" />
+        <h3 className="text-zinc-900 text-sm font-semibold">Generation History</h3>
       </div>
       <div className="px-5 py-4">
         {loading ? (
@@ -2129,7 +2129,7 @@ function ContextPackHistory({ clientId }: { clientId: string }) {
             {history.map(h => (
               <li key={h.id} className="flex items-center gap-3 text-sm">
                 <div className="w-1.5 h-1.5 rounded-full bg-[#70BF4B] shrink-0" />
-                <span className="text-zinc-300 font-mono">
+                <span className="text-zinc-600 font-mono">
                   {new Date(h.generated_at).toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' })}
                 </span>
               </li>
@@ -2145,7 +2145,7 @@ function ContextPackHistory({ clientId }: { clientId: string }) {
 
 function EmptyState({ icon, message }: { icon: string; message: string }) {
   return (
-    <div className="bg-[#001f1f] border border-[#003434] rounded-xl py-16 flex flex-col items-center text-center gap-3">
+    <div className="bg-white border border-zinc-200 rounded-xl py-16 flex flex-col items-center text-center gap-3">
       <span className="text-3xl">{icon}</span>
       <p className="text-zinc-500 text-sm">{message}</p>
     </div>
@@ -2170,7 +2170,7 @@ export default function ClientDetailPage({ params }: { params: { id: string } })
     return (
       <div className="space-y-6 pb-20 lg:pb-4">
         <Skeleton className="h-5 w-24" />
-        <div className="bg-[#001f1f] border border-[#003434] rounded-2xl p-6">
+      <div className="bg-white border border-zinc-200 rounded-2xl p-6">
           <div className="flex gap-4">
             <Skeleton className="w-14 h-14 rounded-2xl shrink-0" />
             <div className="flex-1 space-y-2"><Skeleton className="h-5 w-48" /><Skeleton className="h-3 w-32" /></div>
@@ -2185,7 +2185,7 @@ export default function ClientDetailPage({ params }: { params: { id: string } })
   if (error || data?.error || !data?.client) {
     return (
       <div className="flex flex-col items-center justify-center min-h-[50vh] text-center gap-4">
-        <p className="text-white font-semibold text-lg">Client not found</p>
+        <p className="text-zinc-900 font-semibold text-lg">Client not found</p>
         <p className="text-zinc-500 text-sm">{data?.error ?? "No client matches this ID."}</p>
         <Link href="/clients" className="text-[#70BF4B] hover:text-[#D0F255] text-sm border border-[#70BF4B]/30 px-4 py-2 rounded-xl transition-colors">
           ← Back to Clients
@@ -2249,7 +2249,7 @@ export default function ClientDetailPage({ params }: { params: { id: string } })
     <div className="space-y-5 pb-20 lg:pb-4 max-w-6xl mx-auto">
       {/* Header Utilities */}
       <div className="flex items-center justify-between">
-        <Link href="/clients" className="inline-flex items-center gap-1.5 text-zinc-500 hover:text-white text-sm transition-colors">
+        <Link href="/clients" className="inline-flex items-center gap-1.5 text-zinc-500 hover:text-[#003434] text-sm transition-colors">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
@@ -2258,7 +2258,7 @@ export default function ClientDetailPage({ params }: { params: { id: string } })
         <div className="flex items-center gap-2">
           <button
             onClick={handleExportCsv}
-            className="flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-xl border border-[#003434] bg-[#001a1a] text-zinc-400 hover:text-white hover:border-[#70BF4B]/40 transition-all shadow-sm"
+            className="flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-xl border border-zinc-200 bg-white text-zinc-600 hover:text-zinc-900 hover:border-zinc-400 transition-all shadow-sm"
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -2267,7 +2267,7 @@ export default function ClientDetailPage({ params }: { params: { id: string } })
           </button>
           <button
             onClick={() => { setShowDeleteModal(true); setDeleteConfirmText(''); setDeleteError('') }}
-            className="flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-xl border border-red-900/50 bg-[#001a1a] text-red-500 hover:text-red-400 hover:border-red-700/60 transition-all shadow-sm"
+            className="flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-xl border border-red-100 bg-red-50 text-red-600 hover:bg-red-100 transition-all shadow-sm"
           >
             <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
@@ -2279,8 +2279,8 @@ export default function ClientDetailPage({ params }: { params: { id: string } })
 
       {/* Delete confirmation modal */}
       {showDeleteModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm px-4">
-          <div className="bg-[#0d1a1a] border border-red-900/40 rounded-2xl p-6 w-full max-w-md shadow-2xl">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
+          <div className="bg-white border border-zinc-200 rounded-2xl p-6 w-full max-w-md shadow-2xl">
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center justify-center shrink-0">
                 <svg className="w-5 h-5 text-red-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2288,20 +2288,20 @@ export default function ClientDetailPage({ params }: { params: { id: string } })
                 </svg>
               </div>
               <div>
-                <h3 className="text-white font-semibold text-sm">Delete client permanently</h3>
+                <h3 className="text-zinc-900 font-semibold text-sm">Delete client permanently</h3>
                 <p className="text-zinc-500 text-xs mt-0.5">This will remove all data including content, credentials, and portal access.</p>
               </div>
             </div>
 
-            <p className="text-zinc-400 text-xs mb-3">
-              Type <span className="font-mono text-white bg-[#001a1a] px-1.5 py-0.5 rounded border border-[#003434]">{clientLabel}</span> to confirm.
+            <p className="text-zinc-500 text-xs mb-3">
+              Type <span className="font-mono text-zinc-900 bg-zinc-100 px-1.5 py-0.5 rounded border border-zinc-200">{clientLabel}</span> to confirm.
             </p>
             <input
               type="text"
               value={deleteConfirmText}
               onChange={e => setDeleteConfirmText(e.target.value)}
               placeholder={clientLabel}
-              className="w-full bg-[#001a1a] text-white text-sm border border-[#003434] focus:border-red-700/60 outline-none rounded-xl px-3 py-2 mb-4"
+              className="w-full bg-white text-zinc-900 text-sm border border-zinc-200 focus:border-red-500 outline-none rounded-xl px-3 py-2 mb-4"
             />
 
             {deleteError && (
@@ -2312,7 +2312,7 @@ export default function ClientDetailPage({ params }: { params: { id: string } })
               <button
                 onClick={() => setShowDeleteModal(false)}
                 disabled={deleting}
-                className="px-4 py-2 text-xs font-medium text-zinc-400 hover:text-white border border-[#003434] rounded-xl transition-colors"
+                className="px-4 py-2 text-xs font-medium text-zinc-500 hover:text-zinc-900 border border-zinc-200 rounded-xl transition-colors"
               >
                 Cancel
               </button>
@@ -2329,13 +2329,13 @@ export default function ClientDetailPage({ params }: { params: { id: string } })
       )}
 
       {/* Hero */}
-      <div className="bg-[#001f1f] border border-[#003434] rounded-2xl p-6 shadow-sm relative">
+      <div className="bg-white border border-zinc-200 rounded-2xl p-6 shadow-sm relative">
         <div className="flex flex-col sm:flex-row sm:items-center gap-4">
           <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-[#003434] to-[#70BF4B] flex items-center justify-center shrink-0 shadow-lg shadow-[#70BF4B]/10">
-            <span className="text-[#D0F255] font-bold text-xl">{(client.legal_name || client.email || "?")[0]?.toUpperCase()}</span>
+            <span className="text-white font-bold text-xl">{(client.legal_name || client.email || "?")[0]?.toUpperCase()}</span>
           </div>
           <div className="flex-1 min-w-0">
-            <h1 className="text-white text-xl font-bold tracking-tight truncate">{client.legal_name || client.email || "Unknown Client"}</h1>
+            <h1 className="text-zinc-900 text-xl font-bold tracking-tight truncate">{client.legal_name || client.email || "Unknown Client"}</h1>
             <p className="text-zinc-500 text-sm mt-0.5">{client.email || "—"}</p>
           </div>
           <div className="flex items-center gap-3 shrink-0">
@@ -2344,7 +2344,7 @@ export default function ClientDetailPage({ params }: { params: { id: string } })
           </div>
         </div>
         {mrr != null && mrr !== "" && (
-          <p className="text-[#D0F255] font-mono text-sm mt-4">₹{Number(mrr).toLocaleString("en-IN")}/mo</p>
+          <p className="text-[#003434] font-mono text-sm mt-4 font-bold">₹{Number(mrr).toLocaleString("en-IN")}/mo</p>
         )}
       </div>
 
@@ -2356,8 +2356,8 @@ export default function ClientDetailPage({ params }: { params: { id: string } })
             onClick={() => setActiveTab(i)}
             className={`shrink-0 px-4 py-2.5 rounded-xl text-sm font-medium transition-all focus:outline-none ${
               activeTab === i
-                ? "bg-[#003434] text-[#D0F255] border border-[#70BF4B]/40 shadow-inner"
-                : "text-zinc-500 hover:text-zinc-200 hover:bg-[#001f1f] border border-transparent"
+                ? "bg-[#003434] text-white border border-[#003434] shadow-sm"
+                : "text-zinc-500 hover:text-[#003434] hover:bg-zinc-50 border border-transparent"
             }`}
           >
             {tab}

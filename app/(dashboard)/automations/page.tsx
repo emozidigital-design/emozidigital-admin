@@ -182,7 +182,7 @@ function RunDots({ runs }: { runs: RunHistoryDot[] }) {
           className={`w-2 h-2 rounded-full transition-all ${
             r.status === "success" ? "bg-[#70BF4B]" :
             r.status === "fail"    ? "bg-red-400" :
-                                     "bg-zinc-700"
+                                     "bg-zinc-200"
           }`}
         />
       ))}
@@ -251,12 +251,12 @@ function AutomationCard({
     : null
 
   return (
-    <div className={`bg-[#001f1f] border rounded-xl overflow-hidden transition-all ${
-      expanded ? "border-[#70BF4B]/25" : "border-[#003434]"
+    <div className={`bg-white border rounded-xl overflow-hidden transition-all shadow-sm ${
+      expanded ? "border-[#70BF4B]/50" : "border-zinc-200"
     }`}>
       {/* Card header — always visible */}
       <div
-        className="p-4 cursor-pointer hover:bg-[#003434]/20 transition-colors"
+        className="p-4 cursor-pointer hover:bg-zinc-50 transition-colors"
         onClick={() => setExpanded(e => !e)}
       >
         <div className="flex items-start gap-3">
@@ -268,7 +268,7 @@ function AutomationCard({
           <div className="flex-1 min-w-0">
             <div className="flex items-start justify-between gap-2 flex-wrap">
               <div className="min-w-0">
-                <p className="text-white text-sm font-semibold">{automation.name}</p>
+                <p className="text-zinc-900 text-sm font-semibold">{automation.name}</p>
                 <p className="text-zinc-500 text-xs mt-0.5 leading-relaxed">{automation.description}</p>
               </div>
               <div className="flex items-center gap-1.5 shrink-0 flex-wrap">
@@ -283,11 +283,11 @@ function AutomationCard({
 
             {/* Trigger → Action + run dots */}
             <div className="flex items-center gap-3 mt-2.5 flex-wrap">
-              <span className="text-[11px] text-zinc-400 bg-[#003434]/60 px-2 py-0.5 rounded-md">
+              <span className="text-[11px] text-zinc-600 bg-zinc-100 px-2 py-0.5 rounded-md">
                 {automation.trigger}
               </span>
-              <span className="text-zinc-600 text-xs">→</span>
-              <span className="text-[11px] text-zinc-400 bg-[#003434]/60 px-2 py-0.5 rounded-md">
+              <span className="text-zinc-400 text-xs">→</span>
+              <span className="text-[11px] text-zinc-600 bg-zinc-100 px-2 py-0.5 rounded-md">
                 {automation.action}
               </span>
               <div className="ml-auto">
@@ -308,7 +308,7 @@ function AutomationCard({
 
       {/* Expanded panel */}
       {expanded && (
-        <div className="border-t border-[#003434] px-4 pb-4 pt-3 space-y-3 bg-[#001414]/40">
+        <div className="border-t border-zinc-100 px-4 pb-4 pt-3 space-y-3 bg-zinc-50/50">
 
           {/* Client selector (only for client-specific workflows) */}
           {automation.clientSpecific && (
@@ -319,7 +319,7 @@ function AutomationCard({
               <select
                 value={selectedClientId}
                 onChange={e => setSelectedClientId(e.target.value)}
-                className="w-full bg-[#001f1f] border border-[#003434] text-zinc-300 text-sm rounded-xl px-3 py-2 outline-none focus:border-[#70BF4B]/40 transition-colors"
+                className="w-full bg-white border border-zinc-200 text-zinc-700 text-sm rounded-xl px-3 py-2 outline-none focus:border-[#70BF4B] transition-colors"
               >
                 <option value="">— Choose a client —</option>
                 {clients.map((c: {id: string; name: string}) => (
@@ -335,10 +335,10 @@ function AutomationCard({
             <button
               onClick={() => trigger(false)}
               disabled={running || testing || !isClientReady}
-              className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold border transition-all ${
+              className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold border transition-all shadow-sm ${
                 running || testing || !isClientReady
-                  ? "bg-zinc-800 border-zinc-700 text-zinc-500 cursor-not-allowed"
-                  : "bg-[#70BF4B]/10 border-[#70BF4B]/50 text-[#D0F255] hover:bg-[#70BF4B]/20 hover:border-[#70BF4B]"
+                  ? "bg-zinc-100 border-zinc-200 text-zinc-400 cursor-not-allowed"
+                  : "bg-[#003434] border-[#003434] text-white hover:bg-[#004d4d]"
               }`}
             >
               {running ? (
@@ -364,10 +364,10 @@ function AutomationCard({
             <button
               onClick={() => trigger(true)}
               disabled={running || testing}
-              className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold border transition-all ${
+              className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold border transition-all shadow-sm ${
                 running || testing
-                  ? "bg-zinc-800 border-zinc-700 text-zinc-500 cursor-not-allowed"
-                  : "bg-[#003434] border-[#003434] text-zinc-300 hover:text-white hover:border-zinc-500"
+                  ? "bg-zinc-100 border-zinc-200 text-zinc-400 cursor-not-allowed"
+                  : "bg-white border-zinc-200 text-zinc-600 hover:text-zinc-900 hover:border-zinc-400"
               }`}
             >
               {testing ? (
@@ -394,7 +394,7 @@ function AutomationCard({
                 href={n8nEditorUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold border border-[#003434] bg-transparent text-zinc-400 hover:text-purple-300 hover:border-purple-500/40 transition-all"
+                className="flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold border border-zinc-200 bg-white text-zinc-500 hover:text-purple-600 hover:border-purple-200 transition-all shadow-sm"
               >
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
@@ -402,7 +402,7 @@ function AutomationCard({
                 View in n8n
               </a>
             ) : (
-              <div className="flex items-center justify-center px-3 py-2.5 rounded-xl text-xs text-zinc-700 border border-zinc-800 select-none">
+              <div className="flex items-center justify-center px-3 py-2.5 rounded-xl text-xs text-zinc-400 border border-zinc-100 bg-zinc-50/50 select-none">
                 Not in n8n
               </div>
             )}
@@ -425,7 +425,7 @@ function AutomationCard({
                     : "Trigger failed"}
                 </span>
                 {lastResult.test_mode && (
-                  <span className="ml-auto text-[10px] px-2 py-0.5 rounded-full bg-zinc-700/50 text-zinc-400 border border-zinc-600/40">
+                  <span className="ml-auto text-[10px] px-2 py-0.5 rounded-full bg-zinc-100 text-zinc-500 border border-zinc-200">
                     test mode
                   </span>
                 )}
@@ -478,8 +478,8 @@ export default function AutomationsPage() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-white text-xl font-bold tracking-tight">Automations</h1>
-          <p className="text-zinc-600 text-sm mt-0.5">
+          <h1 className="text-zinc-900 text-xl font-bold tracking-tight">Automations</h1>
+          <p className="text-zinc-500 text-sm mt-0.5">
             {active} active · {total - active} paused
             {errorCount > 0 && <span className="text-red-400 ml-1">· {errorCount} error</span>}
           </p>
@@ -504,7 +504,7 @@ export default function AutomationsPage() {
           { label: "Paused",   value: total - active - errorCount, color: "#f59e0b" },
           { label: "Platforms", value: 2,             color: "#a78bfa" },
         ].map(s => (
-          <div key={s.label} className="bg-[#001f1f] border border-[#003434] rounded-xl p-4">
+          <div key={s.label} className="bg-white border border-zinc-200 rounded-xl p-4 shadow-sm">
             <p className="text-2xl font-bold" style={{ color: s.color }}>{s.value}</p>
             <p className="text-zinc-500 text-xs mt-0.5">{s.label}</p>
           </div>
@@ -512,11 +512,11 @@ export default function AutomationsPage() {
       </div>
 
       {/* Legend */}
-      <div className="flex items-center gap-4 text-[10px] text-zinc-600">
+      <div className="flex items-center gap-4 text-[10px] text-zinc-500">
         <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-[#70BF4B]" />Success</span>
         <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-red-400" />Failed</span>
-        <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-zinc-700" />No run</span>
-        <span className="ml-auto text-zinc-700 italic">Click a card to expand run controls</span>
+        <span className="flex items-center gap-1.5"><span className="w-2 h-2 rounded-full bg-zinc-200" />No run</span>
+        <span className="ml-auto text-zinc-400 italic">Click a card to expand run controls</span>
       </div>
 
       {/* Automation cards */}
@@ -531,14 +531,14 @@ export default function AutomationsPage() {
       </div>
 
       {/* Info banner */}
-      <div className="bg-[#003434]/30 border border-[#70BF4B]/15 rounded-xl p-4 flex gap-3">
-        <svg className="w-5 h-5 text-[#70BF4B] shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <div className="bg-zinc-50 border border-zinc-200 rounded-xl p-4 flex gap-3">
+        <svg className="w-5 h-5 text-[#003434] shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
         </svg>
         <div>
-          <p className="text-zinc-300 text-sm font-medium">Manual triggers run the real workflow</p>
+          <p className="text-zinc-900 text-sm font-medium">Manual triggers run the real workflow</p>
           <p className="text-zinc-500 text-xs mt-0.5">
-            Use <span className="text-zinc-300 font-medium">Test with Dummy Data</span> first to verify a workflow before running it against real clients.
+            Use <span className="text-zinc-900 font-medium">Test with Dummy Data</span> first to verify a workflow before running it against real clients.
           </p>
         </div>
       </div>

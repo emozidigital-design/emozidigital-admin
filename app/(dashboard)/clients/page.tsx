@@ -51,7 +51,7 @@ function Badge({ label, colorMap }: { label: string; colorMap: Record<string, st
 }
 
 function Skeleton({ className }: { className?: string }) {
-  return <div className={`animate-pulse rounded bg-white/5 ${className}`} />
+  return <div className={`animate-pulse rounded bg-zinc-100 ${className}`} />
 }
 
 // ─── Sort ────────────────────────────────────────────────────────────────────
@@ -110,9 +110,9 @@ function AddClientModal({ onClose, onSuccess }: { onClose: () => void; onSuccess
       className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm"
       onClick={e => e.target === e.currentTarget && onClose()}
     >
-      <div className="bg-[#001a1a] border border-[#003434] rounded-2xl p-6 w-full max-w-md shadow-2xl shadow-black/60">
+      <div className="bg-white border border-zinc-200 rounded-2xl p-6 w-full max-w-md shadow-2xl shadow-black/10">
         <div className="flex items-center justify-between mb-5">
-          <h2 className="text-white font-semibold text-base">Add New Client</h2>
+          <h2 className="text-zinc-900 font-semibold text-base">Add New Client</h2>
           <button onClick={onClose} className="text-zinc-500 hover:text-white transition-colors">
             <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -131,7 +131,7 @@ function AddClientModal({ onClose, onSuccess }: { onClose: () => void; onSuccess
                 required={f.required}
                 value={form[f.key]}
                 onChange={e => setForm(p => ({ ...p, [f.key]: e.target.value }))}
-                className="w-full bg-[#003434] border border-[#70BF4B]/20 focus:border-[#70BF4B]/50 text-white text-sm rounded-lg px-3 py-2.5 outline-none transition-colors placeholder-zinc-600"
+                className="w-full bg-white border border-zinc-200 focus:border-[#70BF4B] text-zinc-900 text-sm rounded-lg px-3 py-2.5 outline-none transition-colors placeholder-zinc-400"
                 placeholder={f.label}
               />
             </div>
@@ -144,7 +144,7 @@ function AddClientModal({ onClose, onSuccess }: { onClose: () => void; onSuccess
             <select
               value={form.package}
               onChange={e => setForm(p => ({ ...p, package: e.target.value }))}
-              className="w-full bg-[#003434] border border-[#70BF4B]/20 text-white text-sm rounded-lg px-3 py-2.5 outline-none"
+              className="w-full bg-white border border-zinc-200 text-zinc-900 text-sm rounded-lg px-3 py-2.5 outline-none"
             >
               {PACKAGES.map(p => <option key={p} value={p}>{p}</option>)}
             </select>
@@ -157,10 +157,10 @@ function AddClientModal({ onClose, onSuccess }: { onClose: () => void; onSuccess
           )}
 
           <div className="flex gap-3 pt-1">
-            <button type="button" onClick={onClose} className="flex-1 py-2.5 border border-[#003434] text-zinc-400 hover:text-white rounded-xl text-sm transition-colors">
+            <button type="button" onClick={onClose} className="flex-1 py-2.5 border border-zinc-200 text-zinc-500 hover:text-zinc-900 rounded-xl text-sm transition-colors">
               Cancel
             </button>
-            <button type="submit" disabled={loading} className="flex-1 py-2.5 bg-[#70BF4B] hover:bg-[#5faa3e] disabled:opacity-50 text-[#001a1a] font-semibold rounded-xl text-sm transition-colors">
+            <button type="submit" disabled={loading} className="flex-1 py-2.5 bg-[#003434] hover:bg-[#004d4d] disabled:opacity-50 text-white font-semibold rounded-xl text-sm transition-colors">
               {loading ? "Creating…" : "Create Client"}
             </button>
           </div>
@@ -212,12 +212,12 @@ export default function ClientsPage() {
   }
 
   const COLS: { label: string; key: SortKey; render: (c: Client) => React.ReactNode }[] = [
-    { label: "Name",       key: "name",      render: c => <span className="text-white font-medium text-sm">{c.name || <span className="text-zinc-500 italic">Unnamed</span>}</span> },
-    { label: "Package",    key: "package",   render: c => <span className="text-zinc-300 text-sm">{c.package || "—"}</span> },
-    { label: "Tier",       key: "tier",      render: c => <span className="text-zinc-400 text-sm">{c.tier || "—"}</span> },
+    { label: "Name",       key: "name",      render: c => <span className="text-zinc-900 font-medium text-sm">{c.name || <span className="text-zinc-500 italic">Unnamed</span>}</span> },
+    { label: "Package",    key: "package",   render: c => <span className="text-zinc-700 text-sm">{c.package || "—"}</span> },
+    { label: "Tier",       key: "tier",      render: c => <span className="text-zinc-500 text-sm">{c.tier || "—"}</span> },
     { label: "Status",     key: "status",    render: c => <Badge label={c.status} colorMap={STATUS_COLOR} /> },
     { label: "Start Date", key: "startDate", render: c => <span className="text-zinc-400 text-sm font-mono">{c.startDate ?? "—"}</span> },
-    { label: "MRR (₹)",    key: "mrr",       render: c => <span className="text-[#D0F255] text-sm font-mono">{c.mrr != null ? `₹${c.mrr.toLocaleString("en-IN")}` : "—"}</span> },
+    { label: "MRR (₹)",    key: "mrr",       render: c => <span className="text-[#003434] font-bold text-sm font-mono">{c.mrr != null ? `₹${c.mrr.toLocaleString("en-IN")}` : "—"}</span> },
     { label: "Payment",    key: "payment",   render: c => <Badge label={c.payment} colorMap={PAYMENT_COLOR} /> },
     { label: "Risk",       key: "risk",      render: c => <Badge label={c.risk} colorMap={RISK_COLOR} /> },
   ]
@@ -235,8 +235,8 @@ export default function ClientsPage() {
         {/* Header */}
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-white text-xl font-bold tracking-tight">Clients</h1>
-            <p className="text-zinc-600 text-sm mt-0.5">
+            <h1 className="text-zinc-900 text-xl font-bold tracking-tight">Clients</h1>
+            <p className="text-zinc-500 text-sm mt-0.5">
               {isLoading ? "Loading…" : `${filtered.length} of ${clients.length} client${clients.length !== 1 ? "s" : ""}`}
             </p>
           </div>
@@ -258,7 +258,7 @@ export default function ClientsPage() {
                 }))
                 exportToCSV(rows as unknown as Record<string, unknown>[], `emozi_clients_${todayStr()}.csv`)
               }}
-              className="flex items-center gap-1.5 text-xs font-medium px-3 py-2.5 rounded-xl border border-[#003434] bg-[#001a1a] text-zinc-400 hover:text-white hover:border-[#70BF4B]/40 transition-all"
+              className="flex items-center gap-1.5 text-xs font-medium px-3 py-2.5 rounded-xl border border-zinc-200 bg-white text-zinc-500 hover:text-zinc-900 hover:border-zinc-400 transition-all shadow-sm"
             >
               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -267,7 +267,7 @@ export default function ClientsPage() {
             </button>
             <button
               onClick={() => setShowModal(true)}
-              className="flex items-center gap-2 bg-[#70BF4B] hover:bg-[#5faa3e] text-[#001a1a] font-semibold text-sm px-4 py-2.5 rounded-xl transition-colors shadow shadow-[#70BF4B]/20"
+              className="flex items-center gap-2 bg-[#003434] hover:bg-[#004d4d] text-white font-semibold text-sm px-4 py-2.5 rounded-xl transition-colors shadow-sm"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -288,7 +288,7 @@ export default function ClientsPage() {
               value={search}
               onChange={e => setSearch(e.target.value)}
               placeholder="Search by name or email…"
-              className="w-full bg-[#001f1f] border border-[#003434] focus:border-[#70BF4B]/40 text-white text-sm rounded-xl pl-10 pr-4 py-2.5 outline-none transition-colors placeholder-zinc-600"
+              className="w-full bg-white border border-zinc-200 focus:border-[#003434] text-zinc-900 text-sm rounded-xl pl-10 pr-4 py-2.5 outline-none transition-colors placeholder-zinc-400"
             />
           </div>
           {[
@@ -300,7 +300,7 @@ export default function ClientsPage() {
               key={f.label}
               value={f.val}
               onChange={e => f.set(e.target.value)}
-              className="bg-[#001f1f] border border-[#003434] text-zinc-300 text-sm rounded-xl px-3 py-2.5 outline-none"
+              className="bg-white border border-zinc-200 text-zinc-700 text-sm rounded-xl px-3 py-2.5 outline-none"
             >
               <option value="all">All {f.label}s</option>
               {f.opts.map(o => <option key={o} value={o}>{o}</option>)}
@@ -309,12 +309,12 @@ export default function ClientsPage() {
         </div>
 
         {/* Table */}
-        <div className="bg-[#001f1f] border border-[#003434] rounded-2xl overflow-hidden">
+        <div className="bg-white border border-zinc-200 rounded-2xl overflow-hidden shadow-sm">
           {/* Desktop */}
           <div className="hidden md:block overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-[#003434]">
+                <tr className="border-b border-zinc-100">
                   {COLS.map(col => (
                     <th
                       key={col.key}
@@ -327,7 +327,7 @@ export default function ClientsPage() {
                   ))}
                 </tr>
               </thead>
-              <tbody className="divide-y divide-[#003434]/50">
+              <tbody className="divide-y divide-zinc-100">
                 {isLoading
                   ? [...Array(5)].map((_, i) => (
                       <tr key={i}>
@@ -350,7 +350,7 @@ export default function ClientsPage() {
                     <tr
                       key={client.id}
                       onClick={() => router.push(`/clients/${client.id}`)}
-                      className="hover:bg-[#003434]/40 cursor-pointer transition-colors group"
+                      className="hover:bg-zinc-50 cursor-pointer transition-colors group"
                     >
                       {COLS.map(col => (
                         <td key={col.key} className="px-4 py-3.5 whitespace-nowrap">
@@ -377,10 +377,10 @@ export default function ClientsPage() {
                 <div
                   key={client.id}
                   onClick={() => router.push(`/clients/${client.id}`)}
-                  className="p-4 flex items-start justify-between gap-3 hover:bg-[#003434]/40 cursor-pointer transition-colors"
+                  className="p-4 flex items-start justify-between gap-3 hover:bg-zinc-50 cursor-pointer transition-colors"
                 >
                   <div className="min-w-0 flex-1">
-                    <p className="text-white font-medium text-sm truncate">{client.name || <span className="text-zinc-500 italic">Unnamed</span>}</p>
+                    <p className="text-zinc-900 font-medium text-sm truncate">{client.name || <span className="text-zinc-500 italic">Unnamed</span>}</p>
                     <p className="text-zinc-500 text-xs mt-0.5">{client.email || "—"}</p>
                     <div className="flex flex-wrap gap-1.5 mt-2">
                       <Badge label={client.status}  colorMap={STATUS_COLOR}  />
@@ -388,7 +388,7 @@ export default function ClientsPage() {
                       <Badge label={client.risk}    colorMap={RISK_COLOR}    />
                     </div>
                     {client.mrr != null && (
-                      <p className="text-[#D0F255] text-xs font-mono mt-1.5">₹{client.mrr.toLocaleString("en-IN")}/mo</p>
+                      <p className="text-[#003434] text-xs font-mono mt-1.5 font-bold">₹{client.mrr.toLocaleString("en-IN")}/mo</p>
                     )}
                   </div>
                   <svg className="w-4 h-4 text-zinc-600 shrink-0 mt-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">

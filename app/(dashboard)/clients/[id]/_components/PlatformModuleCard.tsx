@@ -21,15 +21,6 @@ const HAS_AD_ACCOUNT = new Set([
 ])
 const HAS_PUBLIC_ADDRESS = new Set(["gbp"])
 
-// Section D nests each platform under its own key inside the section_d JSONB blob.
-// We need a single update that merges the platform's sub-object without clobbering
-// sibling platforms or the top-level section_d fields.
-//
-// The /api/clients/[id] PATCH does a SHALLOW merge at the section level, so a write
-// like { section_d: { instagram: {...newInst} } } would NOT merge nested objects —
-// it would replace the entire instagram sub-object. That's actually what we want
-// here: each save passes the full merged platform sub-object.
-
 export default function PlatformModuleCard({
   clientId,
   platformKey,
@@ -45,15 +36,11 @@ export default function PlatformModuleCard({
   const exists = data.exists as "yes" | "no" | undefined
   const label = PLATFORM_LABELS[platformKey] ?? platformKey
 
-  // Each sub-field write merges the platform sub-object and writes the whole thing
-  // back under section_d.{platformKey}. The PATCH route's section-level shallow
-  // merge then preserves sibling platforms and top-level section_d keys.
   function saveField(key: string, value: unknown) {
     const next = { ...data, [key]: value }
     update("section_d", { [platformKey]: next })
   }
 
-  // Adapter to make the existing E* components save into the platform sub-object
   const sub = (key: string) => ({
     clientId,
     section: undefined,
@@ -63,25 +50,25 @@ export default function PlatformModuleCard({
   })
 
   return (
-    <div className="border border-[#003434] rounded-xl overflow-hidden bg-[#001a1a]/60">
+    <div className="border border-zinc-200 rounded-xl overflow-hidden bg-white shadow-sm transition-all hover:shadow-md">
       <button
         type="button"
         onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-[#003434]/40 transition-colors text-left"
+        className="w-full flex items-center gap-3 px-4 py-3 hover:bg-zinc-50 transition-colors text-left"
       >
-        <span className="font-semibold text-zinc-200 text-sm">{label}</span>
+        <span className="font-semibold text-zinc-900 text-sm">{label}</span>
         {exists === "yes" && (
-          <span className="text-[10px] font-bold uppercase tracking-wider bg-[#70BF4B]/15 text-[#70BF4B] border border-[#70BF4B]/30 px-2 py-0.5 rounded-full">
+          <span className="text-[10px] font-bold uppercase tracking-wider bg-emerald-50 text-emerald-600 border border-emerald-100 px-2 py-0.5 rounded-full">
             Active account
           </span>
         )}
         {exists === "no" && (
-          <span className="text-[10px] font-bold uppercase tracking-wider bg-zinc-700/30 text-zinc-400 border border-zinc-700 px-2 py-0.5 rounded-full">
+          <span className="text-[10px] font-bold uppercase tracking-wider bg-zinc-100 text-zinc-500 border border-zinc-200 px-2 py-0.5 rounded-full">
             New account
           </span>
         )}
         <svg
-          className={`ml-auto w-4 h-4 text-zinc-500 transition-transform ${open ? "rotate-180" : ""}`}
+          className={`ml-auto w-4 h-4 text-zinc-400 transition-transform duration-200 ${open ? "rotate-180" : ""}`}
           fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}
         >
           <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
@@ -89,7 +76,7 @@ export default function PlatformModuleCard({
       </button>
 
       {open && (
-        <div className="px-4 pb-4 pt-1 border-t border-[#003434] space-y-1">
+        <div className="px-4 pb-4 pt-1 border-t border-zinc-100 space-y-1 bg-zinc-50/30">
           <ESelect
             {...sub("exists")}
             label="Account Exists?"
