@@ -103,6 +103,22 @@ export async function PATCH(
           .eq('id', params.id)
 
         if (error) throw error
+
+        if (section === 'section_m' && typeof merged === 'object' && merged !== null) {
+          const mergedObj = merged as Record<string, unknown>
+          const onboardingWebhook = process.env.N8N_ONBOARDING_WEBHOOK_URL
+          if (onboardingWebhook && String(mergedObj.onboarding_status).toLowerCase() === 'completed') {
+            try {
+              await fetch(onboardingWebhook, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ record: { id: params.id, status: mergedObj.onboarding_status } })
+              })
+            } catch (webhookError) {
+              console.error("Onboarding webhook failed:", webhookError)
+            }
+          }
+        }
       } else {
         // section_notes is plain text — accept string or { notes: string }
         const notesVal =
@@ -145,6 +161,19 @@ export async function PATCH(
         .update({ [col]: value })
         .eq('id', params.id)
       if (error) throw error
+
+      const onboardingWebhook = process.env.N8N_ONBOARDING_WEBHOOK_URL
+      if (onboardingWebhook && col === 'status' && String(value).toLowerCase() === 'completed') {
+        try {
+          await fetch(onboardingWebhook, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ record: { id: params.id, status: value } })
+          })
+        } catch (webhookError) {
+          console.error("Onboarding webhook failed:", webhookError)
+        }
+      }
     }
     // Unknown fields are silently ignored (Notion-era calls)
 

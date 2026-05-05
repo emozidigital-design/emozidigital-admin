@@ -26,12 +26,23 @@ type Entry = {
   media_url?: string
   notes?: string
   client_feedback?: string
-  submitted_by?: string        // name of person who left feedback
-  submitted_at?: string        // ISO timestamp of feedback submission
-  feedback_role?: string       // e.g. "Owner", "Manager", "Client"
+  submitted_by?: string
+  submitted_at?: string
+  feedback_role?: string
   revision_count?: number
   revision_history?: RevisionHistoryItem[]
   clients?: { legal_name: string }
+  // AI-generated content fields
+  topic?: string
+  hook?: string
+  cta?: string
+  image_prompt?: string
+  visual_direction?: string
+  category?: string
+  best_time_ist?: string
+  // Post-publish tracking
+  posted_url?: string
+  posted_at?: string
 }
 
 const PLATFORMS = ["Instagram", "Facebook", "LinkedIn", "Twitter", "YouTube", "Pinterest"]
@@ -58,6 +69,12 @@ const STATUS_COLORS: Record<string, string> = {
 }
 
 const NEEDS_REVIEW = (status: string) => status === "changes_requested" || status === "rejected"
+
+const GEN_STATUS_COLORS: Record<string, string> = {
+  success: "bg-emerald-50 text-emerald-600 border-emerald-100",
+  error: "bg-red-50 text-red-600 border-red-100",
+  partial: "bg-amber-50 text-amber-600 border-amber-100",
+}
 
 export default function ContentPage() {
   const [view, setView] = useState<"table" | "calendar">("table")
@@ -235,6 +252,7 @@ export default function ContentPage() {
       )}
 
       <BlogActivityPanel />
+      <GenerationLogsPanel />
     </div>
   )
 }
@@ -246,7 +264,7 @@ function TableView({ entries, onEdit, onDelete, onMarkPosted, onRowClick }: { en
         <table className="w-full text-left border-collapse">
           <thead>
             <tr className="border-b border-zinc-100 bg-zinc-50">
-              {["Title", "Client", "Type", "Platforms", "Status", "Scheduled", "Actions"].map(h => (
+              {["Title", "Client", "Type / Category", "Platforms", "Status", "Scheduled", "Actions"].map(h => (
                 <th key={h} className="px-6 py-4 text-[10px] font-bold uppercase tracking-widest text-zinc-400">{h}</th>
               ))}
             </tr>
@@ -276,7 +294,10 @@ function TableView({ entries, onEdit, onDelete, onMarkPosted, onRowClick }: { en
                     <p className="text-zinc-400 text-xs">{e.clients?.legal_name || "—"}</p>
                   </td>
                   <td className="px-6 py-4">
-                    <span className="text-[10px] px-2 py-0.5 rounded-md bg-zinc-100 text-zinc-500 uppercase font-bold">{e.content_type}</span>
+                    <div className="flex flex-col gap-1">
+                      <span className="text-[10px] px-2 py-0.5 rounded-md bg-zinc-100 text-zinc-500 uppercase font-bold w-fit">{e.content_type}</span>
+                      {e.category && <span className="text-[10px] px-2 py-0.5 rounded-md bg-[#003434]/10 text-[#003434] font-medium w-fit">{e.category}</span>}
+                    </div>
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex flex-wrap gap-1 max-w-[120px]">
@@ -291,7 +312,14 @@ function TableView({ entries, onEdit, onDelete, onMarkPosted, onRowClick }: { en
                     </span>
                   </td>
                   <td className="px-6 py-4">
-                    <p className="text-zinc-400 text-xs font-mono">{e.scheduled_date || "—"}</p>
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-zinc-400 text-xs font-mono">{e.scheduled_date || "—"}</p>
+                      {e.posted_url && (
+                        <a href={e.posted_url} target="_blank" rel="noopener noreferrer" onClick={ev => ev.stopPropagation()} title="View live post" className="text-teal-500 hover:text-teal-600 transition-colors">
+                          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
+                        </a>
+                      )}
+                    </div>
                   </td>
                   <td className="px-6 py-4">
                     <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity" onClick={ev => ev.stopPropagation()}>
@@ -382,7 +410,17 @@ function PostModal({ entry, clients, onClose, onSave }: { entry: Partial<Entry> 
     hashtags: entry?.hashtags || "",
     media_url: entry?.media_url || "",
     notes: entry?.notes || "",
+    topic: entry?.topic || "",
+    hook: entry?.hook || "",
+    cta: entry?.cta || "",
+    image_prompt: entry?.image_prompt || "",
+    visual_direction: entry?.visual_direction || "",
+    category: entry?.category || "",
+    best_time_ist: entry?.best_time_ist || "",
+    posted_url: entry?.posted_url || "",
+    posted_at: entry?.posted_at || "",
   })
+  const [aiSectionOpen, setAiSectionOpen] = useState(!!(entry?.topic || entry?.hook || entry?.cta))
 
   const [loading, setLoading] = useState(false)
 
@@ -505,6 +543,71 @@ function PostModal({ entry, clients, onClose, onSave }: { entry: Partial<Entry> 
             <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">Internal Notes</label>
             <textarea rows={2} value={formData.notes} onChange={e => setFormData({ ...formData, notes: e.target.value })} className="w-full bg-white border border-zinc-200 rounded-xl px-4 py-2 text-sm text-zinc-900 outline-none focus:border-[#70BF4B] resize-none" placeholder="Feedback, ideas, or links..." />
           </div>
+
+          {/* AI Content Details */}
+          <div className="border border-zinc-100 rounded-xl overflow-hidden">
+            <button
+              type="button"
+              onClick={() => setAiSectionOpen(o => !o)}
+              className="w-full flex items-center justify-between px-4 py-3 bg-zinc-50 hover:bg-zinc-100/70 transition-colors"
+            >
+              <div className="flex items-center gap-2">
+                <svg className="w-3.5 h-3.5 text-[#003434]" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                <span className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">AI Content Details</span>
+              </div>
+              <svg className={`w-3.5 h-3.5 text-zinc-400 transition-transform ${aiSectionOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+            </button>
+            {aiSectionOpen && (
+              <div className="p-4 space-y-4 border-t border-zinc-100">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Topic</label>
+                    <input value={formData.topic} onChange={e => setFormData({ ...formData, topic: e.target.value })} className="w-full bg-white border border-zinc-200 rounded-xl px-4 py-2 text-sm text-zinc-900 outline-none focus:border-[#70BF4B]" placeholder="Core topic or theme..." />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Category</label>
+                    <input value={formData.category} onChange={e => setFormData({ ...formData, category: e.target.value })} className="w-full bg-white border border-zinc-200 rounded-xl px-4 py-2 text-sm text-zinc-900 outline-none focus:border-[#70BF4B]" placeholder="e.g. Educational, Promotional..." />
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Hook</label>
+                  <textarea rows={2} value={formData.hook} onChange={e => setFormData({ ...formData, hook: e.target.value })} className="w-full bg-white border border-zinc-200 rounded-xl px-4 py-2 text-sm text-zinc-900 outline-none focus:border-[#70BF4B] resize-none" placeholder="Opening hook line..." />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Call to Action</label>
+                  <input value={formData.cta} onChange={e => setFormData({ ...formData, cta: e.target.value })} className="w-full bg-white border border-zinc-200 rounded-xl px-4 py-2 text-sm text-zinc-900 outline-none focus:border-[#70BF4B]" placeholder="e.g. Book a free call today..." />
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Best Time (IST)</label>
+                    <input value={formData.best_time_ist} onChange={e => setFormData({ ...formData, best_time_ist: e.target.value })} className="w-full bg-white border border-zinc-200 rounded-xl px-4 py-2 text-sm text-zinc-900 outline-none focus:border-[#70BF4B]" placeholder="e.g. 6:00 PM IST" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Visual Direction</label>
+                    <input value={formData.visual_direction} onChange={e => setFormData({ ...formData, visual_direction: e.target.value })} className="w-full bg-white border border-zinc-200 rounded-xl px-4 py-2 text-sm text-zinc-900 outline-none focus:border-[#70BF4B]" placeholder="e.g. Bold text on teal bg..." />
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[10px] font-bold uppercase tracking-widest text-zinc-400">Image Prompt</label>
+                  <textarea rows={2} value={formData.image_prompt} onChange={e => setFormData({ ...formData, image_prompt: e.target.value })} className="w-full bg-white border border-zinc-200 rounded-xl px-4 py-2 text-sm text-zinc-900 outline-none focus:border-[#70BF4B] resize-none" placeholder="AI image generation prompt..." />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Posted URL — shown when status is posted */}
+          {formData.status === "posted" && (
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 border border-teal-100 bg-teal-50/40 rounded-xl p-4">
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold uppercase tracking-widest text-teal-600">Posted URL</label>
+                <input value={formData.posted_url} onChange={e => setFormData({ ...formData, posted_url: e.target.value })} className="w-full bg-white border border-teal-200 rounded-xl px-4 py-2 text-sm text-zinc-900 outline-none focus:border-teal-400" placeholder="https://instagram.com/p/..." />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-[10px] font-bold uppercase tracking-widest text-teal-600">Posted At</label>
+                <input type="datetime-local" value={formData.posted_at ? formData.posted_at.slice(0, 16) : ""} onChange={e => setFormData({ ...formData, posted_at: e.target.value ? new Date(e.target.value).toISOString() : "" })} className="w-full bg-white border border-teal-200 rounded-xl px-4 py-2 text-sm text-zinc-900 outline-none focus:border-teal-400" />
+              </div>
+            </div>
+          )}
         </form>
 
         <div className="px-6 py-4 border-t border-zinc-100 flex items-center justify-end gap-3 bg-zinc-50">
@@ -877,6 +980,93 @@ function ReviewPanel({ entry, onClose, onSaved, onUpdate }: {
               </button>
             </div>
           </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+type GenerationLog = {
+  id: string
+  client_id: string | null
+  generated_at: string
+  status: string | null
+  posts_generated: number | null
+  errors: string | null
+  platforms: string[] | null
+  business_name: string | null
+}
+
+function GenerationLogsPanel() {
+  const [open, setOpen] = useState(false)
+  const { data } = useSWR<{ logs: GenerationLog[] }>('/api/content-generation-logs?limit=15', fetcher)
+  const logs = data?.logs ?? []
+
+  return (
+    <div className="bg-white border border-zinc-200 rounded-2xl overflow-hidden shadow-sm">
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="w-full px-6 py-4 flex items-center justify-between border-b border-zinc-100 bg-zinc-50 transition-colors hover:bg-zinc-100/50"
+      >
+        <div className="flex items-center gap-2.5">
+          <svg className="w-4 h-4 text-[#003434]" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M13 10V3L4 14h7v7l9-11h-7z" />
+          </svg>
+          <span className="text-[#003434] text-xs font-bold uppercase tracking-widest">AI Generation Runs</span>
+          <span className="text-zinc-400 text-xs">({logs.length} recent)</span>
+        </div>
+        <svg
+          className={`w-4 h-4 text-zinc-500 transition-transform ${open ? 'rotate-180' : ''}`}
+          fill="none" stroke="currentColor" viewBox="0 0 24 24"
+        >
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+
+      {open && (
+        <div className="overflow-x-auto">
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="border-b border-zinc-100 bg-zinc-50/50">
+                {["Client", "Generated At", "Status", "Posts Created", "Platforms", "Errors"].map(h => (
+                  <th key={h} className="px-6 py-3 text-[10px] font-bold uppercase tracking-widest text-zinc-400">{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-zinc-100">
+              {logs.length === 0 ? (
+                <tr>
+                  <td colSpan={6} className="px-6 py-8 text-center text-zinc-600 text-sm italic">No generation runs recorded yet.</td>
+                </tr>
+              ) : logs.map(log => (
+                <tr key={log.id} className="hover:bg-zinc-50 transition-colors">
+                  <td className="px-6 py-3 text-zinc-700 text-sm font-medium">{log.business_name || <span className="text-zinc-400 italic text-xs">Unknown</span>}</td>
+                  <td className="px-6 py-3 text-zinc-500 text-xs font-mono whitespace-nowrap">
+                    {log.generated_at ? format(new Date(log.generated_at), 'MMM d, yyyy HH:mm') : '—'}
+                  </td>
+                  <td className="px-6 py-3">
+                    <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase border ${GEN_STATUS_COLORS[log.status ?? ''] ?? 'bg-zinc-100 text-zinc-500 border-zinc-200'}`}>
+                      {log.status ?? '—'}
+                    </span>
+                  </td>
+                  <td className="px-6 py-3 text-zinc-500 text-xs font-mono">
+                    {log.posts_generated != null ? log.posts_generated : <span className="text-zinc-300">—</span>}
+                  </td>
+                  <td className="px-6 py-3">
+                    <div className="flex flex-wrap gap-1">
+                      {(log.platforms ?? []).map(p => (
+                        <span key={p} className={`text-[9px] px-1.5 py-0.5 rounded border font-medium ${PLATFORM_COLORS[p] ?? 'bg-zinc-100 text-zinc-500 border-zinc-200'}`}>{p}</span>
+                      ))}
+                      {!log.platforms?.length && <span className="text-zinc-300 text-xs">—</span>}
+                    </div>
+                  </td>
+                  <td className="px-6 py-3 text-red-400 text-xs max-w-[200px] truncate" title={log.errors ?? ''}>
+                    {log.errors || <span className="text-zinc-300">—</span>}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
     </div>
