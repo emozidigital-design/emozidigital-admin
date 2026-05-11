@@ -1,5 +1,20 @@
 import { NextResponse } from 'next/server';
+import { unified } from 'unified';
+import remarkParse from 'remark-parse';
+import remarkGfm from 'remark-gfm';
+import remarkRehype from 'remark-rehype';
+import rehypeStringify from 'rehype-stringify';
 import { getAgentBazarSupabase } from '@/lib/supabase-agentbazar';
+
+async function markdownToHtml(markdown: string): Promise<string> {
+  const result = await unified()
+    .use(remarkParse)
+    .use(remarkGfm)
+    .use(remarkRehype)
+    .use(rehypeStringify)
+    .process(markdown || '');
+  return String(result);
+}
 
 export const dynamic = 'force-dynamic';
 
@@ -27,7 +42,7 @@ export async function POST(request: Request) {
     const blogPost = {
       slug: body.slug,
       title: body.title,
-      content: body.content,
+      content: await markdownToHtml(body.content),
       excerpt: body.excerpt || '',
       seo_title: body.seo_title || body.title,
       seo_description: body.seo_description || body.excerpt || '',
