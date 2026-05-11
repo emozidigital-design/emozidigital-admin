@@ -1,0 +1,77 @@
+import { NextResponse } from 'next/server';
+import { agentBazarSupabase } from '@/lib/supabase-agentbazar';
+
+export const dynamic = 'force-dynamic';
+
+// Check if a post exists in Agent Bazar blog by slug
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const slug = searchParams.get('slug');
+
+  if (!slug) return NextResponse.json({ exists: false });
+
+  const { data } = await agentBazarSupabase
+    .from('blog_posts')
+    .select('id, slug, status')
+    .eq('slug', slug)
+    .maybeSingle();
+
+  return NextResponse.json({ exists: !!data, post: data });
+}
+
+// Publish or update a post on Agent Bazar blog
+export async function POST(request: Request) {
+  try {
+    const body = await request.json();
+
+    const blogPost = {
+      slug: body.slug,
+      title: body.title,
+      content: body.content,
+      excerpt: body.excerpt || '',
+      seo_title: body.seo_title || body.title,
+      seo_description: body.seo_description || body.excerpt || '',
+      focus_keyword: body.focus_keyword || '',
+      cover_image: body.cover_image_url || '',
+      og_title: body.seo_title || body.title,
+      og_description: body.seo_description || body.excerpt || '',
+      category: body.externalCategory || body.category,
+      tags: body.tags || [],
+      author: body.author || 'Agent Bazar',
+      status: 'published',
+      canonical_url: `https://blog.agentbazar.in/${body.slug}`,
+      published_date: body.published_at || new Date().toISOString(),
+      source: 'emozi-admin',
+    };
+
+    const { data, error } = await agentBazarSupabase
+      .from('blog_posts')
+      .upsert([blogPost], { onConflict: 'slug' })
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    return NextResponse.json({ post: data });
+  } catch (err: any) {
+    console.error('Agent Bazar publish error:', err);
+    return NextResponse.json({ error: err.message }, { status: 500 });
+  }
+}
+
+// Remove a post from Agent Bazar blog
+export async function DELETE(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const slug = searchParams.get('slug');
+
+  if (!slug) return NextResponse.json({ error: 'slug is required' }, { status: 400 });
+
+  const { error } = await agentBazarSupabase
+    .from('blog_posts')
+    .delete()
+    .eq('slug', slug);
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  return NextResponse.json({ success: true });
+}
