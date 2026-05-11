@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { agentBazarSupabase } from '@/lib/supabase-agentbazar';
+import { getAgentBazarSupabase } from '@/lib/supabase-agentbazar';
 
 export const dynamic = 'force-dynamic';
 
@@ -10,7 +10,7 @@ export async function GET(request: Request) {
 
   if (!slug) return NextResponse.json({ exists: false });
 
-  const { data } = await agentBazarSupabase
+  const { data } = await getAgentBazarSupabase()
     .from('blog_posts')
     .select('id, slug, status')
     .eq('slug', slug)
@@ -44,7 +44,7 @@ export async function POST(request: Request) {
       source: 'emozi-admin',
     };
 
-    const { data, error } = await agentBazarSupabase
+    const { data, error } = await getAgentBazarSupabase()
       .from('blog_posts')
       .upsert([blogPost], { onConflict: 'slug' })
       .select()
@@ -66,7 +66,7 @@ export async function DELETE(request: Request) {
 
   if (!slug) return NextResponse.json({ error: 'slug is required' }, { status: 400 });
 
-  const { error } = await agentBazarSupabase
+  const { error } = await getAgentBazarSupabase()
     .from('blog_posts')
     .delete()
     .eq('slug', slug);
