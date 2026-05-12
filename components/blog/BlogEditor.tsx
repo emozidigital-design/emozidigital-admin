@@ -61,14 +61,21 @@ interface BlogEditorProps {
 }
 
 const INDUSTRY_CATEGORIES: Record<string, string[]> = {
-  "Aviation": ["Aviation", "Visa Updates", "Travel Tips", "Industry News", "Industry Trends", "Travel Tools", "Cruise", "Top Sectors", "New Launches", "Events & Expo"],
-  "Travel": ["Flights", "Hotels", "Tour Packages", "Visa Services", "Travel Insurance", "Car Rentals", "Cruise Booking", "Adventure Tourism", "Corporate Travel", "Travel Technology", "Destination Management", "Group Tours", "Backpacking", "Luxury Travel", "Pilgrimage Tourism", "Eco Tourism", "Medical Tourism", "Railway Booking", "Bus Booking", "Travel Content & Media"],
-  "Hospitality": ["Hotels", "Resorts", "Homestays", "Vacation Rentals", "Restaurants", "Cafes", "Catering", "Event Management", "Banquet Halls", "Cloud Kitchens", "Food Delivery", "Nightlife", "Hospitality Tech", "Luxury Hospitality", "Wellness Retreats", "Theme Parks", "Club & Lounge Services"],
-  "Healthcare": ["Hospitals", "Clinics", "Telemedicine", "Diagnostics", "Pharmacy", "Medical Equipment", "Health Insurance", "Fitness Centers", "Mental Health", "Dental Care", "IVF & Fertility", "Ayurveda", "Home Healthcare", "Medical Tourism", "Rehabilitation Centers", "Nutrition & Diet", "Healthcare SaaS", "Biotechnology"],
-  "Retail": ["Fashion", "Electronics", "Grocery", "Furniture", "Beauty & Cosmetics", "Jewelry", "Footwear", "E-commerce", "D2C Brands", "Supermarkets", "Luxury Retail", "Toys & Gifts", "Sports Goods", "Pet Supplies", "Mobile Accessories", "Apparel Manufacturing", "Wholesale Distribution", "Convenience Stores"],
-  "Real Estate": ["Residential Property", "Commercial Property", "Property Rentals", "Co-working Spaces", "Construction", "Interior Design", "Architecture", "Smart Homes", "Real Estate Tech", "Property Management", "Land Development", "Luxury Villas", "Home Loans", "Real Estate Investment", "Warehousing", "Industrial Real Estate"],
-  "Marketing": ["Digital Marketing", "SEO", "Social Media Marketing", "Influencer Marketing", "Branding", "Public Relations", "Content Marketing", "Email Marketing", "Performance Marketing", "Affiliate Marketing", "Video Marketing", "Marketing Automation", "AI Marketing", "Advertising Agencies", "Media Buying", "Copywriting", "Market Research"],
-  "Tech": ["SaaS", "AI & Machine Learning", "Web Development", "Mobile Apps", "Cybersecurity", "Cloud Computing", "Blockchain", "FinTech", "EdTech", "HealthTech", "TravelTech", "Automation", "IoT", "AR/VR", "UI/UX Design", "Software Development", "Data Analytics", "DevOps", "CRM Solutions", "API Services"]
+  "Retail / E-commerce": ["Fashion Retail", "Electronics Store", "Grocery Store", "D2C Brand", "Online Marketplace", "Home Decor", "Jewelry Store", "Sports Store", "Pet Store", "Mobile Accessories"],
+  "Food & Beverage": ["Restaurant", "Cafe", "Cloud Kitchen", "Bakery", "Catering", "Food Delivery", "Beverage Brand", "Organic Foods", "Fine Dining", "Fast Food Chain"],
+  "Healthcare / Wellness": ["Hospital", "Clinic", "Pharmacy", "Diagnostic Center", "Telemedicine", "Fitness Center", "Yoga Studio", "Mental Health", "Dental Care", "Ayurveda"],
+  "Finance / BFSI": ["Banking", "Insurance", "Investment Firm", "FinTech", "Accounting Services", "Tax Consultancy", "Loan Services", "Wealth Management", "Stock Brokerage"],
+  "Real Estate": ["Residential Real Estate", "Commercial Property", "Property Rentals", "Construction", "Interior Design", "Architecture", "Property Management", "Smart Homes"],
+  "Education / EdTech": ["Online Courses", "Coaching Institute", "School", "University", "Skill Development", "LMS Platform", "Educational Content", "Training Institute"],
+  "Technology / SaaS": ["SaaS Platform", "AI Tools", "Web Development", "Mobile App Development", "Cybersecurity", "Cloud Services", "CRM Software", "Automation Services", "IT Consultancy"],
+  "Professional Services": ["Legal Services", "Consulting", "HR Agency", "Recruitment", "Business Advisory", "Virtual Assistance", "Outsourcing", "Corporate Training"],
+  "Manufacturing": ["Textile Manufacturing", "Electronics Manufacturing", "Food Processing", "Automobile Parts", "Furniture Manufacturing", "Packaging", "Industrial Equipment"],
+  "Hospitality & Travel": ["Aviation", "Visa Updates", "Travel Tips", "Industry News", "Industry Trends", "Travel Tools", "Cruise", "Top Sectors", "New Launches", "Events & Expo"],
+  "Beauty & Personal Care": ["Salon", "Spa", "Cosmetics Brand", "Skincare", "Haircare", "Makeup Studio", "Wellness Products", "Grooming Services"],
+  "Fashion & Lifestyle": ["Clothing Brand", "Luxury Fashion", "Footwear", "Accessories", "Jewelry", "Lifestyle Products", "Designer Boutique"],
+  "Non-Profit / NGO": ["Charity Organization", "Educational NGO", "Healthcare NGO", "Environmental NGO", "Animal Welfare", "Community Development"],
+  "Media & Entertainment": ["News Portal", "Production House", "Music Label", "Influencer Brand", "Podcast", "OTT Media", "Event Entertainment", "Gaming"],
+  "Other": ["Multi-Service Business", "Holding Company", "Local Services", "Miscellaneous Brand", "Startup Venture"],
 };
 
 const INDUSTRIES = Object.keys(INDUSTRY_CATEGORIES);
@@ -125,16 +132,20 @@ export default function BlogEditor({ initialData, isNew = false }: BlogEditorPro
     }
   }, []);
 
-  const { data: clientsData } = useSWR<{ clients: { id: string; name: string }[] }>('/api/clients', fetcher)
+  const { data: clientsData } = useSWR<{ clients: { id: string; name: string; industry: string }[] }>('/api/clients', fetcher)
   const clients = clientsData?.clients ?? []
 
   // Resolve which external blog site is linked to the currently selected client (if any)
-  const selectedClientName = clients.find(c => c.id === post.client_id)?.name ?? ""
+  const selectedClient = clients.find(c => c.id === post.client_id) ?? null
+  const selectedClientName = selectedClient?.name ?? ""
   const clientBlogSite = CLIENT_BLOG_SITES.find(
     s => selectedClientName.toLowerCase().includes(s.nameMatch.toLowerCase())
   ) ?? null
 
   const [isSaving, setIsSaving] = useState(false)
+  const [customCategories, setCustomCategories] = useState<Record<string, string[]>>({})
+  const [newCategoryInput, setNewCategoryInput] = useState("")
+  const [showAddCategory, setShowAddCategory] = useState(false)
   const [isSlugEdited, setIsSlugEdited] = useState(false)
   const lastSavedPostStr = useRef(JSON.stringify(post))
   const autoSaveTimer = useRef<NodeJS.Timeout | null>(null)
@@ -462,7 +473,18 @@ export default function BlogEditor({ initialData, isNew = false }: BlogEditorPro
                 <label className="block text-[10px] text-zinc-600 font-bold uppercase mb-2">Post For</label>
                 <select
                   value={post.client_id ?? ""}
-                  onChange={(e) => updatePost({ client_id: e.target.value || null })}
+                  onChange={(e) => {
+                    const clientId = e.target.value || null
+                    const client = clients.find(c => c.id === clientId)
+                    const clientIndustry = client?.industry ?? ""
+                    const updates: Partial<BlogPost> = { client_id: clientId }
+                    if (clientIndustry && INDUSTRY_CATEGORIES[clientIndustry]) {
+                      updates.industry = clientIndustry
+                      updates.category = INDUSTRY_CATEGORIES[clientIndustry][0] ?? ""
+                      setShowAddCategory(false)
+                    }
+                    updatePost(updates)
+                  }}
                   className="w-full bg-[#001f1f] border border-[#003434] text-white text-sm rounded-lg px-3 py-2 outline-none focus:border-[#70BF4B]/40"
                 >
                   <option value="">Emozi Digital (Own)</option>
@@ -471,31 +493,69 @@ export default function BlogEditor({ initialData, isNew = false }: BlogEditorPro
               </div>
 
               <div>
-                <label className="block text-[10px] text-zinc-600 font-bold uppercase mb-2">Industry</label>
-                <select
-                  value={post.industry || INDUSTRIES[0]}
-                  onChange={(e) => {
-                    const newIndustry = e.target.value;
-                    const categories = INDUSTRY_CATEGORIES[newIndustry] || [];
-                    updatePost({ 
-                      industry: newIndustry,
-                      category: categories[0] || ""
-                    });
-                  }}
-                  className="w-full bg-[#001f1f] border border-[#003434] text-white text-sm rounded-lg px-3 py-2 outline-none focus:border-[#70BF4B]/40"
-                >
-                  {INDUSTRIES.map(i => <option key={i} value={i}>{i}</option>)}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-[10px] text-zinc-600 font-bold uppercase mb-2">Category</label>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-[10px] text-zinc-600 font-bold uppercase">Category</label>
+                  <button
+                    type="button"
+                    onClick={() => { setShowAddCategory(v => !v); setNewCategoryInput("") }}
+                    className="text-[9px] text-[#70BF4B] hover:text-[#5faa3e] font-bold uppercase tracking-wider transition-colors"
+                  >
+                    + Add Category
+                  </button>
+                </div>
+                {showAddCategory && (
+                  <div className="flex gap-1 mb-2">
+                    <input
+                      type="text"
+                      value={newCategoryInput}
+                      onChange={(e) => setNewCategoryInput(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && newCategoryInput.trim()) {
+                          const cat = newCategoryInput.trim()
+                          setCustomCategories(prev => ({
+                            ...prev,
+                            [post.industry]: [...(prev[post.industry] ?? []), cat],
+                          }))
+                          updatePost({ category: cat })
+                          setNewCategoryInput("")
+                          setShowAddCategory(false)
+                        }
+                      }}
+                      placeholder="e.g. Series Fares"
+                      className="flex-1 bg-[#001f1f] border border-[#70BF4B]/40 text-white text-xs rounded-lg px-3 py-1.5 outline-none"
+                      autoFocus
+                    />
+                    <button
+                      type="button"
+                      onClick={() => {
+                        const cat = newCategoryInput.trim()
+                        if (!cat) return
+                        setCustomCategories(prev => ({
+                          ...prev,
+                          [post.industry]: [...(prev[post.industry] ?? []), cat],
+                        }))
+                        updatePost({ category: cat })
+                        setNewCategoryInput("")
+                        setShowAddCategory(false)
+                      }}
+                      className="bg-[#70BF4B] hover:bg-[#5faa3e] text-[#001a1a] text-xs font-bold px-3 py-1.5 rounded-lg transition-all"
+                    >
+                      Add
+                    </button>
+                  </div>
+                )}
                 <select
                   value={post.category}
                   onChange={(e) => updatePost({ category: e.target.value })}
                   className="w-full bg-[#001f1f] border border-[#003434] text-white text-sm rounded-lg px-3 py-2 outline-none focus:border-[#70BF4B]/40"
                 >
-                  {(INDUSTRY_CATEGORIES[post.industry] || []).map(c => <option key={c} value={c}>{c}</option>)}
+                  {(
+                    post.industry && INDUSTRY_CATEGORIES[post.industry]
+                      ? [...(INDUSTRY_CATEGORIES[post.industry] ?? []), ...(customCategories[post.industry] ?? [])]
+                      : Object.values(INDUSTRY_CATEGORIES).flat()
+                  ).map(c => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
                 </select>
               </div>
 
