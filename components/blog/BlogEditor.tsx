@@ -20,6 +20,7 @@ import {
 import toast from "react-hot-toast"
 import { FAQBuilder } from "./FAQBuilder"
 import { GooglePreview } from "./GooglePreview"
+import { AIGeneratePanel, type GeneratedBlogData } from "./AIGeneratePanel"
 
 // Dynamically import MD editor to avoid SSR issues
 const MDEditor = dynamic(
@@ -253,6 +254,27 @@ export default function BlogEditor({ initialData, isNew = false }: BlogEditorPro
     setPost(prev => ({ ...prev, ...updates }))
   }
 
+  const handleAIApply = (data: GeneratedBlogData) => {
+    const industry = INDUSTRIES.includes(data.industry) ? data.industry : post.industry
+    const categories = INDUSTRY_CATEGORIES[industry] ?? []
+    const category = categories.includes(data.category) ? data.category : (categories[0] ?? post.category)
+
+    updatePost({
+      title: data.title || post.title,
+      slug: data.slug || post.slug,
+      content: data.content || post.content,
+      excerpt: data.excerpt || post.excerpt,
+      seo_title: data.seo_title || post.seo_title,
+      seo_description: data.seo_description || post.seo_description,
+      focus_keyword: data.focus_keyword || post.focus_keyword,
+      tags: Array.isArray(data.tags) && data.tags.length ? data.tags : post.tags,
+      author: data.author || post.author,
+      industry,
+      category,
+    })
+    setIsSlugEdited(true)
+  }
+
   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -353,6 +375,9 @@ export default function BlogEditor({ initialData, isNew = false }: BlogEditorPro
       <div className="flex flex-col lg:flex-row flex-1 overflow-hidden">
         {/* Left Panel: Editor */}
         <div className="flex-1 overflow-y-auto p-6 md:p-10 space-y-10 custom-scrollbar">
+          {/* AI Content Generator */}
+          <AIGeneratePanel onApply={handleAIApply} defaultExpanded={isNew} />
+
           {/* Title Section */}
           <div className="space-y-4">
             <input
