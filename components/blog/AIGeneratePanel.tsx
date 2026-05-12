@@ -101,7 +101,6 @@ export function AIGeneratePanel({ onApply, defaultExpanded = false }: Props) {
       setSteps(STEPS.map(s => ({ ...s, done: true })))
       await new Promise(r => setTimeout(r, 400))
       setResult(data)
-      setActiveTab("blog")
       toast.success("Blog content generated!")
     } catch (err: any) {
       clearTimeout(t1)
