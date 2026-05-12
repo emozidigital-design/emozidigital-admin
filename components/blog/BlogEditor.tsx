@@ -16,9 +16,6 @@ import {
   User,
   Calendar,
   Eye,
-  ExternalLink,
-  Send,
-  Trash2,
 } from "lucide-react"
 import toast from "react-hot-toast"
 import { FAQBuilder } from "./FAQBuilder"
@@ -54,6 +51,7 @@ interface BlogPost {
   seo_title: string
   seo_description: string
   client_id: string | null
+  industry: string
 }
 
 interface BlogEditorProps {
@@ -61,32 +59,37 @@ interface BlogEditorProps {
   isNew?: boolean
 }
 
-const CATEGORIES = [
-  "AI Automation",
-  "SEO & Content",
-  "Lead Generation",
-  "CRM & Workflow",
-  "Chatbots",
-  "Performance Marketing"
-]
+const INDUSTRY_CATEGORIES: Record<string, string[]> = {
+  "Aviation": ["Aviation", "Visa Updates", "Travel Tips", "Industry News", "Industry Trends", "Travel Tools", "Cruise", "Top Sectors", "New Launches", "Events & Expo"],
+  "Travel": ["Flights", "Hotels", "Tour Packages", "Visa Services", "Travel Insurance", "Car Rentals", "Cruise Booking", "Adventure Tourism", "Corporate Travel", "Travel Technology", "Destination Management", "Group Tours", "Backpacking", "Luxury Travel", "Pilgrimage Tourism", "Eco Tourism", "Medical Tourism", "Railway Booking", "Bus Booking", "Travel Content & Media"],
+  "Hospitality": ["Hotels", "Resorts", "Homestays", "Vacation Rentals", "Restaurants", "Cafes", "Catering", "Event Management", "Banquet Halls", "Cloud Kitchens", "Food Delivery", "Nightlife", "Hospitality Tech", "Luxury Hospitality", "Wellness Retreats", "Theme Parks", "Club & Lounge Services"],
+  "Healthcare": ["Hospitals", "Clinics", "Telemedicine", "Diagnostics", "Pharmacy", "Medical Equipment", "Health Insurance", "Fitness Centers", "Mental Health", "Dental Care", "IVF & Fertility", "Ayurveda", "Home Healthcare", "Medical Tourism", "Rehabilitation Centers", "Nutrition & Diet", "Healthcare SaaS", "Biotechnology"],
+  "Retail": ["Fashion", "Electronics", "Grocery", "Furniture", "Beauty & Cosmetics", "Jewelry", "Footwear", "E-commerce", "D2C Brands", "Supermarkets", "Luxury Retail", "Toys & Gifts", "Sports Goods", "Pet Supplies", "Mobile Accessories", "Apparel Manufacturing", "Wholesale Distribution", "Convenience Stores"],
+  "Real Estate": ["Residential Property", "Commercial Property", "Property Rentals", "Co-working Spaces", "Construction", "Interior Design", "Architecture", "Smart Homes", "Real Estate Tech", "Property Management", "Land Development", "Luxury Villas", "Home Loans", "Real Estate Investment", "Warehousing", "Industrial Real Estate"],
+  "Marketing": ["Digital Marketing", "SEO", "Social Media Marketing", "Influencer Marketing", "Branding", "Public Relations", "Content Marketing", "Email Marketing", "Performance Marketing", "Affiliate Marketing", "Video Marketing", "Marketing Automation", "AI Marketing", "Advertising Agencies", "Media Buying", "Copywriting", "Market Research"],
+  "Tech": ["SaaS", "AI & Machine Learning", "Web Development", "Mobile Apps", "Cybersecurity", "Cloud Computing", "Blockchain", "FinTech", "EdTech", "HealthTech", "TravelTech", "Automation", "IoT", "AR/VR", "UI/UX Design", "Software Development", "Data Analytics", "DevOps", "CRM Solutions", "API Services"]
+};
 
-// Each entry represents an external blog site the admin can publish to.
-// Add more sites here as new client blogs are set up.
-const EXTERNAL_BLOG_SITES = [
+const INDUSTRIES = Object.keys(INDUSTRY_CATEGORIES);
+
+/**
+ * CLIENT BLOG SITE MAPPING
+ * Maps client name substrings (case-insensitive) to their external blog configuration.
+ * To add a new client: add an entry below with a unique substring of their legal name.
+ * Step-by-step guide for new clients:
+ *   1. Add their Supabase credentials to .env.local (e.g. NEWCLIENT_SUPABASE_URL, NEWCLIENT_SUPABASE_SERVICE_ROLE_KEY)
+ *   2. Create lib/supabase-newclient.ts (copy supabase-agentbazar.ts pattern)
+ *   3. Create app/api/blog/newclient/route.ts (copy agentbazar route.ts pattern)
+ *   4. Add an entry here: { nameMatch: "client legal name substring", apiPath: "/api/blog/newclient", siteUrl: "https://blog.newclient.com", name: "Client Blog Name" }
+ */
+const CLIENT_BLOG_SITES: { nameMatch: string; apiPath: string; siteUrl: string; name: string }[] = [
   {
-    id: "agentbazar",
-    name: "Agent Bazar Blog",
-    siteUrl: "https://blog.agentbazar.in",
+    nameMatch: "tripforu",
     apiPath: "/api/blog/agentbazar",
-    categories: [
-      "Aviation", "Visa Updates", "Travel Tips", "Industry News",
-      "Industry Trends", "Travel Tools", "Cruise", "Top Sectors",
-      "New Launches", "Events & Expo",
-    ],
+    siteUrl: "https://blog.agentbazar.in",
+    name: "Agent Bazar Blog",
   },
-]
-
-type ExtSiteStatus = "unknown" | "published" | "not-published"
+];
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
 
@@ -97,7 +100,7 @@ export default function BlogEditor({ initialData, isNew = false }: BlogEditorPro
     slug: "",
     content: "",
     excerpt: "",
-    category: CATEGORIES[0],
+    category: INDUSTRY_CATEGORIES[INDUSTRIES[0]][0],
     status: "draft",
     published_at: null,
     tags: [],
@@ -111,24 +114,29 @@ export default function BlogEditor({ initialData, isNew = false }: BlogEditorPro
     seo_title: "",
     seo_description: "",
     client_id: null,
+    industry: INDUSTRIES[0],
   })
+
+  // Ensure industry is set if missing from initialData
+  useEffect(() => {
+    if (post && !post.industry) {
+      setPost(prev => ({ ...prev, industry: INDUSTRIES[0] }));
+    }
+  }, []);
 
   const { data: clientsData } = useSWR<{ clients: { id: string; name: string }[] }>('/api/clients', fetcher)
   const clients = clientsData?.clients ?? []
+
+  // Resolve which external blog site is linked to the currently selected client (if any)
+  const selectedClientName = clients.find(c => c.id === post.client_id)?.name ?? ""
+  const clientBlogSite = CLIENT_BLOG_SITES.find(
+    s => selectedClientName.toLowerCase().includes(s.nameMatch.toLowerCase())
+  ) ?? null
 
   const [isSaving, setIsSaving] = useState(false)
   const [isSlugEdited, setIsSlugEdited] = useState(false)
   const lastSavedPostStr = useRef(JSON.stringify(post))
   const autoSaveTimer = useRef<NodeJS.Timeout | null>(null)
-
-  // External blog publishing state (keyed by site id)
-  const [extStatus, setExtStatus] = useState<Record<string, ExtSiteStatus>>(
-    Object.fromEntries(EXTERNAL_BLOG_SITES.map(s => [s.id, "unknown"]))
-  )
-  const [extCategory, setExtCategory] = useState<Record<string, string>>(
-    Object.fromEntries(EXTERNAL_BLOG_SITES.map(s => [s.id, s.categories[0]]))
-  )
-  const [publishingTo, setPublishingTo] = useState<string | null>(null)
 
   // Auto-generate slug from title
   useEffect(() => {
@@ -150,7 +158,7 @@ export default function BlogEditor({ initialData, isNew = false }: BlogEditorPro
     }
   }, [post.content, post.read_time])
 
-  // Explicit Save
+  // Explicit Save — also pushes to client's blog site when publishing
   const handleSave = async (options: { publish?: boolean, silent?: boolean } = {}) => {
     setIsSaving(true)
     
@@ -162,6 +170,7 @@ export default function BlogEditor({ initialData, isNew = false }: BlogEditorPro
     }
 
     try {
+      // 1. Save to internal Emozi Supabase
       const res = await fetch('/api/blog', {
         method: isNew && !post.id ? 'POST' : 'PUT',
         headers: { 'Content-Type': 'application/json' },
@@ -183,14 +192,30 @@ export default function BlogEditor({ initialData, isNew = false }: BlogEditorPro
       const savedPost = result.post
       
       if (isNew && !post.id) {
-        // Update URL to edit mode with the new ID
         router.replace(`/blog/${savedPost.id}`)
       }
 
       setPost(prev => ({ ...prev, id: savedPost.id }));
       lastSavedPostStr.current = JSON.stringify(savedPost)
-      
-      if (!options.silent) {
+
+      // 2. If publishing and a client blog site is mapped, also push there
+      if (options.publish && clientBlogSite) {
+        try {
+          const extRes = await fetch(clientBlogSite.apiPath, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(dataToSave),
+          })
+          if (!extRes.ok) {
+            const extErr = await extRes.json()
+            toast.error(`Saved internally but failed to publish to ${clientBlogSite.name}: ${extErr.error}`, { duration: 6000 })
+          } else if (!options.silent) {
+            toast.success(`Published to Emozi & ${clientBlogSite.name}!`)
+          }
+        } catch (extErr: any) {
+          toast.error(`Saved internally but failed to reach ${clientBlogSite.name}: ${extErr.message}`)
+        }
+      } else if (!options.silent) {
         toast.success(options.publish ? "Post published successfully!" : "Draft saved successfully")
       }
     } catch (err: any) {
@@ -207,51 +232,6 @@ export default function BlogEditor({ initialData, isNew = false }: BlogEditorPro
       }
     } finally {
       setIsSaving(false)
-    }
-  }
-
-  // Check all external sites for this slug whenever it changes
-  useEffect(() => {
-    if (!post.slug) return
-    EXTERNAL_BLOG_SITES.forEach(async (site) => {
-      try {
-        const res = await fetch(`${site.apiPath}?slug=${encodeURIComponent(post.slug)}`)
-        const data = await res.json()
-        setExtStatus(prev => ({ ...prev, [site.id]: data.exists ? "published" : "not-published" }))
-      } catch {
-        setExtStatus(prev => ({ ...prev, [site.id]: "not-published" }))
-      }
-    })
-  }, [post.slug])
-
-  const publishToSite = async (site: typeof EXTERNAL_BLOG_SITES[number]) => {
-    if (!post.title || !post.slug) return
-    setPublishingTo(site.id)
-    try {
-      const res = await fetch(site.apiPath, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...post, externalCategory: extCategory[site.id] }),
-      })
-      if (!res.ok) throw new Error((await res.json()).error)
-      setExtStatus(prev => ({ ...prev, [site.id]: "published" }))
-      toast.success(`Published to ${site.name}!`)
-    } catch (err: any) {
-      toast.error(`Failed: ${err.message}`)
-    } finally {
-      setPublishingTo(null)
-    }
-  }
-
-  const unpublishFromSite = async (site: typeof EXTERNAL_BLOG_SITES[number]) => {
-    if (!confirm(`Remove this post from ${site.name}?`)) return
-    try {
-      const res = await fetch(`${site.apiPath}?slug=${encodeURIComponent(post.slug)}`, { method: "DELETE" })
-      if (!res.ok) throw new Error((await res.json()).error)
-      setExtStatus(prev => ({ ...prev, [site.id]: "not-published" }))
-      toast.success(`Removed from ${site.name}`)
-    } catch (err: any) {
-      toast.error(`Failed: ${err.message}`)
     }
   }
 
@@ -340,18 +320,25 @@ export default function BlogEditor({ initialData, isNew = false }: BlogEditorPro
             <Save className="w-4 h-4" />
             Save Draft
           </button>
-          <button
-            onClick={() => handleSave({ publish: true })}
-            disabled={isSaving || !post.title}
-            className="flex items-center gap-2 bg-[#70BF4B] hover:bg-[#5faa3e] text-[#001a1a] font-bold text-xs px-5 py-2.5 rounded-xl transition-all shadow-lg shadow-[#70BF4B]/10 active:scale-95 disabled:opacity-50"
-          >
-            <Globe className="w-4 h-4" />
-            {post.status === 'published' ? 'Update Post' : 'Publish Now'}
-          </button>
+          <div className="flex flex-col items-end">
+            <button
+              onClick={() => handleSave({ publish: true })}
+              disabled={isSaving || !post.title}
+              className="flex items-center gap-2 bg-[#70BF4B] hover:bg-[#5faa3e] text-[#001a1a] font-bold text-xs px-5 py-2.5 rounded-xl transition-all shadow-lg shadow-[#70BF4B]/10 active:scale-95 disabled:opacity-50"
+            >
+              <Globe className="w-4 h-4" />
+              {post.status === 'published' ? 'Update Post' : 'Publish Now'}
+            </button>
+            {clientBlogSite && (
+              <span className="text-[9px] text-[#70BF4B]/70 font-mono mt-1">
+                → {clientBlogSite.name}
+              </span>
+            )}
+          </div>
           
           {post.status === 'published' && (
             <a
-              href={`https://emozidigital.com/blog/${post.slug}`}
+              href={clientBlogSite ? `${clientBlogSite.siteUrl}/${post.slug}` : `https://emozidigital.com/blog/${post.slug}`}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-2 text-[#70BF4B] hover:text-[#5faa3e] text-xs font-bold px-4 py-2.5 rounded-xl border border-[#70BF4B]/20 bg-[#70BF4B]/5 transition-all"
@@ -376,8 +363,8 @@ export default function BlogEditor({ initialData, isNew = false }: BlogEditorPro
               className="w-full bg-transparent border-none focus:ring-0 text-white text-4xl md:text-5xl font-black placeholder-zinc-800 outline-none"
             />
             
-            <div className="flex items-center gap-2 group">
-              <span className="text-zinc-600 text-sm font-mono">/blog/</span>
+            <div className="flex items-center gap-2 group max-w-2xl bg-[#001f1f] border border-[#003434] hover:border-[#70BF4B]/40 transition-all px-4 py-2 rounded-xl">
+              <span className="text-zinc-600 text-sm font-mono shrink-0">/blog/</span>
               <input
                 type="text"
                 value={post.slug}
@@ -388,6 +375,7 @@ export default function BlogEditor({ initialData, isNew = false }: BlogEditorPro
                 placeholder="slug-url"
                 className="bg-transparent border-none focus:ring-0 text-[#70BF4B] text-sm font-mono p-0 outline-none w-full"
               />
+              <Save className="w-4 h-4 text-zinc-700 group-hover:text-[#70BF4B] transition-colors" />
             </div>
           </div>
 
@@ -458,13 +446,31 @@ export default function BlogEditor({ initialData, isNew = false }: BlogEditorPro
               </div>
 
               <div>
+                <label className="block text-[10px] text-zinc-600 font-bold uppercase mb-2">Industry</label>
+                <select
+                  value={post.industry || INDUSTRIES[0]}
+                  onChange={(e) => {
+                    const newIndustry = e.target.value;
+                    const categories = INDUSTRY_CATEGORIES[newIndustry] || [];
+                    updatePost({ 
+                      industry: newIndustry,
+                      category: categories[0] || ""
+                    });
+                  }}
+                  className="w-full bg-[#001f1f] border border-[#003434] text-white text-sm rounded-lg px-3 py-2 outline-none focus:border-[#70BF4B]/40"
+                >
+                  {INDUSTRIES.map(i => <option key={i} value={i}>{i}</option>)}
+                </select>
+              </div>
+
+              <div>
                 <label className="block text-[10px] text-zinc-600 font-bold uppercase mb-2">Category</label>
                 <select
                   value={post.category}
                   onChange={(e) => updatePost({ category: e.target.value })}
                   className="w-full bg-[#001f1f] border border-[#003434] text-white text-sm rounded-lg px-3 py-2 outline-none focus:border-[#70BF4B]/40"
                 >
-                  {CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                  {(INDUSTRY_CATEGORIES[post.industry] || []).map(c => <option key={c} value={c}>{c}</option>)}
                 </select>
               </div>
 
@@ -640,82 +646,6 @@ export default function BlogEditor({ initialData, isNew = false }: BlogEditorPro
             </div>
           </section>
 
-          {/* External Blog Publishing */}
-          <section className="space-y-4 border-t border-[#003434] pt-8">
-            <div className="flex items-center gap-2 text-zinc-400">
-              <Send className="w-4 h-4" />
-              <h4 className="text-[10px] font-bold uppercase tracking-widest">Publish to External Sites</h4>
-            </div>
-
-            <div className="space-y-3">
-              {EXTERNAL_BLOG_SITES.map(site => {
-                const status = extStatus[site.id] ?? "unknown"
-                const isPublishing = publishingTo === site.id
-                return (
-                  <div key={site.id} className="bg-[#001a1a] border border-[#003434] rounded-xl p-4 space-y-3">
-                    {/* Site header */}
-                    <div className="flex items-center justify-between">
-                      <span className="text-white text-xs font-bold">{site.name}</span>
-                      <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
-                        status === "published"
-                          ? "bg-emerald-500/15 text-emerald-400"
-                          : status === "not-published"
-                          ? "bg-zinc-800 text-zinc-500"
-                          : "bg-zinc-800/50 text-zinc-600"
-                      }`}>
-                        {status === "published" ? "Live" : status === "not-published" ? "Not published" : "Checking…"}
-                      </span>
-                    </div>
-
-                    {/* Category for this site */}
-                    <div>
-                      <label className="block text-[9px] text-zinc-600 font-bold uppercase mb-1.5">Category on this site</label>
-                      <select
-                        value={extCategory[site.id]}
-                        onChange={e => setExtCategory(prev => ({ ...prev, [site.id]: e.target.value }))}
-                        className="w-full bg-[#001f1f] border border-[#003434] text-white text-xs rounded-lg px-3 py-2 outline-none focus:border-[#70BF4B]/40"
-                      >
-                        {site.categories.map(c => <option key={c} value={c}>{c}</option>)}
-                      </select>
-                    </div>
-
-                    {/* Actions */}
-                    <div className="flex flex-col gap-2 pt-1">
-                      <button
-                        onClick={() => publishToSite(site)}
-                        disabled={isPublishing || !post.title || !post.slug}
-                        className="w-full flex items-center justify-center gap-2 bg-[#003434] hover:bg-[#004d4d] text-[#70BF4B] font-bold text-xs px-4 py-2.5 rounded-xl transition-all disabled:opacity-40"
-                      >
-                        <Globe className="w-3.5 h-3.5" />
-                        {isPublishing ? "Publishing…" : status === "published" ? "Update on Site" : "Publish to Site"}
-                      </button>
-
-                      {status === "published" && (
-                        <div className="flex gap-2">
-                          <a
-                            href={`${site.siteUrl}/${post.slug}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex-1 flex items-center justify-center gap-1.5 text-zinc-400 hover:text-white text-[11px] font-bold px-3 py-2 rounded-xl border border-[#003434] transition-all"
-                          >
-                            <ExternalLink className="w-3 h-3" />
-                            View Live
-                          </a>
-                          <button
-                            onClick={() => unpublishFromSite(site)}
-                            className="flex items-center justify-center gap-1.5 text-zinc-600 hover:text-red-400 text-[11px] px-3 py-2 rounded-xl border border-[#003434] hover:border-red-400/30 transition-all"
-                            title="Remove from site"
-                          >
-                            <Trash2 className="w-3 h-3" />
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          </section>
         </div>
       </div>
     </div>
