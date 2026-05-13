@@ -11,6 +11,7 @@ function mapClient(row: any) {
     name:      row.legal_name ?? row.email ?? '',
     email:     row.email ?? '',
     phone:     row.section_a?.phone ?? row.section_b?.phone ?? '',
+    industry:  row.section_a?.industry ?? '',
     package:   m.package   ?? '',
     tier:      m.tier      ?? '',
     status:    row.status  ?? '',
