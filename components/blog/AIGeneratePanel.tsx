@@ -26,6 +26,7 @@ export type GeneratedBlogData = {
   author: string
   category: string
   industry: string
+  image_prompts: string[]
 }
 
 type Props = {
@@ -360,6 +361,16 @@ export function AIGeneratePanel({ onApply, defaultExpanded = false }: Props) {
                 </div>
               </div>
               <Field label="Industry / Category" value={`${result.industry} → ${result.category}`} />
+              {result.image_prompts?.length > 0 && (
+                <div className="bg-[#001a1a] border border-[#003434] rounded-xl p-3 space-y-2">
+                  <p className="text-[9px] text-zinc-600 font-bold uppercase">Image Prompts</p>
+                  {result.image_prompts.map((prompt, i) => (
+                    <p key={i} className="text-zinc-400 text-xs leading-snug border-l-2 border-[#70BF4B]/30 pl-2">
+                      {i + 1}. {prompt}
+                    </p>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Action Buttons */}

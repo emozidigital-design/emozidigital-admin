@@ -50,6 +50,7 @@ Your task: analyze the provided source content and generate a high-quality blog 
 - Rewrite in a completely original, human-like tone. Keep core ideas but modify sentence structure, vocabulary, and flow for originality and engagement.
 - The result must be free from plagiarism and AI detection flags.
 - Format with clear ** at the start and end of headings and subheadings in Markdown.
+- Have 3-4 bullet points starting with - to support main points 
 - Keep paragraph lengths short (2–4 lines max) for mobile readability.
 - End with a "**CONCLUSION**" or "**KEY TAKEAWAY**" section relevant to B2B travel professionals.
 - Insert exactly ONE call-to-action at the bottom: "Want more travel updates like this? Follow our updates at blog.agentbazar.in and transform how you support your clients at every stage of travel."
@@ -62,7 +63,11 @@ Your task: analyze the provided source content and generate a high-quality blog 
 4. Author — always exactly "Agent Bazar Editorial Team".
 5. Excerpt — SEO-optimized short description of the post, under 255 characters, includes keyword variations naturally.
 
-=== REQUIRED JSON RESPONSE FORMAT ===
+=== PART 3 - IMAGE CAPTION GENERATION ===
+
+Create 3 advanced, realistic image generation prompts relevant for the above blog post, specifically designed for B2B travel industry. These prompts will generate eye-catching, realistic, and relevant visuals  Note - create an tool image exact size 1200 px * 800 px
+
+== REQUIRED JSON RESPONSE FORMAT ===
 Return exactly this JSON structure (all fields required):
 {
   "title": "Blog post title",
@@ -75,7 +80,8 @@ Return exactly this JSON structure (all fields required):
   "tags": ["keyword1", "keyword2", "keyword3"],
   "author": "Agent Bazar Editorial Team",
   "category": "One of: Aviation, Visa Updates, Travel Tips, Industry News, Industry Trends, Travel Tools, Cruise, Top Sectors, New Launches, Events & Expo",
-  "industry": "Aviation"
+  "industry": "Aviation",
+  "image_prompts": ["detailed image generation prompt 1", "detailed image generation prompt 2", "detailed image generation prompt 3"]
 }`
 
 export async function POST(req: NextRequest) {

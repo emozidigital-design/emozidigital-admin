@@ -53,6 +53,7 @@ interface BlogPost {
   seo_description: string
   client_id: string | null
   industry: string
+  image_prompts: string[]
 }
 
 interface BlogEditorProps {
@@ -104,7 +105,7 @@ const fetcher = (url: string) => fetch(url).then(r => r.json())
 const DB_FIELDS = [
   'id','title','slug','content','excerpt','category','status','published_at',
   'tags','author','cover_image_url','cover_image_width','cover_image_height',
-  'read_time','schema_faq','focus_keyword','seo_title','seo_description','client_id','industry'
+  'read_time','schema_faq','focus_keyword','seo_title','seo_description','client_id','industry','image_prompts'
 ] as const
 
 function pickDbFields(p: BlogPost) {
@@ -134,6 +135,7 @@ export default function BlogEditor({ initialData, isNew = false }: BlogEditorPro
     seo_description: "",
     client_id: null,
     industry: INDUSTRIES[0],
+    image_prompts: [],
   })
 
   // Ensure industry is set if missing from initialData
@@ -302,6 +304,7 @@ export default function BlogEditor({ initialData, isNew = false }: BlogEditorPro
       author: data.author || post.author,
       industry,
       category,
+      image_prompts: Array.isArray(data.image_prompts) && data.image_prompts.length ? data.image_prompts : post.image_prompts,
     })
     setIsSlugEdited(true)
   }
@@ -541,10 +544,49 @@ export default function BlogEditor({ initialData, isNew = false }: BlogEditorPro
              />
           </div>
 
+          {/* Image Prompts */}
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-zinc-500 text-[10px] font-bold uppercase tracking-widest flex items-center gap-2">
+                <ImageIcon className="w-4 h-4" /> Image Prompts
+              </h3>
+              <span className="text-zinc-600 text-[10px] font-mono">{post.image_prompts.length} prompt{post.image_prompts.length !== 1 ? 's' : ''}</span>
+            </div>
+            <div className="space-y-3">
+              {post.image_prompts.map((prompt, i) => (
+                <div key={i} className="flex gap-2 items-start">
+                  <span className="text-[#70BF4B] text-[10px] font-bold mt-3 shrink-0">{i + 1}.</span>
+                  <textarea
+                    value={prompt}
+                    onChange={(e) => {
+                      const updated = [...post.image_prompts]
+                      updated[i] = e.target.value
+                      updatePost({ image_prompts: updated })
+                    }}
+                    rows={2}
+                    className="flex-1 bg-[#001f1f] border border-[#003434] focus:border-[#70BF4B]/40 text-zinc-300 text-sm rounded-xl px-4 py-3 outline-none transition-all resize-none"
+                  />
+                  <button
+                    onClick={() => updatePost({ image_prompts: post.image_prompts.filter((_, idx) => idx !== i) })}
+                    className="mt-2.5 p-1.5 text-zinc-700 hover:text-red-400 transition-colors"
+                  >
+                    <ChevronLeft className="w-3.5 h-3.5 rotate-45" />
+                  </button>
+                </div>
+              ))}
+              <button
+                onClick={() => updatePost({ image_prompts: [...post.image_prompts, ''] })}
+                className="w-full py-2.5 text-[10px] font-bold uppercase tracking-widest text-zinc-600 hover:text-[#70BF4B] border border-dashed border-[#003434] hover:border-[#70BF4B]/40 rounded-xl transition-all"
+              >
+                + Add Image Prompt
+              </button>
+            </div>
+          </div>
+
           {/* FAQ Builder */}
-          <FAQBuilder 
-            items={post.schema_faq} 
-            onChange={(items) => updatePost({ schema_faq: items })} 
+          <FAQBuilder
+            items={post.schema_faq}
+            onChange={(items) => updatePost({ schema_faq: items })}
           />
         </div>
 
