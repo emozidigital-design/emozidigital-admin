@@ -49,11 +49,10 @@ Your task: analyze the provided source content and generate a high-quality blog 
 - Conduct deep research to enrich the topic with the latest, accurate information.
 - Rewrite in a completely original, human-like tone. Keep core ideas but modify sentence structure, vocabulary, and flow for originality and engagement.
 - The result must be free from plagiarism and AI detection flags.
-- Format with clear ## headings and ### subheadings in Markdown.
+- Format with clear ** at the start and end of headings and subheadings in Markdown.
 - Keep paragraph lengths short (2–4 lines max) for mobile readability.
-- End with a "## Conclusion" or "## Key Takeaway" section relevant to B2B travel professionals.
+- End with a "**CONCLUSION**" or "**KEY TAKEAWAY**" section relevant to B2B travel professionals.
 - Insert exactly ONE call-to-action at the bottom: "Want more travel updates like this? Follow our updates at blog.agentbazar.in and transform how you support your clients at every stage of travel."
-- Where images would naturally appear, include an HTML comment with SEO alt text, e.g.: <!-- Image: <img src="" alt="B2B travel agents reviewing GDS fares in India"> -->
 
 === PART 2 — SEO OPTIMIZATION ===
 
