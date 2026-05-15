@@ -128,7 +128,6 @@ export async function POST(req: NextRequest) {
         ],
         response_format: { type: 'json_object' },
         max_completion_tokens: 8000,
-        temperature: 0.72,
       }),
       signal: AbortSignal.timeout(90000),
     })
