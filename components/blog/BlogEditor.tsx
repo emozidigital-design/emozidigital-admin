@@ -333,6 +333,71 @@ export default function BlogEditor({ initialData, isNew = false }: BlogEditorPro
     }
   }
 
+  const insertTextAtCursor = (text: string) => {
+    const textarea = document.querySelector('textarea.w-md-editor-text-input') as HTMLTextAreaElement;
+    if (!textarea) {
+      updatePost({ content: post.content + text });
+      return;
+    }
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const newContent = post.content.substring(0, start) + text + post.content.substring(end);
+    updatePost({ content: newContent });
+    
+    // Reset cursor position after React re-renders
+    setTimeout(() => {
+      textarea.focus();
+      textarea.setSelectionRange(start + text.length, start + text.length);
+    }, 10);
+  };
+
+  const handleMarkdownImageUpload = async (file: File) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    const toastId = toast.loading("Uploading image...");
+    try {
+      const res = await fetch('/api/upload', {
+        method: 'POST',
+        body: formData
+      });
+      const data = await res.json();
+      if (data.url) {
+        toast.success("Image uploaded", { id: toastId });
+        insertTextAtCursor(`\n![image](${data.url})\n`);
+      } else {
+        throw new Error(data.error || "Upload failed");
+      }
+    } catch (err) {
+      toast.error("Upload failed: " + (err instanceof Error ? err.message : String(err)), { id: toastId });
+    }
+  };
+
+  const handleTextareaPaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of Array.from(items)) {
+      if (item.type.startsWith('image/')) {
+        e.preventDefault();
+        const file = item.getAsFile();
+        if (file) handleMarkdownImageUpload(file);
+        break;
+      }
+    }
+  };
+
+  const handleTextareaDrop = (e: React.DragEvent<HTMLTextAreaElement>) => {
+    const items = e.dataTransfer?.items;
+    if (!items) return;
+    for (const item of Array.from(items)) {
+      if (item.type.startsWith('image/')) {
+        e.preventDefault();
+        const file = item.getAsFile();
+        if (file) handleMarkdownImageUpload(file);
+        break;
+      }
+    }
+  };
+
   return (
     <div className="flex flex-col min-h-screen bg-[#001a1a]">
       {/* Top Header */}
@@ -442,6 +507,10 @@ export default function BlogEditor({ initialData, isNew = false }: BlogEditorPro
               height={500}
               className="border border-[#003434] rounded-2xl overflow-hidden"
               style={{ backgroundColor: '#001f1f' }}
+              textareaProps={{
+                onPaste: handleTextareaPaste,
+                onDrop: handleTextareaDrop
+              }}
             />
           </div>
 

@@ -3,7 +3,11 @@
     "allow": [
       "Bash(git commit -m ' *)",
       "Bash(git push *)",
-      "Bash(git commit *)"
+      "Bash(git commit *)",
+      "mcp__claude_ai_Supabase__list_projects",
+      "mcp__claude_ai_Supabase__execute_sql",
+      "Bash(npx tsc *)",
+      "Bash(gh pr *)"
     ]
   }
 }
