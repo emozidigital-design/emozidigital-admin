@@ -158,7 +158,7 @@ export default function BlogEditor({ initialData, isNew = false }: BlogEditorPro
   const [showAddCategory, setShowAddCategory] = useState(false)
   const [isSlugEdited, setIsSlugEdited] = useState(false)
   const lastSavedPostStr = useRef(JSON.stringify(pickDbFields(post)))
-  const autoSaveTimer = useRef<NodeJS.Timeout | null>(null)
+  const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   // Auto-generate slug from title
   useEffect(() => {
@@ -257,17 +257,17 @@ export default function BlogEditor({ initialData, isNew = false }: BlogEditorPro
     }
   }
 
-  // Auto-save logic (every 30s)
+  // Auto-save: debounced 5s after last change
   useEffect(() => {
-    autoSaveTimer.current = setInterval(() => {
+    autoSaveTimer.current = setTimeout(() => {
       const currentPostStr = JSON.stringify(pickDbFields(post))
       if (currentPostStr !== lastSavedPostStr.current && post.title) {
         handleSave({ silent: true })
       }
-    }, 30000)
+    }, 5000)
 
     return () => {
-      if (autoSaveTimer.current) clearInterval(autoSaveTimer.current)
+      if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current)
     }
   }, [post])
 
