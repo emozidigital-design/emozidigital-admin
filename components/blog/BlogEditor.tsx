@@ -101,6 +101,16 @@ const CLIENT_BLOG_SITES: { nameMatch: string; apiPath: string; siteUrl: string; 
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
 
+const DB_FIELDS = [
+  'id','title','slug','content','excerpt','category','status','published_at',
+  'tags','author','cover_image_url','cover_image_width','cover_image_height',
+  'read_time','schema_faq','focus_keyword','seo_title','seo_description','client_id'
+] as const
+
+function pickDbFields(p: BlogPost) {
+  return Object.fromEntries(DB_FIELDS.map(k => [k, (p as any)[k]]))
+}
+
 export default function BlogEditor({ initialData, isNew = false }: BlogEditorProps) {
   const router = useRouter()
   const [post, setPost] = useState<BlogPost>(initialData || {
@@ -147,7 +157,7 @@ export default function BlogEditor({ initialData, isNew = false }: BlogEditorPro
   const [newCategoryInput, setNewCategoryInput] = useState("")
   const [showAddCategory, setShowAddCategory] = useState(false)
   const [isSlugEdited, setIsSlugEdited] = useState(false)
-  const lastSavedPostStr = useRef(JSON.stringify(post))
+  const lastSavedPostStr = useRef(JSON.stringify(pickDbFields(post)))
   const autoSaveTimer = useRef<NodeJS.Timeout | null>(null)
 
   // Auto-generate slug from title
@@ -208,7 +218,7 @@ export default function BlogEditor({ initialData, isNew = false }: BlogEditorPro
       }
 
       setPost(prev => ({ ...prev, id: savedPost.id }));
-      lastSavedPostStr.current = JSON.stringify(savedPost)
+      lastSavedPostStr.current = JSON.stringify(pickDbFields(savedPost ?? dataToSave))
 
       // 2. If publishing and a client blog site is mapped, also push there
       if (options.publish && clientBlogSite) {
@@ -250,7 +260,7 @@ export default function BlogEditor({ initialData, isNew = false }: BlogEditorPro
   // Auto-save logic (every 30s)
   useEffect(() => {
     autoSaveTimer.current = setInterval(() => {
-      const currentPostStr = JSON.stringify(post)
+      const currentPostStr = JSON.stringify(pickDbFields(post))
       if (currentPostStr !== lastSavedPostStr.current && post.title) {
         handleSave({ silent: true })
       }
@@ -427,7 +437,7 @@ export default function BlogEditor({ initialData, isNew = false }: BlogEditorPro
             </div>
             <MDEditor
               value={post.content}
-              onChange={(val) => updatePost({ content: val || "" })}
+              onChange={(val) => { if (val !== undefined) updatePost({ content: val }) }}
               preview="edit"
               height={500}
               className="border border-[#003434] rounded-2xl overflow-hidden"

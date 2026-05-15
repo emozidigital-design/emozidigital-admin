@@ -87,6 +87,15 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: "ID is required for updates" }, { status: 400 });
     }
 
+    // Prevent accidental blank content from overwriting real content
+    if (updates.content === '' || updates.content === null) {
+      const { data: existing } = await supabase
+        .from('blog_posts').select('content').eq('id', id).single()
+      if (existing?.content) {
+        delete updates.content
+      }
+    }
+
     const { data, error } = await supabase
       .from('blog_posts')
       .update(updates)
