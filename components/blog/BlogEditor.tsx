@@ -104,7 +104,7 @@ const fetcher = (url: string) => fetch(url).then(r => r.json())
 const DB_FIELDS = [
   'id','title','slug','content','excerpt','category','status','published_at',
   'tags','author','cover_image_url','cover_image_width','cover_image_height',
-  'read_time','schema_faq','focus_keyword','seo_title','seo_description','client_id'
+  'read_time','schema_faq','focus_keyword','seo_title','seo_description','client_id','industry'
 ] as const
 
 function pickDbFields(p: BlogPost) {
@@ -113,6 +113,7 @@ function pickDbFields(p: BlogPost) {
 
 export default function BlogEditor({ initialData, isNew = false }: BlogEditorProps) {
   const router = useRouter()
+  const isCreated = useRef(!!initialData?.id)
   const [post, setPost] = useState<BlogPost>(initialData || {
     title: "",
     slug: "",
@@ -194,7 +195,7 @@ export default function BlogEditor({ initialData, isNew = false }: BlogEditorPro
     try {
       // 1. Save to internal Emozi Supabase
       const res = await fetch('/api/blog', {
-        method: isNew && !post.id ? 'POST' : 'PUT',
+        method: !isCreated.current ? 'POST' : 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(dataToSave)
       })
@@ -213,15 +214,15 @@ export default function BlogEditor({ initialData, isNew = false }: BlogEditorPro
       const result = await res.json()
       const savedPost = result.post
       
-      if (isNew && !post.id) {
-        router.replace(`/blog/${savedPost.id}`)
+      if (!isCreated.current) {
+        window.history.replaceState(null, '', `/blog/${savedPost.id}`)
+        isCreated.current = true
       }
 
       setPost(prev => ({
         ...prev,
-        id: savedPost.id,
-        status: dataToSave.status,
-        published_at: dataToSave.published_at,
+        ...(pickDbFields(savedPost)),
+        industry: prev.industry,
       }));
       lastSavedPostStr.current = JSON.stringify(pickDbFields(savedPost ?? dataToSave))
 
@@ -262,14 +263,14 @@ export default function BlogEditor({ initialData, isNew = false }: BlogEditorPro
     }
   }
 
-  // Auto-save: debounced 5s after last change
+  // Auto-save: debounced 1.5s after last change
   useEffect(() => {
     autoSaveTimer.current = setTimeout(() => {
       const currentPostStr = JSON.stringify(pickDbFields(post))
       if (currentPostStr !== lastSavedPostStr.current && post.title) {
         handleSave({ silent: true })
       }
-    }, 5000)
+    }, 1500)
 
     return () => {
       if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current)
@@ -416,7 +417,7 @@ export default function BlogEditor({ initialData, isNew = false }: BlogEditorPro
           </button>
           <div>
             <h1 className="text-white font-bold text-sm leading-tight">
-              {isNew ? "Creating New Post" : "Editing Post"}
+              {!isCreated.current ? "Creating New Post" : "Editing Post"}
             </h1>
             <p className="text-zinc-500 text-[10px] uppercase tracking-widest font-bold mt-0.5">
               {post.status === 'published' ? '🟢 Published' : '⚪ Draft'}
