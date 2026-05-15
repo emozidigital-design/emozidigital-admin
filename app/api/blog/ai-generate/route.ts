@@ -32,7 +32,7 @@ async function fetchUrlContent(url: string): Promise<string> {
   if (!res.ok) throw new Error(`Failed to fetch URL: HTTP ${res.status}`)
   const html = await res.text()
   const text = extractTextFromHtml(html)
-  if (text.length < 50) {
+  if (text.length < 2) {
     throw new Error(
       'Could not extract text from the URL. The page may be JavaScript-rendered — try pasting the content instead.'
     )
@@ -67,8 +67,8 @@ Return exactly this JSON structure (all fields required):
 {
   "title": "Blog post title",
   "slug": "url-friendly-slug-with-hyphens",
-  "content": "Full Markdown blog content with ## headings and ### subheadings",
-  "excerpt": "Under 255 chars SEO-optimized description",
+  "content": "Full Markdown blog content with ** at the start and end of headings and subheadings",
+  "excerpt": "Under 155 chars SEO-optimized description",
   "seo_title": "Max 60 chars SEO title",
   "seo_description": "140-160 chars meta description",
   "focus_keyword": "primary keyword phrase",
@@ -103,7 +103,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    if (!sourceContent || sourceContent.length < 50) {
+    if (!sourceContent || sourceContent.length < 10) {
       return NextResponse.json(
         { error: 'Source content is too short or empty to generate a blog post.' },
         { status: 400 }
