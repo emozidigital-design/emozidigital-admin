@@ -118,7 +118,7 @@ export async function POST(req: NextRequest) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-5.5',
+        model: 'gpt-5-mini',
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
           {
@@ -127,7 +127,7 @@ export async function POST(req: NextRequest) {
           },
         ],
         response_format: { type: 'json_object' },
-        max_tokens: 8000,
+        max_completion_tokens: 8000,
         temperature: 0.72,
       }),
       signal: AbortSignal.timeout(90000),
