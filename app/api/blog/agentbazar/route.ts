@@ -53,7 +53,7 @@ export async function POST(request: Request) {
       category: body.externalCategory || body.category,
       tags: body.tags || [],
       author: body.author || 'Agent Bazar',
-      status: 'published',
+      status: body.status || 'published',
       canonical_url: `https://blog.agentbazar.in/${body.slug}`,
       published_date: body.published_at || new Date().toISOString(),
       source: 'emozi-admin',

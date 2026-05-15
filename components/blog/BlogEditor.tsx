@@ -226,8 +226,8 @@ export default function BlogEditor({ initialData, isNew = false }: BlogEditorPro
       }));
       lastSavedPostStr.current = JSON.stringify(pickDbFields(savedPost ?? dataToSave))
 
-      // 2. If publishing and a client blog site is mapped, also push there
-      if (options.publish && clientBlogSite) {
+      // 2. If a client blog site is mapped, always sync there (draft or published)
+      if (clientBlogSite) {
         try {
           const extRes = await fetch(clientBlogSite.apiPath, {
             method: "POST",
@@ -236,12 +236,16 @@ export default function BlogEditor({ initialData, isNew = false }: BlogEditorPro
           })
           if (!extRes.ok) {
             const extErr = await extRes.json()
-            toast.error(`Saved internally but failed to publish to ${clientBlogSite.name}: ${extErr.error}`, { duration: 6000 })
+            if (!options.silent) {
+              toast.error(`Saved internally but failed to sync to ${clientBlogSite.name}: ${extErr.error}`, { duration: 6000 })
+            }
           } else if (!options.silent) {
-            toast.success(`Published to Emozi & ${clientBlogSite.name}!`)
+            toast.success(options.publish ? `Published to Emozi & ${clientBlogSite.name}!` : "Draft saved to both blogs")
           }
         } catch (extErr: any) {
-          toast.error(`Saved internally but failed to reach ${clientBlogSite.name}: ${extErr.message}`)
+          if (!options.silent) {
+            toast.error(`Saved internally but failed to reach ${clientBlogSite.name}: ${extErr.message}`)
+          }
         }
       } else if (!options.silent) {
         toast.success(options.publish ? "Post published successfully!" : "Draft saved successfully")
