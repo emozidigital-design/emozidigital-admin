@@ -62,6 +62,7 @@ interface BlogEditorProps {
 }
 
 const INDUSTRY_CATEGORIES: Record<string, string[]> = {
+  "Marketing and Tech": [], // populated below — contains all categories across all industries
   "Retail / E-commerce": ["Fashion Retail", "Electronics Store", "Grocery Store", "D2C Brand", "Online Marketplace", "Home Decor", "Jewelry Store", "Sports Store", "Pet Store", "Mobile Accessories"],
   "Food & Beverage": ["Restaurant", "Cafe", "Cloud Kitchen", "Bakery", "Catering", "Food Delivery", "Beverage Brand", "Organic Foods", "Fine Dining", "Fast Food Chain"],
   "Healthcare / Wellness": ["Hospital", "Clinic", "Pharmacy", "Diagnostic Center", "Telemedicine", "Fitness Center", "Yoga Studio", "Mental Health", "Dental Care", "Ayurveda"],
@@ -78,6 +79,10 @@ const INDUSTRY_CATEGORIES: Record<string, string[]> = {
   "Media & Entertainment": ["News Portal", "Production House", "Music Label", "Influencer Brand", "Podcast", "OTT Media", "Event Entertainment", "Gaming"],
   "Other": ["Multi-Service Business", "Holding Company", "Local Services", "Miscellaneous Brand", "Startup Venture"],
 };
+// Emozi Digital (own) uses "Marketing and Tech" which exposes every category
+INDUSTRY_CATEGORIES["Marketing and Tech"] = Object.entries(INDUSTRY_CATEGORIES)
+  .filter(([k]) => k !== "Marketing and Tech")
+  .flatMap(([, v]) => v);
 
 const INDUSTRIES = Object.keys(INDUSTRY_CATEGORIES);
 
@@ -120,7 +125,7 @@ export default function BlogEditor({ initialData, isNew = false }: BlogEditorPro
     slug: "",
     content: "",
     excerpt: "",
-    category: INDUSTRY_CATEGORIES[INDUSTRIES[0]][0],
+    category: INDUSTRY_CATEGORIES["Marketing and Tech"][0],
     status: "draft",
     published_at: null,
     tags: [],
@@ -134,14 +139,15 @@ export default function BlogEditor({ initialData, isNew = false }: BlogEditorPro
     seo_title: "",
     seo_description: "",
     client_id: null,
-    industry: INDUSTRIES[0],
+    industry: "Marketing and Tech",
     image_prompts: [],
   })
 
   // Ensure industry is set if missing from initialData
   useEffect(() => {
     if (post && !post.industry) {
-      setPost(prev => ({ ...prev, industry: INDUSTRIES[0] }));
+      const defaultIndustry = post.client_id ? INDUSTRIES[0] : "Marketing and Tech"
+      setPost(prev => ({ ...prev, industry: defaultIndustry }));
     }
   }, []);
 
@@ -606,13 +612,19 @@ export default function BlogEditor({ initialData, isNew = false }: BlogEditorPro
                   value={post.client_id ?? ""}
                   onChange={(e) => {
                     const clientId = e.target.value || null
-                    const client = clients.find(c => c.id === clientId)
-                    const clientIndustry = client?.industry ?? ""
                     const updates: Partial<BlogPost> = { client_id: clientId }
-                    if (clientIndustry && INDUSTRY_CATEGORIES[clientIndustry]) {
-                      updates.industry = clientIndustry
-                      updates.category = INDUSTRY_CATEGORIES[clientIndustry][0] ?? ""
-                      setShowAddCategory(false)
+                    if (!clientId) {
+                      // Emozi Digital (Own) — always use Marketing and Tech with all categories
+                      updates.industry = "Marketing and Tech"
+                      updates.category = INDUSTRY_CATEGORIES["Marketing and Tech"][0] ?? ""
+                    } else {
+                      const client = clients.find(c => c.id === clientId)
+                      const clientIndustry = client?.industry ?? ""
+                      if (clientIndustry && INDUSTRY_CATEGORIES[clientIndustry]) {
+                        updates.industry = clientIndustry
+                        updates.category = INDUSTRY_CATEGORIES[clientIndustry][0] ?? ""
+                        setShowAddCategory(false)
+                      }
                     }
                     updatePost(updates)
                   }}

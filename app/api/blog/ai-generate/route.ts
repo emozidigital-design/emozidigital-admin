@@ -67,6 +67,10 @@ Your task: analyze the provided source content and generate a high-quality blog 
 
 Create 3 advanced, realistic image generation prompts relevant for the above blog post, specifically designed for B2B travel industry. These prompts will generate eye-catching, realistic, and relevant visuals  Note - create an tool image exact size 1200 px * 800 px
 
+=== PART 4 - FAQ'S GENERATION ===
+
+Create 5 frequently asked questions (FAQs) relevant for the above blog post, specifically designed for B2B travel industry.
+
 == REQUIRED JSON RESPONSE FORMAT ===
 Return exactly this JSON structure (all fields required):
 {
@@ -81,7 +85,14 @@ Return exactly this JSON structure (all fields required):
   "author": "Agent Bazar Editorial Team",
   "category": "One of: Aviation, Visa Updates, Travel Tips, Industry News, Industry Trends, Travel Tools, Cruise, Top Sectors, New Launches, Events & Expo",
   "industry": "Aviation",
-  "image_prompts": ["detailed image generation prompt 1", "detailed image generation prompt 2", "detailed image generation prompt 3"]
+  "image_prompts": ["detailed image generation prompt 1", "detailed image generation prompt 2", "detailed image generation prompt 3"],
+  "schema_faq": [
+    { "question": "FAQ question 1?", "answer": "Detailed answer 1." },
+    { "question": "FAQ question 2?", "answer": "Detailed answer 2." },
+    { "question": "FAQ question 3?", "answer": "Detailed answer 3." },
+    { "question": "FAQ question 4?", "answer": "Detailed answer 4." },
+    { "question": "FAQ question 5?", "answer": "Detailed answer 5." }
+  ]
 }`
 
 export async function POST(req: NextRequest) {
@@ -161,6 +172,11 @@ export async function POST(req: NextRequest) {
     // Ensure tags is always an array
     if (!Array.isArray(result.tags)) {
       result.tags = result.tags ? String(result.tags).split(',').map((t: string) => t.trim()) : []
+    }
+
+    // Ensure schema_faq is always an array
+    if (!Array.isArray(result.schema_faq)) {
+      result.schema_faq = []
     }
 
     return NextResponse.json({ success: true, data: result })
