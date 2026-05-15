@@ -217,7 +217,12 @@ export default function BlogEditor({ initialData, isNew = false }: BlogEditorPro
         router.replace(`/blog/${savedPost.id}`)
       }
 
-      setPost(prev => ({ ...prev, id: savedPost.id }));
+      setPost(prev => ({
+        ...prev,
+        id: savedPost.id,
+        status: dataToSave.status,
+        published_at: dataToSave.published_at,
+      }));
       lastSavedPostStr.current = JSON.stringify(pickDbFields(savedPost ?? dataToSave))
 
       // 2. If publishing and a client blog site is mapped, also push there
