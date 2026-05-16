@@ -15,10 +15,32 @@ interface Lead {
   last_submitted_at: string
 }
 
+function exportCsv(leads: Lead[]) {
+  const headers = ["#", "Name", "Email", "Client", "Submissions", "First Seen", "Last Seen"]
+  const rows = leads.map((l, i) => [
+    i + 1,
+    l.name,
+    l.email,
+    l.display_client_name ?? l.client_name ?? "",
+    l.submission_count,
+    new Date(l.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }),
+    new Date(l.last_submitted_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" }),
+  ])
+  const csv = [headers, ...rows].map(r => r.map(v => `"${String(v).replace(/"/g, '""')}"`).join(",")).join("\n")
+  const blob = new Blob([csv], { type: "text/csv" })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement("a")
+  a.href = url
+  a.download = `leads-${new Date().toISOString().slice(0, 10)}.csv`
+  a.click()
+  URL.revokeObjectURL(url)
+}
+
 export default function LeadsPage() {
   const [leads, setLeads] = useState<Lead[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState("")
+  const [dismissed, setDismissed] = useState<Set<string>>(new Set())
 
   // Filters
   const [dateFrom, setDateFrom] = useState("")
@@ -38,7 +60,7 @@ export default function LeadsPage() {
     fetch(`/api/leads?${params.toString()}`)
       .then(r => r.json())
       .then(d => {
-        if (d.success) setLeads(d.leads)
+        if (d.success) { setLeads(d.leads); setDismissed(new Set()) }
         else setError(d.error ?? "Failed to load leads")
       })
       .catch(() => setError("Failed to load leads"))
@@ -46,14 +68,15 @@ export default function LeadsPage() {
   }, [dateFrom, dateTo, minCount, clientFilter])
 
   const filtered = useMemo(() => {
-    if (!search.trim()) return leads
+    const visible = leads.filter(l => !dismissed.has(l.id))
+    if (!search.trim()) return visible
     const q = search.toLowerCase()
-    return leads.filter(l =>
+    return visible.filter(l =>
       l.name.toLowerCase().includes(q) ||
       l.email.toLowerCase().includes(q) ||
       (l.display_client_name ?? l.client_name ?? "").toLowerCase().includes(q)
     )
-  }, [leads, search])
+  }, [leads, search, dismissed])
 
   const clientOptions = useMemo(() => {
     const seen = new Set<string>()
@@ -78,6 +101,18 @@ export default function LeadsPage() {
               {filtered.length} lead{filtered.length !== 1 ? "s" : ""} across all clients
             </p>
           </div>
+          <button
+            onClick={() => exportCsv(filtered)}
+            disabled={filtered.length === 0}
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-zinc-200 bg-white text-xs font-semibold text-zinc-600 hover:bg-zinc-50 hover:text-zinc-900 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+              <polyline points="7 10 12 15 17 10"/>
+              <line x1="12" y1="15" x2="12" y2="3"/>
+            </svg>
+            Export CSV
+          </button>
         </div>
 
         {/* Filters */}
@@ -175,11 +210,12 @@ export default function LeadsPage() {
                     <th className="px-4 py-3 font-semibold text-zinc-500 text-[11px] uppercase tracking-wide">Submissions</th>
                     <th className="px-4 py-3 font-semibold text-zinc-500 text-[11px] uppercase tracking-wide whitespace-nowrap">First seen</th>
                     <th className="px-4 py-3 font-semibold text-zinc-500 text-[11px] uppercase tracking-wide whitespace-nowrap">Last seen</th>
+                    <th className="px-4 py-3 w-10"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-zinc-100">
                   {filtered.map((lead, i) => (
-                    <tr key={lead.id} className="hover:bg-zinc-50 transition-colors">
+                    <tr key={lead.id} className="hover:bg-zinc-50 transition-colors group">
                       <td className="px-4 py-3 text-zinc-400 tabular-nums">{i + 1}</td>
                       <td className="px-4 py-3 font-medium text-zinc-900">{lead.name}</td>
                       <td className="px-4 py-3 text-zinc-600">
@@ -204,6 +240,20 @@ export default function LeadsPage() {
                       </td>
                       <td className="px-4 py-3 text-zinc-500 whitespace-nowrap tabular-nums">
                         {new Date(lead.last_submitted_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}
+                      </td>
+                      <td className="px-4 py-3">
+                        <button
+                          onClick={() => setDismissed(prev => new Set(prev).add(lead.id))}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity p-1.5 rounded-md text-zinc-300 hover:text-red-500 hover:bg-red-50"
+                          title="Remove from view"
+                        >
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                            <polyline points="3 6 5 6 21 6"/>
+                            <path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/>
+                            <path d="M10 11v6M14 11v6"/>
+                            <path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/>
+                          </svg>
+                        </button>
                       </td>
                     </tr>
                   ))}
