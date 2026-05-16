@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import toast from "react-hot-toast"
+import { useClient } from "../client-context"
 
 interface EmailList {
   id: string
@@ -12,6 +13,7 @@ interface EmailList {
 }
 
 export default function ListsPage() {
+  const { clientId } = useClient()
   const [lists, setLists] = useState<EmailList[]>([])
   const [loading, setLoading] = useState(true)
   const [form, setForm] = useState({ client_id: "", name: "" })
@@ -19,13 +21,42 @@ export default function ListsPage() {
   const [expandedList, setExpandedList] = useState<string | null>(null)
   const [addEmail, setAddEmail] = useState("")
   const [addingContact, setAddingContact] = useState(false)
+  const [importingAll, setImportingAll] = useState<string | null>(null)
 
   useEffect(() => {
-    fetch("/api/email/lists")
+    if (clientId) setForm(f => ({ ...f, client_id: clientId }))
+  }, [clientId])
+
+  useEffect(() => {
+    setLoading(true)
+    const params = new URLSearchParams()
+    if (clientId) params.set("client_id", clientId)
+    fetch(`/api/email/lists?${params}`)
       .then(r => r.json())
       .then(d => setLists(Array.isArray(d) ? d : []))
       .finally(() => setLoading(false))
-  }, [])
+  }, [clientId])
+
+  const handleAdd = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setAdding(true)
+    try {
+      const res = await fetch("/api/email/lists", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      setLists(prev => [data, ...prev])
+      setForm({ client_id: clientId, name: "" })
+      toast.success("List created")
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Error")
+    } finally {
+      setAdding(false)
+    }
+  }
 
   const handleAddContact = async (listId: string) => {
     if (!addEmail) return
@@ -48,33 +79,31 @@ export default function ListsPage() {
     }
   }
 
+  const handleImportAll = async (listId: string) => {
+    setImportingAll(listId)
+    try {
+      const res = await fetch(`/api/email/lists/${listId}/contacts`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ all: true }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      toast.success(`Imported ${data.imported} contacts`)
+      setLists(prev => prev.map(l => l.id === listId ? { ...l, contact_count: data.imported } : l))
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Error")
+    } finally {
+      setImportingAll(null)
+    }
+  }
+
   const handleDelete = async (id: string, name: string) => {
     if (!confirm(`Delete list "${name}"? This also removes all contacts from the list.`)) return
     const res = await fetch(`/api/email/lists/${id}`, { method: "DELETE" })
     if (!res.ok) { toast.error("Failed to delete"); return }
     setLists(prev => prev.filter(l => l.id !== id))
     toast.success("List deleted")
-  }
-
-  const handleAdd = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setAdding(true)
-    try {
-      const res = await fetch("/api/email/lists", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error)
-      setLists(prev => [data, ...prev])
-      setForm({ client_id: "", name: "" })
-      toast.success("List created")
-    } catch (err: unknown) {
-      toast.error(err instanceof Error ? err.message : "Error")
-    } finally {
-      setAdding(false)
-    }
   }
 
   return (
@@ -132,21 +161,30 @@ export default function ListsPage() {
                 </div>
               </div>
               {expandedList === l.id && (
-                <div className="border-t border-zinc-100 px-4 py-3 bg-zinc-50 flex gap-2">
-                  <input
-                    className="flex-1 border border-zinc-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#003434]/20 bg-white"
-                    placeholder="contact@email.com"
-                    type="email"
-                    value={addEmail}
-                    onChange={e => setAddEmail(e.target.value)}
-                    onKeyDown={e => e.key === "Enter" && handleAddContact(l.id)}
-                  />
+                <div className="border-t border-zinc-100 px-4 py-3 bg-zinc-50 space-y-2">
+                  <div className="flex gap-2">
+                    <input
+                      className="flex-1 border border-zinc-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#003434]/20 bg-white"
+                      placeholder="contact@email.com"
+                      type="email"
+                      value={addEmail}
+                      onChange={e => setAddEmail(e.target.value)}
+                      onKeyDown={e => e.key === "Enter" && handleAddContact(l.id)}
+                    />
+                    <button
+                      onClick={() => handleAddContact(l.id)}
+                      disabled={addingContact}
+                      className="bg-[#003434] text-white text-xs px-3 py-1.5 rounded-lg hover:bg-[#004444] disabled:opacity-50 transition-colors"
+                    >
+                      {addingContact ? "Adding…" : "Add"}
+                    </button>
+                  </div>
                   <button
-                    onClick={() => handleAddContact(l.id)}
-                    disabled={addingContact}
-                    className="bg-[#003434] text-white text-xs px-3 py-1.5 rounded-lg hover:bg-[#004444] disabled:opacity-50 transition-colors"
+                    onClick={() => handleImportAll(l.id)}
+                    disabled={importingAll === l.id}
+                    className="w-full text-xs border border-zinc-200 bg-white text-zinc-600 hover:bg-zinc-100 px-3 py-1.5 rounded-lg disabled:opacity-50 transition-colors"
                   >
-                    {addingContact ? "Adding…" : "Add"}
+                    {importingAll === l.id ? "Importing…" : "Import all contacts for this client"}
                   </button>
                 </div>
               )}

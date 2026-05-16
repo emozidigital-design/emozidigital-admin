@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import toast from "react-hot-toast"
+import { useClient } from "../client-context"
 
 interface Campaign {
   id: string
@@ -25,6 +26,7 @@ const STATUS_STYLE: Record<string, string> = {
 }
 
 export default function CampaignsPage() {
+  const { clientId } = useClient()
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
@@ -33,11 +35,18 @@ export default function CampaignsPage() {
   const [sending, setSending] = useState<string | null>(null)
 
   useEffect(() => {
-    fetch("/api/email/campaigns")
+    if (clientId) setForm(f => ({ ...f, client_id: clientId }))
+  }, [clientId])
+
+  useEffect(() => {
+    setLoading(true)
+    const params = new URLSearchParams()
+    if (clientId) params.set("client_id", clientId)
+    fetch(`/api/email/campaigns?${params}`)
       .then(r => r.json())
       .then(d => setCampaigns(Array.isArray(d) ? d : []))
       .finally(() => setLoading(false))
-  }, [])
+  }, [clientId])
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -52,21 +61,13 @@ export default function CampaignsPage() {
       if (!res.ok) throw new Error(data.error)
       setCampaigns(prev => [data, ...prev])
       setCreating(false)
-      setForm({ client_id: "", sender_id: "", template_id: "", list_id: "", subject: "", scheduled_at: "" })
+      setForm({ client_id: clientId, sender_id: "", template_id: "", list_id: "", subject: "", scheduled_at: "" })
       toast.success("Campaign created")
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Error")
     } finally {
       setSaving(false)
     }
-  }
-
-  const handleDelete = async (id: string, subject: string) => {
-    if (!confirm(`Delete campaign "${subject}"? This also removes all send logs.`)) return
-    const res = await fetch(`/api/email/campaigns/${id}`, { method: "DELETE" })
-    if (!res.ok) { toast.error("Failed to delete"); return }
-    setCampaigns(prev => prev.filter(c => c.id !== id))
-    toast.success("Campaign deleted")
   }
 
   const handleSend = async (id: string) => {
@@ -83,6 +84,14 @@ export default function CampaignsPage() {
     } finally {
       setSending(null)
     }
+  }
+
+  const handleDelete = async (id: string, subject: string) => {
+    if (!confirm(`Delete campaign "${subject}"? This also removes all send logs.`)) return
+    const res = await fetch(`/api/email/campaigns/${id}`, { method: "DELETE" })
+    if (!res.ok) { toast.error("Failed to delete"); return }
+    setCampaigns(prev => prev.filter(c => c.id !== id))
+    toast.success("Campaign deleted")
   }
 
   return (

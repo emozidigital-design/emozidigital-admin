@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import toast from "react-hot-toast"
+import { useClient } from "../client-context"
 
 interface Template {
   id: string
@@ -15,6 +16,7 @@ interface Template {
 }
 
 export default function TemplatesPage() {
+  const { clientId } = useClient()
   const [templates, setTemplates] = useState<Template[]>([])
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState<Template | null>(null)
@@ -24,11 +26,18 @@ export default function TemplatesPage() {
   const [preview, setPreview] = useState<Template | null>(null)
 
   useEffect(() => {
-    fetch("/api/email/templates")
+    if (clientId) setForm(f => ({ ...f, client_id: clientId }))
+  }, [clientId])
+
+  useEffect(() => {
+    setLoading(true)
+    const params = new URLSearchParams()
+    if (clientId) params.set("client_id", clientId)
+    fetch(`/api/email/templates?${params}`)
       .then(r => r.json())
       .then(d => setTemplates(Array.isArray(d) ? d : []))
       .finally(() => setLoading(false))
-  }, [])
+  }, [clientId])
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -51,7 +60,7 @@ export default function TemplatesPage() {
       }
       setEditing(null)
       setCreating(false)
-      setForm({ client_id: "", name: "", subject: "", html_body: "", variables: "" })
+      setForm({ client_id: clientId, name: "", subject: "", html_body: "", variables: "" })
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Save error")
     } finally {
@@ -75,7 +84,7 @@ export default function TemplatesPage() {
   const cancelEdit = () => {
     setEditing(null)
     setCreating(false)
-    setForm({ client_id: "", name: "", subject: "", html_body: "", variables: "" })
+    setForm({ client_id: clientId, name: "", subject: "", html_body: "", variables: "" })
   }
 
   return (

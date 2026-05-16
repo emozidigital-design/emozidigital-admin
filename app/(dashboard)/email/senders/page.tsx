@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import toast from "react-hot-toast"
+import { useClient } from "../client-context"
 
 interface Sender {
   id: string
@@ -16,6 +17,7 @@ interface Sender {
 }
 
 export default function SendersPage() {
+  const { clientId } = useClient()
   const [senders, setSenders] = useState<Sender[]>([])
   const [loading, setLoading] = useState(true)
   const [adding, setAdding] = useState(false)
@@ -23,11 +25,18 @@ export default function SendersPage() {
   const [newSender, setNewSender] = useState<Sender | null>(null)
 
   useEffect(() => {
-    fetch("/api/email/senders")
+    if (clientId) setForm(f => ({ ...f, client_id: clientId }))
+  }, [clientId])
+
+  useEffect(() => {
+    setLoading(true)
+    const params = new URLSearchParams()
+    if (clientId) params.set("client_id", clientId)
+    fetch(`/api/email/senders?${params}`)
       .then(r => r.json())
       .then(d => setSenders(Array.isArray(d) ? d : []))
       .finally(() => setLoading(false))
-  }, [])
+  }, [clientId])
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -42,7 +51,7 @@ export default function SendersPage() {
       if (!res.ok) throw new Error(data.error)
       setNewSender(data)
       setSenders(prev => [data, ...prev])
-      setForm({ client_id: "", from_email: "", from_name: "" })
+      setForm({ client_id: clientId, from_email: "", from_name: "" })
       toast.success("Sender added — add DKIM records to your DNS")
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Error adding sender")

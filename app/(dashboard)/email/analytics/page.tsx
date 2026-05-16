@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useClient } from "../client-context"
 
 interface Campaign {
   id: string
@@ -22,12 +23,16 @@ interface Stats {
 }
 
 export default function AnalyticsPage() {
+  const { clientId } = useClient()
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
   const [stats, setStats] = useState<Record<string, Stats>>({})
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    fetch("/api/email/campaigns")
+    setLoading(true)
+    const params = new URLSearchParams()
+    if (clientId) params.set("client_id", clientId)
+    fetch(`/api/email/campaigns?${params}`)
       .then(r => r.json())
       .then(async (data: Campaign[]) => {
         const sent = Array.isArray(data) ? data.filter(c => c.status === "sent") : []
@@ -40,7 +45,7 @@ export default function AnalyticsPage() {
         setStats(map)
       })
       .finally(() => setLoading(false))
-  }, [])
+  }, [clientId])
 
   const pct = (n: number, total: number) => total ? `${((n / total) * 100).toFixed(1)}%` : "—"
 

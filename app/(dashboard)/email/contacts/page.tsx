@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from "react"
 import toast from "react-hot-toast"
+import { useClient } from "../client-context"
 
 interface Contact {
   id: string
@@ -15,6 +16,7 @@ interface Contact {
 }
 
 export default function ContactsPage() {
+  const { clientId } = useClient()
   const [contacts, setContacts] = useState<Contact[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
@@ -24,17 +26,25 @@ export default function ContactsPage() {
   const [importClientId, setImportClientId] = useState("")
   const fileRef = useRef<HTMLInputElement>(null)
 
+  useEffect(() => {
+    if (clientId) {
+      setForm(f => ({ ...f, client_id: clientId }))
+      setImportClientId(clientId)
+    }
+  }, [clientId])
+
   const load = () => {
     setLoading(true)
     const params = new URLSearchParams()
     if (search) params.set("search", search)
+    if (clientId) params.set("client_id", clientId)
     fetch(`/api/email/contacts?${params}`)
       .then(r => r.json())
       .then(d => setContacts(Array.isArray(d) ? d : []))
       .finally(() => setLoading(false))
   }
 
-  useEffect(() => { load() }, [search])
+  useEffect(() => { load() }, [search, clientId])
 
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -48,7 +58,7 @@ export default function ContactsPage() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
       toast.success("Contact added")
-      setForm({ client_id: "", email: "", name: "" })
+      setForm({ client_id: clientId, email: "", name: "" })
       load()
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Error")

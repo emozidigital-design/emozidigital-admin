@@ -6,11 +6,32 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const unauth = await requireAuth()
   if (unauth) return unauth
 
-  const { email } = await req.json()
-  if (!email) return NextResponse.json({ error: "email required" }, { status: 400 })
+  const body = await req.json()
 
   const { data: list } = await supabaseAdmin.from("email_lists").select("client_id").eq("id", params.id).single()
   if (!list) return NextResponse.json({ error: "list not found" }, { status: 404 })
+
+  // Bulk import all eligible contacts for this client
+  if (body.all) {
+    const { data: contacts } = await supabaseAdmin
+      .from("email_contacts")
+      .select("id")
+      .eq("client_id", list.client_id)
+      .eq("subscribed", true)
+      .eq("bounced", false)
+      .eq("complained", false)
+
+    if (!contacts?.length) return NextResponse.json({ imported: 0 })
+
+    const rows = contacts.map(c => ({ list_id: params.id, contact_id: c.id }))
+    await supabaseAdmin.from("email_list_contacts").upsert(rows, { onConflict: "list_id,contact_id" })
+
+    return NextResponse.json({ imported: contacts.length })
+  }
+
+  // Single contact by email
+  const { email } = body
+  if (!email) return NextResponse.json({ error: "email required" }, { status: 400 })
 
   const { data: contact } = await supabaseAdmin
     .from("email_contacts")
