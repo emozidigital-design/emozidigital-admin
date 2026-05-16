@@ -61,6 +61,14 @@ export default function CampaignsPage() {
     }
   }
 
+  const handleDelete = async (id: string, subject: string) => {
+    if (!confirm(`Delete campaign "${subject}"? This also removes all send logs.`)) return
+    const res = await fetch(`/api/email/campaigns/${id}`, { method: "DELETE" })
+    if (!res.ok) { toast.error("Failed to delete"); return }
+    setCampaigns(prev => prev.filter(c => c.id !== id))
+    toast.success("Campaign deleted")
+  }
+
   const handleSend = async (id: string) => {
     if (!confirm("Send this campaign now to all eligible contacts?")) return
     setSending(id)
@@ -142,6 +150,12 @@ export default function CampaignsPage() {
                       {sending === c.id ? "Sending…" : "Send now"}
                     </button>
                   )}
+                  <button
+                    onClick={() => handleDelete(c.id, c.subject)}
+                    className="text-xs text-red-400 hover:text-red-600 underline underline-offset-2"
+                  >
+                    Delete
+                  </button>
                 </div>
               </div>
             </div>
