@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
   // Handle SNS subscription confirmation (one-time)
   if (msg.Type === "SubscriptionConfirmation") {
     const url = msg.SubscribeURL as string
-    if (url && url.startsWith("https://sns.amazonaws.com/")) {
+    if (url && url.startsWith("https://") && url.includes("amazonaws.com")) {
       await fetch(url) // confirms the subscription
     }
     return NextResponse.json({ ok: true })
