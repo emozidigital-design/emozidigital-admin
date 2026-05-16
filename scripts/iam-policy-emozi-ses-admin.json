@@ -1,0 +1,30 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "SESEmailSending",
+      "Effect": "Allow",
+      "Action": [
+        "ses:SendEmail",
+        "ses:SendRawEmail",
+        "ses:GetIdentityVerificationAttributes",
+        "ses:VerifyDomainDkim",
+        "ses:GetIdentityDkimAttributes",
+        "ses:CreateConfigurationSet",
+        "ses:CreateConfigurationSetEventDestination",
+        "ses:DescribeConfigurationSet"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "SNSFeedback",
+      "Effect": "Allow",
+      "Action": [
+        "sns:CreateTopic",
+        "sns:Subscribe",
+        "sns:ListSubscriptionsByTopic"
+      ],
+      "Resource": "arn:aws:sns:ap-south-1:841291679210:emozi-ses-feedback"
+    }
+  ]
+}

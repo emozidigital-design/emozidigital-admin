@@ -1,0 +1,51 @@
+import { NextRequest, NextResponse } from "next/server"
+import { getServerSession } from "next-auth"
+import { authOptions } from "@/lib/auth"
+import { supabaseAdmin } from "@/lib/supabase-server"
+
+export async function POST(req: NextRequest) {
+  const session = await getServerSession(authOptions)
+  if (!session) return NextResponse.json({ error: "unauthorized" }, { status: 401 })
+
+  const formData = await req.formData()
+  const clientId = formData.get("client_id") as string
+  const file = formData.get("file") as File | null
+
+  if (!clientId || !file) {
+    return NextResponse.json({ error: "client_id and file required" }, { status: 400 })
+  }
+
+  const text = await file.text()
+  const lines = text.split("\n").map(l => l.trim()).filter(Boolean)
+
+  if (lines.length < 2) {
+    return NextResponse.json({ error: "CSV must have header row + at least one data row" }, { status: 400 })
+  }
+
+  const headers = lines[0].split(",").map(h => h.replace(/^"|"$/g, "").trim().toLowerCase())
+  const emailIdx = headers.indexOf("email")
+  const nameIdx = headers.indexOf("name")
+
+  if (emailIdx === -1) {
+    return NextResponse.json({ error: "CSV must have an 'email' column" }, { status: 400 })
+  }
+
+  const contacts = lines.slice(1).flatMap(line => {
+    const cols = line.split(",").map(c => c.replace(/^"|"$/g, "").trim())
+    const email = cols[emailIdx]
+    if (!email || !email.includes("@")) return []
+    return [{ client_id: clientId, email, name: nameIdx !== -1 ? cols[nameIdx] : null, metadata: {} }]
+  })
+
+  if (contacts.length === 0) {
+    return NextResponse.json({ error: "no valid email addresses found" }, { status: 400 })
+  }
+
+  const { error } = await supabaseAdmin
+    .from("email_contacts")
+    .upsert(contacts, { onConflict: "client_id,email" })
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  return NextResponse.json({ imported: contacts.length })
+}
