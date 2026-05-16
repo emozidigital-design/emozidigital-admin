@@ -25,7 +25,25 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: false, error: error.message }, { status: 500 })
     }
 
-    return NextResponse.json({ success: true, leads: data ?? [] })
+    // Join with clients table to get registered client name
+    const uuidClientIds = [...new Set(
+      (data ?? []).map((l: { client_id: string | null }) => l.client_id).filter((id: string | null) => id && id.includes('-'))
+    )] as string[]
+    let clientMap: Record<string, string> = {}
+    if (uuidClientIds.length > 0) {
+      const { data: clients } = await supabaseAdmin
+        .from('clients')
+        .select('id, legal_name')
+        .in('id', uuidClientIds)
+      clientMap = Object.fromEntries((clients ?? []).map((c: { id: string; legal_name: string | null }) => [c.id, c.legal_name ?? c.id]))
+    }
+
+    const enrichedLeads = (data ?? []).map((l: { client_id: string | null; client_name: string | null }) => ({
+      ...l,
+      display_client_name: (l.client_id && clientMap[l.client_id]) ? clientMap[l.client_id] : (l.client_name ?? null),
+    }))
+
+    return NextResponse.json({ success: true, leads: enrichedLeads })
   } catch (err: unknown) {
     const message = err instanceof Error ? err.message : 'Internal server error'
     return NextResponse.json({ success: false, error: message }, { status: 500 })

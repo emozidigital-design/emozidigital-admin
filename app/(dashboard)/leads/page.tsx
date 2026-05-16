@@ -8,6 +8,7 @@ interface Lead {
   email: string
   client_id: string | null
   client_name: string | null
+  display_client_name: string | null
   source: string
   submission_count: number
   created_at: string
@@ -50,7 +51,7 @@ export default function LeadsPage() {
     return leads.filter(l =>
       l.name.toLowerCase().includes(q) ||
       l.email.toLowerCase().includes(q) ||
-      (l.client_name ?? "").toLowerCase().includes(q)
+      (l.display_client_name ?? l.client_name ?? "").toLowerCase().includes(q)
     )
   }, [leads, search])
 
@@ -60,7 +61,7 @@ export default function LeadsPage() {
     leads.forEach(l => {
       if (l.client_id && !seen.has(l.client_id)) {
         seen.add(l.client_id)
-        opts.push({ id: l.client_id, name: l.client_name ?? l.client_id })
+        opts.push({ id: l.client_id, name: l.display_client_name ?? l.client_name ?? l.client_id })
       }
     })
     return opts
@@ -185,9 +186,9 @@ export default function LeadsPage() {
                         <a href={`mailto:${lead.email}`} className="hover:text-[#003434] transition-colors">{lead.email}</a>
                       </td>
                       <td className="px-4 py-3">
-                        {lead.client_name ? (
+                        {(lead.display_client_name ?? lead.client_name) ? (
                           <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold bg-[#003434]/10 text-[#003434]">
-                            {lead.client_name}
+                            {lead.display_client_name ?? lead.client_name}
                           </span>
                         ) : (
                           <span className="text-zinc-400">—</span>
