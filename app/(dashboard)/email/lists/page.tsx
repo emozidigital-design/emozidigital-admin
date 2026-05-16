@@ -16,6 +16,9 @@ export default function ListsPage() {
   const [loading, setLoading] = useState(true)
   const [form, setForm] = useState({ client_id: "", name: "" })
   const [adding, setAdding] = useState(false)
+  const [expandedList, setExpandedList] = useState<string | null>(null)
+  const [addEmail, setAddEmail] = useState("")
+  const [addingContact, setAddingContact] = useState(false)
 
   useEffect(() => {
     fetch("/api/email/lists")
@@ -23,6 +26,27 @@ export default function ListsPage() {
       .then(d => setLists(Array.isArray(d) ? d : []))
       .finally(() => setLoading(false))
   }, [])
+
+  const handleAddContact = async (listId: string) => {
+    if (!addEmail) return
+    setAddingContact(true)
+    try {
+      const res = await fetch(`/api/email/lists/${listId}/contacts`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: addEmail }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      toast.success("Contact added to list")
+      setAddEmail("")
+      setLists(prev => prev.map(l => l.id === listId ? { ...l, contact_count: l.contact_count + 1 } : l))
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Error")
+    } finally {
+      setAddingContact(false)
+    }
+  }
 
   const handleDelete = async (id: string, name: string) => {
     if (!confirm(`Delete list "${name}"? This also removes all contacts from the list.`)) return
@@ -90,15 +114,42 @@ export default function ListsPage() {
       ) : (
         <div className="space-y-2">
           {lists.map(l => (
-            <div key={l.id} className="bg-white border border-zinc-200 rounded-xl px-4 py-3 flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-zinc-800">{l.name}</p>
-                <p className="text-xs text-zinc-400">{l.contact_count} contacts</p>
+            <div key={l.id} className="bg-white border border-zinc-200 rounded-xl overflow-hidden">
+              <div className="px-4 py-3 flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-zinc-800">{l.name}</p>
+                  <p className="text-xs text-zinc-400">{l.contact_count} contacts</p>
+                </div>
+                <div className="flex items-center gap-4">
+                  <p className="text-xs text-zinc-400">{new Date(l.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</p>
+                  <button
+                    onClick={() => { setExpandedList(expandedList === l.id ? null : l.id); setAddEmail("") }}
+                    className="text-xs text-[#003434] hover:text-[#004444] underline underline-offset-2"
+                  >
+                    {expandedList === l.id ? "Close" : "Add contacts"}
+                  </button>
+                  <button onClick={() => handleDelete(l.id, l.name)} className="text-xs text-red-400 hover:text-red-600 underline underline-offset-2">Delete</button>
+                </div>
               </div>
-              <div className="flex items-center gap-4">
-                <p className="text-xs text-zinc-400">{new Date(l.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</p>
-                <button onClick={() => handleDelete(l.id, l.name)} className="text-xs text-red-400 hover:text-red-600 underline underline-offset-2">Delete</button>
-              </div>
+              {expandedList === l.id && (
+                <div className="border-t border-zinc-100 px-4 py-3 bg-zinc-50 flex gap-2">
+                  <input
+                    className="flex-1 border border-zinc-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#003434]/20 bg-white"
+                    placeholder="contact@email.com"
+                    type="email"
+                    value={addEmail}
+                    onChange={e => setAddEmail(e.target.value)}
+                    onKeyDown={e => e.key === "Enter" && handleAddContact(l.id)}
+                  />
+                  <button
+                    onClick={() => handleAddContact(l.id)}
+                    disabled={addingContact}
+                    className="bg-[#003434] text-white text-xs px-3 py-1.5 rounded-lg hover:bg-[#004444] disabled:opacity-50 transition-colors"
+                  >
+                    {addingContact ? "Adding…" : "Add"}
+                  </button>
+                </div>
+              )}
             </div>
           ))}
         </div>
