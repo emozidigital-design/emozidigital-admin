@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getServerSession } from "next-auth"
-import { authOptions } from "@/lib/auth"
 import { supabaseAdmin } from "@/lib/supabase-server"
 import { sesClient } from "@/lib/ses"
 import { GetIdentityVerificationAttributesCommand } from "@aws-sdk/client-ses"
+import { requireAuth } from "@/lib/require-auth"
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
-  const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: "unauthorized" }, { status: 401 })
+  const unauth = await requireAuth()
+  if (unauth) return unauth
 
   const { data: sender, error: fetchErr } = await supabaseAdmin
     .from("email_senders")

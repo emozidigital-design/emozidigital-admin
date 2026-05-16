@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getServerSession } from "next-auth"
-import { authOptions } from "@/lib/auth"
 import { supabaseAdmin } from "@/lib/supabase-server"
 import { sesClient } from "@/lib/ses"
 import { GetIdentityVerificationAttributesCommand, VerifyDomainDkimCommand } from "@aws-sdk/client-ses"
+import { requireAuth } from "@/lib/require-auth"
 
 export async function GET(req: NextRequest) {
-  const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: "unauthorized" }, { status: 401 })
+  const unauth = await requireAuth()
+  if (unauth) return unauth
 
   const { searchParams } = new URL(req.url)
   const clientId = searchParams.get("client_id")
@@ -22,8 +21,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: "unauthorized" }, { status: 401 })
+  const unauth = await requireAuth()
+  if (unauth) return unauth
 
   const body = await req.json()
   const { client_id, from_email, from_name } = body

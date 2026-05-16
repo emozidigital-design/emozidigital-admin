@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getServerSession } from "next-auth"
-import { authOptions } from "@/lib/auth"
 import { supabaseAdmin } from "@/lib/supabase-server"
+import { requireAuth } from "@/lib/require-auth"
 
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: "unauthorized" }, { status: 401 })
+  const unauth = await requireAuth()
+  if (unauth) return unauth
 
   const formData = await req.formData()
   const clientId = formData.get("client_id") as string

@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getServerSession } from "next-auth"
-import { authOptions } from "@/lib/auth"
 import { supabaseAdmin } from "@/lib/supabase-server"
 import { sesClient, SES_CONFIGURATION_SET } from "@/lib/ses"
 import { SendEmailCommand } from "@aws-sdk/client-ses"
+import { requireAuth } from "@/lib/require-auth"
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
-  const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: "unauthorized" }, { status: 401 })
+  const unauth = await requireAuth()
+  if (unauth) return unauth
 
   const campaignId = params.id
 
@@ -47,17 +46,20 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   let sent = 0
   let failed = 0
+  const BATCH = 10
 
-  for (const contact of contacts) {
-    // Personalise subject if template has variables
-    const htmlBody = (campaign.email_templates.html_body as string)
-      .replace(/\{\{name\}\}/gi, contact.name ?? "there")
-      .replace(/\{\{email\}\}/gi, contact.email)
+  for (let i = 0; i < contacts.length; i += BATCH) {
+    const batch = contacts.slice(i, i + BATCH)
+    const results = await Promise.allSettled(batch.map(async (contact) => {
+      const htmlBody = (campaign.email_templates.html_body as string)
+        .replace(/\{\{name\}\}/gi, contact.name ?? "there")
+        .replace(/\{\{email\}\}/gi, contact.email)
 
-    const unsubLink = `${process.env.NEXTAUTH_URL}/api/email/unsubscribe?email=${encodeURIComponent(contact.email)}&client=${campaign.client_id}`
-    const finalHtml = htmlBody.includes("{{unsubscribe}}") ? htmlBody.replace(/\{\{unsubscribe\}\}/gi, unsubLink) : htmlBody + `<br/><br/><small><a href="${unsubLink}">Unsubscribe</a></small>`
+      const unsubLink = `${process.env.NEXTAUTH_URL}/api/email/unsubscribe?email=${encodeURIComponent(contact.email)}&client=${campaign.client_id}`
+      const finalHtml = htmlBody.includes("{{unsubscribe}}")
+        ? htmlBody.replace(/\{\{unsubscribe\}\}/gi, unsubLink)
+        : htmlBody + `<br/><br/><small><a href="${unsubLink}">Unsubscribe</a></small>`
 
-    try {
       const cmd = new SendEmailCommand({
         Source: `${campaign.email_senders.from_name} <${campaign.email_senders.from_email}>`,
         Destination: { ToAddresses: [contact.email] },
@@ -69,26 +71,21 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       })
 
       const res = await sesClient.send(cmd)
-      const sesMessageId = res.MessageId ?? null
+      return res.MessageId ?? null
+    }))
 
-      await supabaseAdmin.from("email_sends").insert({
-        campaign_id: campaignId,
-        contact_id: contact.id,
-        ses_message_id: sesMessageId,
-        status: "sent",
-        sent_at: new Date().toISOString(),
-      })
+    const rows = results.map((r, idx) => ({
+      campaign_id: campaignId,
+      contact_id: batch[idx].id,
+      ses_message_id: r.status === "fulfilled" ? r.value : null,
+      status: r.status === "fulfilled" ? "sent" : "failed",
+      ...(r.status === "fulfilled" ? { sent_at: new Date().toISOString() } : {}),
+    }))
 
-      sent++
-    } catch (e) {
-      console.error("SES send error", contact.email, e)
-      await supabaseAdmin.from("email_sends").insert({
-        campaign_id: campaignId,
-        contact_id: contact.id,
-        status: "failed",
-      })
-      failed++
-    }
+    await supabaseAdmin.from("email_sends").insert(rows)
+
+    sent += results.filter(r => r.status === "fulfilled").length
+    failed += results.filter(r => r.status === "rejected").length
   }
 
   await supabaseAdmin

@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from "next/server"
-import { getServerSession } from "next-auth"
-import { authOptions } from "@/lib/auth"
 import { supabaseAdmin } from "@/lib/supabase-server"
+import { requireAuth } from "@/lib/require-auth"
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {
-  const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: "unauthorized" }, { status: 401 })
+  const unauth = await requireAuth()
+  if (unauth) return unauth
 
   const body = await req.json()
   const { name, subject, html_body, variables } = body
@@ -23,8 +22,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
-  const session = await getServerSession(authOptions)
-  if (!session) return NextResponse.json({ error: "unauthorized" }, { status: 401 })
+  const unauth = await requireAuth()
+  if (unauth) return unauth
 
   const { error } = await supabaseAdmin.from("email_templates").delete().eq("id", params.id)
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
