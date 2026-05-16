@@ -26,9 +26,9 @@ export async function GET(request: NextRequest) {
     }
 
     // Join with clients table to get registered client name
-    const uuidClientIds = [...new Set(
-      (data ?? []).map((l: { client_id: string | null }) => l.client_id).filter((id: string | null) => id && id.includes('-'))
-    )] as string[]
+    const uuidClientIds = Array.from(new Set(
+      (data ?? []).map((l: { client_id: string | null }) => l.client_id).filter((id: string | null): id is string => !!id && id.includes('-'))
+    ))
     let clientMap: Record<string, string> = {}
     if (uuidClientIds.length > 0) {
       const { data: clients } = await supabaseAdmin
