@@ -24,6 +24,14 @@ export default function ListsPage() {
       .finally(() => setLoading(false))
   }, [])
 
+  const handleDelete = async (id: string, name: string) => {
+    if (!confirm(`Delete list "${name}"? This also removes all contacts from the list.`)) return
+    const res = await fetch(`/api/email/lists/${id}`, { method: "DELETE" })
+    if (!res.ok) { toast.error("Failed to delete"); return }
+    setLists(prev => prev.filter(l => l.id !== id))
+    toast.success("List deleted")
+  }
+
   const handleAdd = async (e: React.FormEvent) => {
     e.preventDefault()
     setAdding(true)
@@ -87,7 +95,10 @@ export default function ListsPage() {
                 <p className="text-sm font-medium text-zinc-800">{l.name}</p>
                 <p className="text-xs text-zinc-400">{l.contact_count} contacts</p>
               </div>
-              <p className="text-xs text-zinc-400">{new Date(l.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</p>
+              <div className="flex items-center gap-4">
+                <p className="text-xs text-zinc-400">{new Date(l.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</p>
+                <button onClick={() => handleDelete(l.id, l.name)} className="text-xs text-red-400 hover:text-red-600 underline underline-offset-2">Delete</button>
+              </div>
             </div>
           ))}
         </div>

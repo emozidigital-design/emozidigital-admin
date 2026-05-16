@@ -57,6 +57,14 @@ export default function ContactsPage() {
     }
   }
 
+  const handleDelete = async (id: string, email: string) => {
+    if (!confirm(`Delete contact ${email}?`)) return
+    const res = await fetch(`/api/email/contacts/${id}`, { method: "DELETE" })
+    if (!res.ok) { toast.error("Failed to delete"); return }
+    setContacts(prev => prev.filter(c => c.id !== id))
+    toast.success("Contact deleted")
+  }
+
   const handleImport = async () => {
     const file = fileRef.current?.files?.[0]
     if (!file || !importClientId) {
@@ -134,6 +142,7 @@ export default function ContactsPage() {
                 <th className="text-left px-4 py-2.5 text-xs font-semibold text-zinc-500 uppercase tracking-wide">Name</th>
                 <th className="text-left px-4 py-2.5 text-xs font-semibold text-zinc-500 uppercase tracking-wide">Status</th>
                 <th className="text-left px-4 py-2.5 text-xs font-semibold text-zinc-500 uppercase tracking-wide">Added</th>
+                <th className="px-4 py-2.5" />
               </tr>
             </thead>
             <tbody>
@@ -148,6 +157,9 @@ export default function ContactsPage() {
                     : <span className="text-xs bg-zinc-100 text-zinc-500 border border-zinc-200 px-2 py-0.5 rounded-full">unsubscribed</span>}
                   </td>
                   <td className="px-4 py-2.5 text-zinc-400 text-xs">{new Date(c.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</td>
+                  <td className="px-4 py-2.5 text-right">
+                    <button onClick={() => handleDelete(c.id, c.email)} className="text-xs text-red-400 hover:text-red-600 underline underline-offset-2">Delete</button>
+                  </td>
                 </tr>
               ))}
             </tbody>

@@ -58,6 +58,14 @@ export default function SendersPage() {
     toast.success(`Status: ${data.dkim_status}`)
   }
 
+  const handleDelete = async (id: string, email: string) => {
+    if (!confirm(`Delete sender ${email}?`)) return
+    const res = await fetch(`/api/email/senders/${id}`, { method: "DELETE" })
+    if (!res.ok) { toast.error("Failed to delete"); return }
+    setSenders(prev => prev.filter(s => s.id !== id))
+    toast.success("Sender deleted")
+  }
+
   return (
     <div className="max-w-3xl">
       <div className="mb-6">
@@ -141,6 +149,12 @@ export default function SendersPage() {
                   className="text-xs text-zinc-500 hover:text-zinc-800 underline underline-offset-2"
                 >
                   Check status
+                </button>
+                <button
+                  onClick={() => handleDelete(s.id, s.from_email)}
+                  className="text-xs text-red-400 hover:text-red-600 underline underline-offset-2"
+                >
+                  Delete
                 </button>
               </div>
             </div>
