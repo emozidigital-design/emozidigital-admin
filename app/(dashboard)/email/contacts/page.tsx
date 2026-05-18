@@ -15,22 +15,38 @@ interface Contact {
   created_at: string
 }
 
+interface EmailList {
+  id: string
+  name: string
+}
+
 export default function ContactsPage() {
   const { clientId } = useClient()
   const [contacts, setContacts] = useState<Contact[]>([])
+  const [lists, setLists] = useState<EmailList[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState("")
-  const [form, setForm] = useState({ client_id: "", email: "", name: "" })
+  const [form, setForm] = useState({ client_id: "", email: "", name: "", list_id: "" })
   const [adding, setAdding] = useState(false)
   const [importing, setImporting] = useState(false)
   const [importClientId, setImportClientId] = useState("")
+  const [importListId, setImportListId] = useState("")
   const fileRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (clientId) {
-      setForm(f => ({ ...f, client_id: clientId }))
+      setForm(f => ({ ...f, client_id: clientId, list_id: "" }))
       setImportClientId(clientId)
+      setImportListId("")
     }
+  }, [clientId])
+
+  // Fetch lists for selected client
+  useEffect(() => {
+    if (!clientId) { setLists([]); return }
+    fetch(`/api/email/lists?client_id=${clientId}`)
+      .then(r => r.json())
+      .then(d => setLists(Array.isArray(d) ? d : []))
   }, [clientId])
 
   const load = () => {
@@ -53,12 +69,29 @@ export default function ContactsPage() {
       const res = await fetch("/api/email/contacts", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
+        body: JSON.stringify({ client_id: form.client_id, email: form.email, name: form.name }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
-      toast.success("Contact added")
-      setForm({ client_id: clientId, email: "", name: "" })
+
+      // Add to list if one was selected
+      if (form.list_id) {
+        const listRes = await fetch(`/api/email/lists/${form.list_id}/contacts`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email: form.email }),
+        })
+        if (!listRes.ok) {
+          const listErr = await listRes.json()
+          toast.error(`Contact added but list assignment failed: ${listErr.error}`)
+        } else {
+          toast.success("Contact added and assigned to list")
+        }
+      } else {
+        toast.success("Contact added")
+      }
+
+      setForm({ client_id: clientId, email: "", name: "", list_id: form.list_id })
       load()
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : "Error")
@@ -89,7 +122,24 @@ export default function ContactsPage() {
       const res = await fetch("/api/email/contacts/import", { method: "POST", body: fd })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
-      toast.success(`Imported ${data.imported} contacts`)
+
+      // Add all imported contacts to list if one was selected
+      if (importListId) {
+        const listRes = await fetch(`/api/email/lists/${importListId}/contacts`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ all: true }),
+        })
+        const listData = await listRes.json()
+        if (!listRes.ok) {
+          toast.error(`Imported ${data.imported} contacts but list assignment failed`)
+        } else {
+          toast.success(`Imported ${data.imported} contacts, ${listData.imported} assigned to list`)
+        }
+      } else {
+        toast.success(`Imported ${data.imported} contacts`)
+      }
+
       if (fileRef.current) fileRef.current.value = ""
       load()
     } catch (err: unknown) {
@@ -98,6 +148,21 @@ export default function ContactsPage() {
       setImporting(false)
     }
   }
+
+  const listSelect = (value: string, onChange: (v: string) => void, placeholder = "Add to list (optional)") => (
+    lists.length > 0 ? (
+      <select
+        value={value}
+        onChange={e => onChange(e.target.value)}
+        className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#003434]/20 text-zinc-700 bg-white"
+      >
+        <option value="">{placeholder}</option>
+        {lists.map(l => (
+          <option key={l.id} value={l.id}>{l.name}</option>
+        ))}
+      </select>
+    ) : null
+  )
 
   return (
     <div className="max-w-4xl">
@@ -113,6 +178,7 @@ export default function ContactsPage() {
           <input className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#003434]/20" placeholder="Client ID" value={form.client_id} onChange={e => setForm(f => ({ ...f, client_id: e.target.value }))} required />
           <input className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#003434]/20" placeholder="email@example.com" type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} required />
           <input className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#003434]/20" placeholder="Name (optional)" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
+          {listSelect(form.list_id, v => setForm(f => ({ ...f, list_id: v })))}
           <button type="submit" disabled={adding} className="bg-[#003434] text-white text-sm px-4 py-2 rounded-lg hover:bg-[#004444] transition-colors disabled:opacity-50 w-full">
             {adding ? "Adding…" : "Add contact"}
           </button>
@@ -123,6 +189,7 @@ export default function ContactsPage() {
           <p className="text-sm font-semibold text-zinc-700">CSV import</p>
           <p className="text-xs text-zinc-400">CSV must have an <code className="bg-zinc-100 px-1 rounded">email</code> column. Optional: <code className="bg-zinc-100 px-1 rounded">name</code>.</p>
           <input className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#003434]/20" placeholder="Client ID" value={importClientId} onChange={e => setImportClientId(e.target.value)} />
+          {listSelect(importListId, setImportListId)}
           <input ref={fileRef} type="file" accept=".csv" className="w-full text-sm text-zinc-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-zinc-100 file:text-zinc-700 hover:file:bg-zinc-200" />
           <button onClick={handleImport} disabled={importing} className="bg-[#003434] text-white text-sm px-4 py-2 rounded-lg hover:bg-[#004444] transition-colors disabled:opacity-50 w-full">
             {importing ? "Importing…" : "Import CSV"}
