@@ -178,34 +178,52 @@ function buildAgentBazarNewsletterHtml(opts: {
                 </td>
               </tr>
 
-              <!-- Social icons: black circle, white icons — using table cells for max email-client compatibility -->
+              <!-- Social icons: black circle + white ring + bold white icon (40x40, table-cell layout) -->
               <tr>
                 <td style="text-align:center;padding-bottom:20px;">
                   <table cellpadding="0" cellspacing="0" style="display:inline-table;">
                     <tr>
                       <td style="padding:0 5px;">
-                        <a href="https://www.facebook.com/people/Agentbazarblogs/" title="Facebook" style="display:block;width:38px;height:38px;background:#111111;border-radius:19px;text-align:center;text-decoration:none;line-height:38px;font-size:0;">
-                          <svg xmlns="http://www.w3.org/2000/svg" width="38" height="38" viewBox="0 0 24 24" style="display:block;"><circle cx="12" cy="12" r="12" fill="#111111"/><path fill="#ffffff" d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
+                        <a href="https://www.facebook.com/people/Agentbazarblogs/" title="Facebook" style="display:block;width:40px;height:40px;text-decoration:none;font-size:0;">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40" style="display:block;">
+                            <circle cx="20" cy="20" r="19" fill="#111111" stroke="#ffffff" stroke-width="1.5"/>
+                            <path fill="#ffffff" d="M22 20h-2.5v9H16v-9h-2v-3h2v-1.8C16 12.4 17.4 11 20.3 11c1.3 0 2.7.3 2.7.3V14h-1.5c-1.1 0-1.5.5-1.5 1.3V17H23l-.5 3z"/>
+                          </svg>
                         </a>
                       </td>
                       <td style="padding:0 5px;">
-                        <a href="https://x.com/AgentBazar" title="X" style="display:block;width:38px;height:38px;background:#111111;border-radius:19px;text-align:center;text-decoration:none;line-height:38px;font-size:0;">
-                          <svg xmlns="http://www.w3.org/2000/svg" width="38" height="38" viewBox="0 0 24 24" style="display:block;"><circle cx="12" cy="12" r="12" fill="#111111"/><path fill="#ffffff" d="M13.6 11.15 18.34 5.5h-1.13l-4.14 4.82L9.72 5.5H5.8l5.03 7.32-5.03 5.68h1.13l4.4-5.12 3.51 5.12H14.2zm-1.56 1.81-.5-.72-4.01-5.74h1.73l3.24 4.63.5.72 4.22 6.04h-1.73z"/></svg>
+                        <a href="https://x.com/AgentBazar" title="X" style="display:block;width:40px;height:40px;text-decoration:none;font-size:0;">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40" style="display:block;">
+                            <circle cx="20" cy="20" r="19" fill="#111111" stroke="#ffffff" stroke-width="1.5"/>
+                            <path fill="#ffffff" d="M22.2 18.7 28.3 11h-1.5l-5.3 6.2-4.2-6.2H12l6.5 9.5-6.5 7.5h1.5l5.7-6.6 4.5 6.6H29l-6.8-9.8zm-2 2.3-.7-1-5.3-7.6h2.3l4.3 6.1.7 1 5.5 7.9H25l-4.8-6.4z"/>
+                          </svg>
                         </a>
                       </td>
                       <td style="padding:0 5px;">
-                        <a href="https://www.instagram.com/agentbazarblogs/" title="Instagram" style="display:block;width:38px;height:38px;background:#111111;border-radius:19px;text-align:center;text-decoration:none;line-height:38px;font-size:0;">
-                          <svg xmlns="http://www.w3.org/2000/svg" width="38" height="38" viewBox="0 0 24 24" style="display:block;"><circle cx="12" cy="12" r="12" fill="#111111"/><rect x="6.5" y="6.5" width="11" height="11" rx="3" fill="none" stroke="#ffffff" stroke-width="1.5"/><circle cx="12" cy="12" r="3" fill="none" stroke="#ffffff" stroke-width="1.5"/><circle cx="16.2" cy="7.8" r="0.9" fill="#ffffff"/></svg>
+                        <a href="https://www.instagram.com/agentbazarblogs/" title="Instagram" style="display:block;width:40px;height:40px;text-decoration:none;font-size:0;">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40" style="display:block;">
+                            <circle cx="20" cy="20" r="19" fill="#111111" stroke="#ffffff" stroke-width="1.5"/>
+                            <rect x="11" y="11" width="18" height="18" rx="5" ry="5" fill="none" stroke="#ffffff" stroke-width="2"/>
+                            <circle cx="20" cy="20" r="4.5" fill="none" stroke="#ffffff" stroke-width="2"/>
+                            <circle cx="25.5" cy="14.5" r="1.5" fill="#ffffff"/>
+                          </svg>
                         </a>
                       </td>
                       <td style="padding:0 5px;">
-                        <a href="https://www.youtube.com/@agentbazar6074" title="YouTube" style="display:block;width:38px;height:38px;background:#111111;border-radius:19px;text-align:center;text-decoration:none;line-height:38px;font-size:0;">
-                          <svg xmlns="http://www.w3.org/2000/svg" width="38" height="38" viewBox="0 0 24 24" style="display:block;"><circle cx="12" cy="12" r="12" fill="#111111"/><path fill="#ffffff" d="M19.6 8.6a2.4 2.4 0 0 0-1.7-1.7C16.6 6.5 12 6.5 12 6.5s-4.6 0-5.9.4A2.4 2.4 0 0 0 4.4 8.6C4 9.9 4 12 4 12s0 2.1.4 3.4a2.4 2.4 0 0 0 1.7 1.7c1.3.4 5.9.4 5.9.4s4.6 0 5.9-.4a2.4 2.4 0 0 0 1.7-1.7C20 14.1 20 12 20 12s0-2.1-.4-3.4zm-8.9 5.5V9.9l3.9 2.1z"/></svg>
+                        <a href="https://www.youtube.com/@agentbazar6074" title="YouTube" style="display:block;width:40px;height:40px;text-decoration:none;font-size:0;">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40" style="display:block;">
+                            <circle cx="20" cy="20" r="19" fill="#111111" stroke="#ffffff" stroke-width="1.5"/>
+                            <rect x="9" y="14" width="22" height="12" rx="3.5" fill="#ffffff"/>
+                            <path fill="#111111" d="M17 16.8l7.5 3.2-7.5 3.2z"/>
+                          </svg>
                         </a>
                       </td>
                       <td style="padding:0 5px;">
-                        <a href="https://www.whatsapp.com/channel/0029VaCTkLJBFLgcbBhFnM1C" title="WhatsApp" style="display:block;width:38px;height:38px;background:#111111;border-radius:19px;text-align:center;text-decoration:none;line-height:38px;font-size:0;">
-                          <svg xmlns="http://www.w3.org/2000/svg" width="38" height="38" viewBox="0 0 24 24" style="display:block;"><circle cx="12" cy="12" r="12" fill="#111111"/><path fill="#ffffff" d="M12 4.8a7.2 7.2 0 0 0-6.3 10.7L4.5 19.5l4.1-1.4A7.2 7.2 0 1 0 12 4.8zm3.9 9.9c-.2.5-.9.9-1.4 1-.4.1-.9.1-2.5-.6-2.1-1-3.4-3.1-3.5-3.2-.1-.2-.8-1.1-.8-2.2s.6-1.5.8-1.7l.6-.3h.4c.1 0 .3.1.5.5.2.5.7 1.7.7 1.8.1.1.1.3 0 .4-.1.2-.2.3-.3.5-.2.1-.3.3-.2.5.4.6.9 1.2 1.6 1.7.5.3 1 .5 1.5.6.2.1.4 0 .5-.2.2-.2.5-.7.7-.9.1-.2.3-.2.5-.1l1.5.8c.2.1.3.2.4.3-.1.4-.2.8-.5 1.1z"/></svg>
+                        <a href="https://www.whatsapp.com/channel/0029VaCTkLJBFLgcbBhFnM1C" title="WhatsApp" style="display:block;width:40px;height:40px;text-decoration:none;font-size:0;">
+                          <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40" style="display:block;">
+                            <circle cx="20" cy="20" r="19" fill="#111111" stroke="#ffffff" stroke-width="1.5"/>
+                            <path fill="#ffffff" d="M20 10a10 10 0 0 0-8.7 14.9L10 30l5.3-1.3A10 10 0 1 0 20 10zm5.1 13.4c-.3.7-1.2 1.2-2 1.3-.5.1-1.2.2-3.4-.8-2.8-1.3-4.6-4.1-4.8-4.3-.1-.2-1-1.5-1-2.9s.8-2.1 1.1-2.3c.3-.3.6-.4.8-.4h.5c.2 0 .4.1.6.6.3.7.9 2.3.9 2.5.1.2.1.4 0 .6-.1.2-.2.4-.4.6-.2.2-.3.4-.2.6.5.8 1.2 1.6 2.1 2.3.7.4 1.3.6 2 .8.3.1.5 0 .6-.2.3-.3.6-.8.9-1.2.2-.2.4-.3.7-.1l2 1c.2.1.4.3.4.4-.1.5-.3 1.1-.6 1.5z"/>
+                          </svg>
                         </a>
                       </td>
                     </tr>
