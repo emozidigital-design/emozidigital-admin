@@ -2,6 +2,17 @@ import { NextRequest, NextResponse } from "next/server"
 import { supabaseAdmin } from "@/lib/supabase-server"
 import { requireAuth } from "@/lib/require-auth"
 
+async function syncContactCount(listId: string) {
+  const { count } = await supabaseAdmin
+    .from("email_list_contacts")
+    .select("*", { count: "exact", head: true })
+    .eq("list_id", listId)
+  await supabaseAdmin
+    .from("email_lists")
+    .update({ contact_count: count ?? 0 })
+    .eq("id", listId)
+}
+
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const unauth = await requireAuth()
   if (unauth) return unauth
@@ -25,6 +36,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
     const rows = contacts.map(c => ({ list_id: params.id, contact_id: c.id }))
     await supabaseAdmin.from("email_list_contacts").upsert(rows, { onConflict: "list_id,contact_id" })
+    await syncContactCount(params.id)
 
     return NextResponse.json({ imported: contacts.length })
   }
@@ -47,6 +59,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     .upsert({ list_id: params.id, contact_id: contact.id }, { onConflict: "list_id,contact_id" })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  await syncContactCount(params.id)
 
   return NextResponse.json({ ok: true })
 }
