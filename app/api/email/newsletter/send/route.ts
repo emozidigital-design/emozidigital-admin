@@ -68,12 +68,12 @@ function buildAgentBazarNewsletterHtml(opts: {
   unsubscribeUrl: string
 }) {
   const heroCoverHtml = opts.hero.coverImage
-    ? `<tr><td style="padding:0;"><img src="${opts.hero.coverImage}" alt="${opts.hero.title}" width="600" style="display:block;width:100%;max-width:600px;height:auto;border:0;" /></td></tr>`
+    ? `<tr><td style="padding:0;"><a href="${opts.hero.url}" style="display:block;"><img src="${opts.hero.coverImage}" alt="${opts.hero.title}" width="600" style="display:block;width:100%;max-width:600px;height:auto;border:0;" /></a></td></tr>`
     : ""
 
   const trendingCols = opts.trending.map(p => `
     <td width="${Math.floor(100 / opts.trending.length)}%" style="padding:4px;vertical-align:top;">
-      ${p.coverImage ? `<img src="${p.coverImage}" alt="${p.title}" width="272" style="display:block;width:100%;height:auto;margin-bottom:8px;border:0;" />` : ""}
+      ${p.coverImage ? `<a href="${p.url}" style="display:block;margin-bottom:8px;"><img src="${p.coverImage}" alt="${p.title}" width="272" style="display:block;width:100%;height:auto;border:0;" /></a>` : ""}
       <a href="${p.url}" style="font-size:13px;color:#F47920;text-decoration:none;line-height:1.4;font-weight:600;">${p.title}</a>
     </td>`).join("")
 
@@ -98,15 +98,21 @@ function buildAgentBazarNewsletterHtml(opts: {
   <meta name="viewport" content="width=device-width,initial-scale=1.0">
   <title>${opts.hero.title}</title>
 </head>
-<body style="margin:0;padding:0;background:#f4f6f9;font-family:Arial,Helvetica,sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6f9;padding:20px 0;">
+<body style="margin:0;padding:0;background:#ffffff;font-family:Arial,Helvetica,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#ffffff;padding:20px 0;">
     <tr><td align="center">
       <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;max-width:600px;width:100%;">
 
-        <!-- Logo header -->
+        <!-- Logo header: blue top strip → white with logo → orange bottom strip -->
         <tr>
-          <td style="background:#001D4A;padding:14px 24px;text-align:center;">
-            <img src="https://blog.agentbazar.in/new-logo.jpg" alt="AgentBazar" height="48" style="height:48px;max-height:48px;border:0;display:inline-block;" />
+          <td style="padding:0;background:#ffffff;">
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr><td style="background:#001D4A;height:10px;font-size:1px;line-height:1px;"> </td></tr>
+              <tr><td style="background:#ffffff;padding:10px 24px;text-align:center;">
+                <img src="https://blog.agentbazar.in/new-logo.jpg" alt="AgentBazar" height="52" style="height:52px;max-height:52px;border:0;display:inline-block;" />
+              </td></tr>
+              <tr><td style="background:#F47920;height:10px;font-size:1px;line-height:1px;"> </td></tr>
+            </table>
           </td>
         </tr>
 
@@ -125,7 +131,7 @@ function buildAgentBazarNewsletterHtml(opts: {
         <tr>
           <td style="padding:20px 24px 8px;">
             <a href="${opts.hero.url}" style="display:block;font-size:20px;font-weight:bold;color:#F47920;text-decoration:none;line-height:1.3;margin-bottom:12px;">${opts.hero.title}</a>
-            <p style="margin:0 0 20px;font-size:14px;color:#1a2332;line-height:1.65;font-weight:600;">${opts.hero.excerpt}</p>
+            <a href="${opts.hero.url}" style="display:block;margin:0 0 20px;font-size:14px;color:#1a2332;text-decoration:none;line-height:1.65;font-weight:600;">${opts.hero.excerpt}</a>
             <a href="${opts.hero.url}" style="display:inline-block;background:#F47920;color:#ffffff;text-decoration:none;padding:10px 28px;border-radius:4px;font-size:14px;font-weight:bold;font-style:italic;">Read Full Blog...</a>
           </td>
         </tr>
