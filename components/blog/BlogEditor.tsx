@@ -231,6 +231,9 @@ export default function BlogEditor({ initialData, isNew = false }: BlogEditorPro
         ...prev,
         ...(pickDbFields(savedPost)),
         industry: prev.industry,
+        // Preserve the cover image if the saved record came back without one
+        // (can happen when the admin DB hasn't stored the URL yet)
+        cover_image_url: savedPost?.cover_image_url || prev.cover_image_url,
       }));
       lastSavedPostStr.current = JSON.stringify(pickDbFields(savedPost ?? dataToSave))
 

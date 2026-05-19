@@ -50,7 +50,7 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
 
-    const blogPost = {
+    const blogPost: Record<string, unknown> = {
       slug: body.slug,
       title: body.title,
       content: await markdownToHtml(body.content),
@@ -58,7 +58,6 @@ export async function POST(request: Request) {
       seo_title: body.seo_title || body.title,
       seo_description: body.seo_description || body.excerpt || '',
       focus_keyword: body.focus_keyword || '',
-      cover_image: body.cover_image_url || '',
       og_title: body.seo_title || body.title,
       og_description: body.seo_description || body.excerpt || '',
       category: body.externalCategory || body.category,
@@ -69,6 +68,11 @@ export async function POST(request: Request) {
       published_date: body.published_at || new Date().toISOString(),
       source: 'emozi-admin',
     };
+    // Only write cover_image when a non-empty value is provided — prevents
+    // accidental overwrites that would clear an existing image.
+    if (body.cover_image_url) {
+      blogPost.cover_image = body.cover_image_url;
+    }
 
     const { data, error } = await getAgentBazarSupabase()
       .from('blog_posts')

@@ -44,31 +44,77 @@ interface NewsletterSend {
   blog_post_id: string
 }
 
+interface NewsletterTemplate {
+  id: string
+  client_id: string
+  name: string
+  subject: string
+  html_body: string
+  template_type: string
+  created_at: string
+  updated_at: string
+}
+
 const STATUS_STYLE: Record<string, string> = {
   sending: "bg-amber-50 text-amber-700 border-amber-200",
   sent: "bg-emerald-50 text-emerald-700 border-emerald-200",
   failed: "bg-red-50 text-red-700 border-red-200",
 }
 
-export default function NewsletterPage() {
-  const { clientId } = useClient()
-  const isAgentBazar = clientId === AGENTBAZAR_CLIENT_ID
+const VARIABLE_REFERENCE = [
+  { key: "{{first_name}}", desc: "Recipient's first name" },
+  { key: "{{hero_title}}", desc: "Hero post title" },
+  { key: "{{hero_excerpt}}", desc: "Hero post excerpt" },
+  { key: "{{hero_url}}", desc: "Hero post URL" },
+  { key: "{{hero_image_url}}", desc: "Hero post cover image URL" },
+  { key: "{{trending_1_title}}", desc: "Trending post 1 title" },
+  { key: "{{trending_1_excerpt}}", desc: "Trending post 1 excerpt" },
+  { key: "{{trending_1_url}}", desc: "Trending post 1 URL" },
+  { key: "{{trending_1_image_url}}", desc: "Trending post 1 image URL" },
+  { key: "{{trending_2_title}}", desc: "Trending post 2 title" },
+  { key: "{{trending_2_excerpt}}", desc: "Trending post 2 excerpt" },
+  { key: "{{trending_2_url}}", desc: "Trending post 2 URL" },
+  { key: "{{trending_2_image_url}}", desc: "Trending post 2 image URL" },
+  { key: "{{unsubscribe_url}}", desc: "Unsubscribe link URL" },
+  { key: "{{client_name}}", desc: "Sender / client name" },
+]
 
-  // Form state
+export default function NewsletterPage() {
+  const { clientId, clients } = useClient()
+  const isAgentBazar = clientId === AGENTBAZAR_CLIENT_ID
+  const clientLabel = clients.find(c => c.client_id === clientId)?.label
+
+  // Wizard state
   const [step, setStep] = useState<1 | 2 | 3>(1)
   const [selectedPost, setSelectedPost] = useState<BlogPost | null>(null)
   const [trendingPosts, setTrendingPosts] = useState<BlogPost[]>([])
   const [postSearch, setPostSearch] = useState("")
   const [recipientType, setRecipientType] = useState<"leads" | "list">("leads")
 
-  // AgentBazar always sends to a contact list, not raw leads
   useEffect(() => {
     if (isAgentBazar) setRecipientType("list")
   }, [isAgentBazar])
+
   const [senderId, setSenderId] = useState("")
   const [listId, setListId] = useState("")
   const [subject, setSubject] = useState("")
   const [sending, setSending] = useState(false)
+
+  // Newsletter template state
+  const [newsletterTemplates, setNewsletterTemplates] = useState<NewsletterTemplate[]>([])
+  const [selectedTemplateId, setSelectedTemplateId] = useState("")
+  const [loadingTemplates, setLoadingTemplates] = useState(false)
+
+  // Template panel state
+  const [showTemplatePanel, setShowTemplatePanel] = useState(false)
+  const [showVarRef, setShowVarRef] = useState(false)
+  const [editingTemplate, setEditingTemplate] = useState<NewsletterTemplate | null>(null)
+  const [isCreating, setIsCreating] = useState(false)
+  const [tmplName, setTmplName] = useState("")
+  const [tmplSubject, setTmplSubject] = useState("")
+  const [tmplHtml, setTmplHtml] = useState("")
+  const [savingTemplate, setSavingTemplate] = useState(false)
+  const [deletingId, setDeletingId] = useState("")
 
   // Data
   const [posts, setPosts] = useState<BlogPost[]>([])
@@ -129,6 +175,37 @@ export default function NewsletterPage() {
       .finally(() => setLoadingHistory(false))
   }, [clientId])
 
+  // Fetch newsletter templates for current client — auto-select if exactly one
+  useEffect(() => {
+    if (!clientId) {
+      setNewsletterTemplates([])
+      setSelectedTemplateId("")
+      return
+    }
+    setLoadingTemplates(true)
+    const params = new URLSearchParams({ client_id: clientId, template_type: "newsletter" })
+    fetch(`/api/email/templates?${params}`)
+      .then(r => r.json())
+      .then(d => {
+        const tmpl: NewsletterTemplate[] = Array.isArray(d) ? d : []
+        setNewsletterTemplates(tmpl)
+        setSelectedTemplateId(tmpl.length === 1 ? tmpl[0].id : "")
+      })
+      .finally(() => setLoadingTemplates(false))
+  }, [clientId])
+
+  const refreshTemplates = () => {
+    if (!clientId) return
+    const params = new URLSearchParams({ client_id: clientId, template_type: "newsletter" })
+    fetch(`/api/email/templates?${params}`)
+      .then(r => r.json())
+      .then(d => {
+        const tmpl: NewsletterTemplate[] = Array.isArray(d) ? d : []
+        setNewsletterTemplates(tmpl)
+        if (tmpl.length === 1) setSelectedTemplateId(tmpl[0].id)
+      })
+  }
+
   const filteredPosts = posts.filter(p =>
     p.title.toLowerCase().includes(postSearch.toLowerCase()) ||
     (p.category ?? "").toLowerCase().includes(postSearch.toLowerCase())
@@ -137,7 +214,6 @@ export default function NewsletterPage() {
   const handleSelectHero = (post: BlogPost) => {
     setSelectedPost(post)
     setSubject(post.title)
-    // remove this post from trending if it was selected
     setTrendingPosts(prev => prev.filter(t => t.id !== post.id))
     if (!isAgentBazar) setStep(2)
   }
@@ -172,6 +248,7 @@ export default function NewsletterPage() {
           client_id: clientId || null,
           recipient_type: recipientType,
           list_id: recipientType === "list" ? listId : null,
+          newsletter_template_id: selectedTemplateId || null,
         }),
       })
       const data = await res.json()
@@ -195,7 +272,89 @@ export default function NewsletterPage() {
     }
   }
 
+  // Template CRUD
+  const openCreate = () => {
+    setEditingTemplate(null)
+    setIsCreating(true)
+    setTmplName("")
+    setTmplSubject("")
+    setTmplHtml("")
+  }
+
+  const openEdit = (t: NewsletterTemplate) => {
+    setEditingTemplate(t)
+    setIsCreating(false)
+    setTmplName(t.name)
+    setTmplSubject(t.subject)
+    setTmplHtml(t.html_body)
+  }
+
+  const cancelForm = () => {
+    setEditingTemplate(null)
+    setIsCreating(false)
+  }
+
+  const saveTemplate = async () => {
+    if (!tmplName.trim() || !tmplHtml.trim()) {
+      toast.error("Name and HTML body are required")
+      return
+    }
+    setSavingTemplate(true)
+    try {
+      if (isCreating) {
+        const res = await fetch("/api/email/templates", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            client_id: clientId,
+            name: tmplName.trim(),
+            subject: tmplSubject.trim(),
+            html_body: tmplHtml.trim(),
+            template_type: "newsletter",
+          }),
+        })
+        if (!res.ok) throw new Error((await res.json()).error)
+        toast.success("Template created")
+      } else if (editingTemplate) {
+        const res = await fetch(`/api/email/templates/${editingTemplate.id}`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            name: tmplName.trim(),
+            subject: tmplSubject.trim(),
+            html_body: tmplHtml.trim(),
+          }),
+        })
+        if (!res.ok) throw new Error((await res.json()).error)
+        toast.success("Template updated")
+      }
+      cancelForm()
+      refreshTemplates()
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Save failed")
+    } finally {
+      setSavingTemplate(false)
+    }
+  }
+
+  const deleteTemplate = async (id: string) => {
+    if (!confirm("Delete this newsletter template?")) return
+    setDeletingId(id)
+    try {
+      const res = await fetch(`/api/email/templates/${id}`, { method: "DELETE" })
+      if (!res.ok) throw new Error((await res.json()).error)
+      toast.success("Template deleted")
+      if (selectedTemplateId === id) setSelectedTemplateId("")
+      refreshTemplates()
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Delete failed")
+    } finally {
+      setDeletingId("")
+    }
+  }
+
   const blogBaseUrl = isAgentBazar ? "https://blog.agentbazar.in" : "https://emozidigital.com/blog"
+  const activeTemplate = newsletterTemplates.find(t => t.id === selectedTemplateId)
 
   return (
     <div className="max-w-4xl">
@@ -235,7 +394,6 @@ export default function NewsletterPage() {
       {/* Step 1: Pick blog post(s) */}
       {step === 1 && (
         <div className="bg-white border border-zinc-200 rounded-xl p-5 space-y-4">
-          {/* Hero post section */}
           <div>
             <p className="text-sm font-semibold text-zinc-700 mb-1">
               {isAgentBazar ? "Select hero post (Today's Highlight)" : "Select a blog post"}
@@ -268,12 +426,17 @@ export default function NewsletterPage() {
                           : "border-zinc-100 hover:border-[#003434] hover:bg-[#003434]/5"
                       }`}
                     >
-                      {post.cover_image_url && (
+                      {post.cover_image_url ? (
                         <img
                           src={post.cover_image_url}
                           alt=""
                           className="w-16 h-16 object-cover rounded-md shrink-0"
+                          onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none" }}
                         />
+                      ) : (
+                        <div className="w-16 h-16 rounded-md shrink-0 bg-zinc-100 flex items-center justify-center">
+                          <span className="text-zinc-300 text-xs">No img</span>
+                        </div>
                       )}
                       <div className="min-w-0 flex-1">
                         <p className="text-sm font-medium text-zinc-800 group-hover:text-[#003434] truncate">{post.title}</p>
@@ -292,7 +455,7 @@ export default function NewsletterPage() {
             )}
           </div>
 
-          {/* Trending posts section (AgentBazar only) */}
+          {/* Trending posts (AgentBazar only) */}
           {isAgentBazar && selectedPost && (
             <div className="border-t border-zinc-100 pt-4">
               <p className="text-sm font-semibold text-zinc-700 mb-1">
@@ -319,8 +482,17 @@ export default function NewsletterPage() {
                             : "border-zinc-100 hover:border-[#F47920] hover:bg-orange-50/40"
                         }`}
                       >
-                        {post.cover_image_url && (
-                          <img src={post.cover_image_url} alt="" className="w-14 h-14 object-cover rounded-md shrink-0" />
+                        {post.cover_image_url ? (
+                          <img
+                            src={post.cover_image_url}
+                            alt=""
+                            className="w-14 h-14 object-cover rounded-md shrink-0"
+                            onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none" }}
+                          />
+                        ) : (
+                          <div className="w-14 h-14 rounded-md shrink-0 bg-zinc-100 flex items-center justify-center">
+                            <span className="text-zinc-300 text-xs">No img</span>
+                          </div>
                         )}
                         <div className="min-w-0 flex-1">
                           <p className="text-sm font-medium text-zinc-800 truncate">{post.title}</p>
@@ -349,7 +521,7 @@ export default function NewsletterPage() {
         <div className="bg-white border border-zinc-200 rounded-xl p-5 space-y-4">
           <div className="flex items-center gap-3 p-3 bg-zinc-50 rounded-lg border border-zinc-100">
             {selectedPost.cover_image_url && (
-              <img src={selectedPost.cover_image_url} alt="" className="w-12 h-12 object-cover rounded-md shrink-0" />
+              <img src={selectedPost.cover_image_url} alt="" className="w-12 h-12 object-cover rounded-md shrink-0" onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none" }} />
             )}
             <div className="min-w-0">
               <p className="text-sm font-semibold text-zinc-800 truncate">{selectedPost.title}</p>
@@ -365,6 +537,44 @@ export default function NewsletterPage() {
                   Trending: {p.title}
                 </span>
               ))}
+            </div>
+          )}
+
+          {/* Newsletter template selector */}
+          {!loadingTemplates && (
+            <div>
+              <label className="text-xs font-medium text-zinc-500 block mb-1">Newsletter template</label>
+              {newsletterTemplates.length === 0 ? (
+                <div className="flex items-center gap-2 p-3 rounded-lg border border-zinc-100 bg-zinc-50">
+                  <span className="text-xs text-zinc-400 flex-1">No newsletter templates yet — using default system layout.</span>
+                  <button
+                    type="button"
+                    onClick={() => { setShowTemplatePanel(true); openCreate() }}
+                    className="text-xs font-medium text-[#003434] hover:underline shrink-0"
+                  >
+                    + Create one
+                  </button>
+                </div>
+              ) : (
+                <>
+                  <select
+                    value={selectedTemplateId}
+                    onChange={e => setSelectedTemplateId(e.target.value)}
+                    className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#003434]/20 bg-white"
+                  >
+                    <option value="">Default system layout</option>
+                    {newsletterTemplates.map(t => (
+                      <option key={t.id} value={t.id}>{t.name}</option>
+                    ))}
+                  </select>
+                  {selectedTemplateId && (
+                    <p className="text-xs text-emerald-600 mt-1">✓ Custom template selected — your HTML design will be used</p>
+                  )}
+                  {!selectedTemplateId && (
+                    <p className="text-xs text-zinc-400 mt-1">Using the default AgentBazar branded layout</p>
+                  )}
+                </>
+              )}
             </div>
           )}
 
@@ -397,7 +607,6 @@ export default function NewsletterPage() {
           </div>
 
           {isAgentBazar ? (
-            /* AgentBazar: contacts list only — greeting personalised from email_contacts.name */
             <div>
               <label className="text-xs font-medium text-zinc-500 block mb-1">Recipient list</label>
               <select
@@ -488,23 +697,26 @@ export default function NewsletterPage() {
               <button onClick={() => setStep(2)} className="text-xs text-zinc-400 hover:text-zinc-600">← Edit</button>
             </div>
 
-            {isAgentBazar ? (
-              /* AgentBazar branded preview */
+            {activeTemplate ? (
+              <div className="border border-zinc-100 rounded-xl overflow-hidden max-w-lg mx-auto bg-zinc-50 p-4 text-center">
+                <p className="text-xs font-semibold text-zinc-500 mb-1">Custom template: {activeTemplate.name}</p>
+                <p className="text-xs text-zinc-400">Variables will be substituted at send time.</p>
+                <div className="mt-3 text-left text-xs font-mono text-zinc-400 bg-white border border-zinc-100 rounded-lg p-3 max-h-48 overflow-y-auto whitespace-pre-wrap break-all">
+                  {activeTemplate.html_body.slice(0, 400)}{activeTemplate.html_body.length > 400 ? "…" : ""}
+                </div>
+              </div>
+            ) : isAgentBazar ? (
               <div className="border border-zinc-100 rounded-xl overflow-hidden max-w-lg mx-auto text-sm">
-                {/* Header */}
                 <div style={{ background: "#001D4A" }} className="px-6 py-3 text-center">
                   <p className="text-white text-xs font-bold tracking-wider">agentBazar.in</p>
                 </div>
-                {/* Greeting */}
                 <div className="px-6 pt-4 pb-3" style={{ borderBottom: "2px solid #F47920" }}>
                   <p className="italic text-zinc-700">Hello [subscriber],</p>
                   <p className="font-bold text-zinc-800 text-xs mt-0.5">Today&apos;s Highlight</p>
                 </div>
-                {/* Hero image */}
                 {selectedPost.cover_image_url && (
-                  <img src={selectedPost.cover_image_url} alt="" className="w-full h-40 object-cover" />
+                  <img src={selectedPost.cover_image_url} alt="" className="w-full h-40 object-cover" onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none" }} />
                 )}
-                {/* Hero content */}
                 <div className="px-6 py-4">
                   <p style={{ color: "#F47920" }} className="font-bold text-base leading-snug mb-2">{selectedPost.title}</p>
                   {selectedPost.excerpt && (
@@ -514,40 +726,46 @@ export default function NewsletterPage() {
                     Read Full Blog...
                   </span>
                 </div>
-                {/* Divider */}
                 <div className="px-6"><hr className="border-zinc-100" /></div>
-                {/* Trending */}
                 {trendingPosts.length > 0 && (
-                  <div className="px-6 py-4">
-                    <p className="font-bold italic underline text-zinc-800 mb-3">Trending Today</p>
-                    <div className="grid grid-cols-2 gap-3">
-                      {trendingPosts.map(p => (
-                        <div key={p.id}>
-                          {p.cover_image_url && (
-                            <img src={p.cover_image_url} alt="" className="w-full h-24 object-cover rounded mb-1.5" />
-                          )}
-                          <p style={{ color: "#F47920" }} className="text-xs font-semibold leading-snug">{p.title}</p>
-                        </div>
-                      ))}
-                    </div>
+                  <div className="px-6 py-4 space-y-4">
+                    <p className="font-bold italic underline text-zinc-800">Trending Today</p>
+                    {trendingPosts.map(p => (
+                      <div key={p.id}>
+                        {p.cover_image_url && (
+                          <img src={p.cover_image_url} alt="" className="w-full h-28 object-cover rounded-lg mb-2" onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none" }} />
+                        )}
+                        <p style={{ color: "#F47920" }} className="text-sm font-bold leading-snug mb-1">{p.title}</p>
+                        {p.excerpt && <p className="text-xs text-zinc-600 leading-relaxed mb-2">{p.excerpt}</p>}
+                        <span style={{ background: "#F47920" }} className="inline-block text-white text-xs font-bold italic px-4 py-1.5 rounded">Read More...</span>
+                      </div>
+                    ))}
                   </div>
                 )}
-                {/* WhatsApp banner */}
                 <div style={{ background: "#1a6b3a" }} className="px-6 py-4 text-center">
                   <p className="text-white text-xs mb-0.5">For the latest Travel Blog &amp; Updates</p>
                   <p className="text-white font-bold text-sm mb-2">Join Our WhatsApp Community Now</p>
-                  <span className="inline-block bg-white text-xs font-bold px-5 py-1.5 rounded-full" style={{ color: "#1a6b3a" }}>
-                    ▶ JOIN NOW
-                  </span>
+                  <span className="inline-block bg-white text-xs font-bold px-5 py-1.5 rounded-full" style={{ color: "#1a6b3a" }}>▶ JOIN NOW</span>
                 </div>
-                {/* Footer */}
-                <div style={{ background: "#001D4A" }} className="px-6 py-4 text-center">
-                  <p className="text-xs text-zinc-400">+91-9435009519 · support@agentbazar.in</p>
-                  <p className="text-xs text-zinc-500 mt-1">© Copyright 2025 by Tripforu Holidays Pvt. Ltd.</p>
+                {/* Footer: white BW Travel style */}
+                <div className="px-6 py-5 border-t border-zinc-100 bg-white text-center">
+                  <img src="https://blog.agentbazar.in/new-logo.jpg" alt="AgentBazar" className="h-8 mx-auto mb-2" onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none" }} />
+                  <p className="text-[10px] text-zinc-400 tracking-widest uppercase mb-3">agentbazar.in</p>
+                  <div className="flex justify-center gap-2 mb-3">
+                    {["FB","X","IG","YT","WA"].map(s => (
+                      <span key={s} className="w-7 h-7 rounded-full bg-zinc-900 flex items-center justify-center text-white text-[8px] font-bold">{s}</span>
+                    ))}
+                  </div>
+                  <p className="text-[10px] font-bold text-zinc-800 mb-1">HOME · ABOUT US · BLOG · HELP</p>
+                  <p className="text-[10px] font-bold text-zinc-700 mb-1">For Enquiries, please contact:</p>
+                  <p className="text-[10px] text-zinc-500 mb-1">+91-9435009519 · support@agentbazar.in</p>
+                  <p className="text-[10px] text-zinc-400 mb-2">Tripforu Holidays Pvt. Ltd. (Guwahati)</p>
+                  <hr className="border-zinc-100 mb-2" />
+                  <p className="text-[10px] font-bold text-zinc-800 underline mb-1">Unsubscribe from AgentBazar</p>
+                  <p className="text-[10px] font-bold text-zinc-800">AgentBazar ©2025</p>
                 </div>
               </div>
             ) : (
-              /* Standard preview */
               <div className="border border-zinc-100 rounded-xl overflow-hidden max-w-lg mx-auto">
                 <div className="bg-[#003434] px-6 py-4">
                   <p className="text-white text-sm font-semibold">
@@ -555,7 +773,7 @@ export default function NewsletterPage() {
                   </p>
                 </div>
                 {selectedPost.cover_image_url && (
-                  <img src={selectedPost.cover_image_url} alt="" className="w-full h-48 object-cover" />
+                  <img src={selectedPost.cover_image_url} alt="" className="w-full h-48 object-cover" onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none" }} />
                 )}
                 <div className="p-6">
                   <p className="text-xs font-semibold text-zinc-400 uppercase tracking-widest mb-2">{selectedPost.category}</p>
@@ -575,7 +793,6 @@ export default function NewsletterPage() {
               </div>
             )}
 
-            {/* Summary */}
             <div className="mt-4 grid grid-cols-3 gap-3 text-center">
               <div className="bg-zinc-50 rounded-lg p-3">
                 <p className="text-xs text-zinc-400 mb-0.5">Subject</p>
@@ -590,8 +807,8 @@ export default function NewsletterPage() {
                 </p>
               </div>
               <div className="bg-zinc-50 rounded-lg p-3">
-                <p className="text-xs text-zinc-400 mb-0.5">Blog link</p>
-                <p className="text-xs font-medium text-zinc-700 truncate">{blogBaseUrl}/{selectedPost.slug}</p>
+                <p className="text-xs text-zinc-400 mb-0.5">Template</p>
+                <p className="text-xs font-medium text-zinc-700 truncate">{activeTemplate?.name ?? "Default"}</p>
               </div>
             </div>
           </div>
@@ -606,8 +823,165 @@ export default function NewsletterPage() {
         </div>
       )}
 
+      {/* Newsletter Templates Panel */}
+      <div className="mt-8 border border-zinc-200 rounded-xl overflow-hidden">
+        <button
+          onClick={() => setShowTemplatePanel(v => !v)}
+          className="w-full flex items-center justify-between px-5 py-4 bg-white hover:bg-zinc-50 transition-colors"
+        >
+          <div className="flex items-center gap-3">
+            <span className="text-sm font-semibold text-zinc-800">Newsletter Templates</span>
+            {clientLabel && (
+              <span className="text-xs bg-zinc-100 text-zinc-500 px-2 py-0.5 rounded-full">{clientLabel}</span>
+            )}
+            {newsletterTemplates.length > 0 && (
+              <span className="text-xs bg-[#003434]/10 text-[#003434] px-2 py-0.5 rounded-full font-medium">
+                {newsletterTemplates.length} template{newsletterTemplates.length !== 1 ? "s" : ""}
+              </span>
+            )}
+          </div>
+          <span className="text-zinc-400 text-sm">{showTemplatePanel ? "▲" : "▼"}</span>
+        </button>
+
+        {showTemplatePanel && (
+          <div className="border-t border-zinc-100 bg-white p-5 space-y-5">
+            <p className="text-xs text-zinc-500">
+              Newsletter templates are exclusive to this section. Write a full HTML email and use{" "}
+              <code className="bg-zinc-100 px-1 rounded text-zinc-700">{"{{variable}}"}</code> placeholders for dynamic content.
+              {clientId ? "" : " Select a client to manage their templates."}
+            </p>
+
+            {/* Template list */}
+            {newsletterTemplates.length > 0 && !isCreating && !editingTemplate && (
+              <div className="space-y-2">
+                {newsletterTemplates.map(t => (
+                  <div key={t.id} className={`flex items-center gap-3 p-3 rounded-lg border transition-colors ${selectedTemplateId === t.id ? "border-[#003434] bg-[#003434]/5" : "border-zinc-100 bg-zinc-50"}`}>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-zinc-800 truncate">{t.name}</p>
+                      {t.subject && <p className="text-xs text-zinc-400 truncate">Subject hint: {t.subject}</p>}
+                      <p className="text-xs text-zinc-400 mt-0.5">Updated {new Date(t.updated_at).toLocaleDateString("en-IN")}</p>
+                    </div>
+                    <div className="flex items-center gap-2 shrink-0">
+                      {selectedTemplateId === t.id ? (
+                        <span className="text-xs font-semibold text-[#003434]">✓ Active</span>
+                      ) : (
+                        <button
+                          onClick={() => setSelectedTemplateId(t.id)}
+                          className="text-xs text-zinc-500 hover:text-[#003434] font-medium"
+                        >
+                          Use
+                        </button>
+                      )}
+                      <button
+                        onClick={() => openEdit(t)}
+                        className="text-xs text-zinc-400 hover:text-zinc-700 px-2 py-1 rounded hover:bg-zinc-100"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        onClick={() => deleteTemplate(t.id)}
+                        disabled={deletingId === t.id}
+                        className="text-xs text-red-400 hover:text-red-600 px-2 py-1 rounded hover:bg-red-50 disabled:opacity-40"
+                      >
+                        {deletingId === t.id ? "…" : "Delete"}
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Create/Edit form */}
+            {(isCreating || editingTemplate) ? (
+              <div className="border border-zinc-200 rounded-xl p-4 space-y-4 bg-zinc-50">
+                <p className="text-sm font-semibold text-zinc-700">{isCreating ? "New newsletter template" : `Edit: ${editingTemplate!.name}`}</p>
+
+                <div>
+                  <label className="text-xs font-medium text-zinc-500 block mb-1">Template name *</label>
+                  <input
+                    type="text"
+                    value={tmplName}
+                    onChange={e => setTmplName(e.target.value)}
+                    placeholder="e.g. AgentBazar Weekly"
+                    className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#003434]/20 bg-white"
+                  />
+                </div>
+
+                <div>
+                  <label className="text-xs font-medium text-zinc-500 block mb-1">Subject hint <span className="font-normal text-zinc-400">(optional reference)</span></label>
+                  <input
+                    type="text"
+                    value={tmplSubject}
+                    onChange={e => setTmplSubject(e.target.value)}
+                    placeholder="e.g. This week in travel"
+                    className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#003434]/20 bg-white"
+                  />
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="text-xs font-medium text-zinc-500">HTML body *</label>
+                    <button
+                      type="button"
+                      onClick={() => setShowVarRef(v => !v)}
+                      className="text-xs text-[#003434] hover:underline"
+                    >
+                      {showVarRef ? "Hide" : "Show"} variables
+                    </button>
+                  </div>
+
+                  {showVarRef && (
+                    <div className="mb-2 rounded-lg border border-zinc-100 bg-white divide-y divide-zinc-50 text-xs overflow-hidden">
+                      {VARIABLE_REFERENCE.map(v => (
+                        <div key={v.key} className="flex items-center gap-3 px-3 py-1.5">
+                          <code className="font-mono text-[#003434] shrink-0">{v.key}</code>
+                          <span className="text-zinc-400">{v.desc}</span>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  <textarea
+                    value={tmplHtml}
+                    onChange={e => setTmplHtml(e.target.value)}
+                    rows={16}
+                    placeholder={"<!DOCTYPE html>\n<html>…use {{hero_title}}, {{hero_url}}, etc.</html>"}
+                    className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#003434]/20 bg-white resize-y"
+                  />
+                </div>
+
+                <div className="flex gap-2">
+                  <button
+                    onClick={saveTemplate}
+                    disabled={savingTemplate}
+                    className="flex-1 bg-[#003434] text-white text-sm py-2 rounded-lg hover:bg-[#004444] disabled:opacity-40 transition-colors font-medium"
+                  >
+                    {savingTemplate ? "Saving…" : isCreating ? "Create template" : "Save changes"}
+                  </button>
+                  <button
+                    onClick={cancelForm}
+                    className="px-4 py-2 text-sm text-zinc-500 border border-zinc-200 rounded-lg hover:bg-zinc-50"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            ) : (
+              clientId && (
+                <button
+                  onClick={openCreate}
+                  className="w-full border border-dashed border-zinc-200 rounded-xl py-3 text-sm text-zinc-400 hover:border-[#003434] hover:text-[#003434] transition-colors"
+                >
+                  + New newsletter template
+                </button>
+              )
+            )}
+          </div>
+        )}
+      </div>
+
       {/* History */}
-      <div className="mt-10">
+      <div className="mt-8">
         <h2 className="text-sm font-semibold text-zinc-700 mb-3">Send history</h2>
         {loadingHistory ? (
           <p className="text-sm text-zinc-400">Loading…</p>

@@ -9,8 +9,11 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const clientId = searchParams.get("client_id")
 
+  const templateType = searchParams.get("template_type")
+
   let query = supabaseAdmin.from("email_templates").select("*").order("created_at", { ascending: false })
   if (clientId) query = query.eq("client_id", clientId)
+  if (templateType) query = query.eq("template_type", templateType)
 
   const { data, error } = await query
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -23,7 +26,7 @@ export async function POST(req: NextRequest) {
   if (unauth) return unauth
 
   const body = await req.json()
-  const { client_id, name, subject, html_body, variables } = body
+  const { client_id, name, subject, html_body, variables, template_type } = body
 
   if (!client_id || !name || !subject || !html_body) {
     return NextResponse.json({ error: "client_id, name, subject, html_body required" }, { status: 400 })
@@ -31,7 +34,7 @@ export async function POST(req: NextRequest) {
 
   const { data, error } = await supabaseAdmin
     .from("email_templates")
-    .insert({ client_id, name, subject, html_body, variables: variables ?? [] })
+    .insert({ client_id, name, subject, html_body, variables: variables ?? [], template_type: template_type ?? "campaign" })
     .select()
     .single()
 
