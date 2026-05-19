@@ -4,6 +4,8 @@ import { useState, useEffect } from "react"
 import toast from "react-hot-toast"
 import { useClient } from "../client-context"
 
+const AGENTBAZAR_CLIENT_ID = "d5104fcd-defe-4e3d-a4cf-1893dba7b931"
+
 interface BlogPost {
   id: string
   title: string
@@ -50,12 +52,19 @@ const STATUS_STYLE: Record<string, string> = {
 
 export default function NewsletterPage() {
   const { clientId } = useClient()
+  const isAgentBazar = clientId === AGENTBAZAR_CLIENT_ID
 
   // Form state
   const [step, setStep] = useState<1 | 2 | 3>(1)
   const [selectedPost, setSelectedPost] = useState<BlogPost | null>(null)
+  const [trendingPosts, setTrendingPosts] = useState<BlogPost[]>([])
   const [postSearch, setPostSearch] = useState("")
   const [recipientType, setRecipientType] = useState<"leads" | "list">("leads")
+
+  // AgentBazar always sends to a contact list, not raw leads
+  useEffect(() => {
+    if (isAgentBazar) setRecipientType("list")
+  }, [isAgentBazar])
   const [senderId, setSenderId] = useState("")
   const [listId, setListId] = useState("")
   const [subject, setSubject] = useState("")
@@ -71,13 +80,33 @@ export default function NewsletterPage() {
 
   useEffect(() => {
     setLoadingPosts(true)
-    const params = new URLSearchParams({ status: "published", limit: "100" })
-    if (clientId) params.set("clientId", clientId)
-    fetch(`/api/blog?${params}`)
-      .then(r => r.json())
-      .then(d => setPosts(Array.isArray(d.posts) ? d.posts : []))
-      .finally(() => setLoadingPosts(false))
-  }, [clientId])
+    if (isAgentBazar) {
+      fetch(`/api/blog/agentbazar`)
+        .then(r => r.json())
+        .then(d => {
+          const normalized: BlogPost[] = (d.posts ?? []).map((p: any) => ({
+            id: p.id,
+            title: p.title,
+            slug: p.slug,
+            category: p.category ?? "",
+            status: p.status,
+            excerpt: p.excerpt,
+            cover_image_url: p.cover_image,
+            published_at: p.published_date ?? null,
+            client_id: null,
+          }))
+          setPosts(normalized)
+        })
+        .finally(() => setLoadingPosts(false))
+    } else {
+      const params = new URLSearchParams({ status: "published", limit: "100" })
+      if (clientId) params.set("clientId", clientId)
+      fetch(`/api/blog?${params}`)
+        .then(r => r.json())
+        .then(d => setPosts(Array.isArray(d.posts) ? d.posts : []))
+        .finally(() => setLoadingPosts(false))
+    }
+  }, [clientId, isAgentBazar])
 
   useEffect(() => {
     const params = new URLSearchParams()
@@ -105,10 +134,20 @@ export default function NewsletterPage() {
     (p.category ?? "").toLowerCase().includes(postSearch.toLowerCase())
   )
 
-  const handleSelectPost = (post: BlogPost) => {
+  const handleSelectHero = (post: BlogPost) => {
     setSelectedPost(post)
-    setSubject(`${post.title}`)
-    setStep(2)
+    setSubject(post.title)
+    // remove this post from trending if it was selected
+    setTrendingPosts(prev => prev.filter(t => t.id !== post.id))
+    if (!isAgentBazar) setStep(2)
+  }
+
+  const toggleTrending = (post: BlogPost) => {
+    setTrendingPosts(prev => {
+      if (prev.some(t => t.id === post.id)) return prev.filter(t => t.id !== post.id)
+      if (prev.length >= 2) return prev
+      return [...prev, post]
+    })
   }
 
   const handleSend = async () => {
@@ -127,6 +166,7 @@ export default function NewsletterPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           blog_post_id: selectedPost.id,
+          trending_post_ids: isAgentBazar ? trendingPosts.map(p => p.id) : undefined,
           sender_id: senderId,
           subject,
           client_id: clientId || null,
@@ -137,15 +177,14 @@ export default function NewsletterPage() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
       toast.success(`Sent to ${data.sent} recipient${data.sent !== 1 ? "s" : ""}${data.failed ? ` · ${data.failed} failed` : ""}`)
-      // Reset form
       setStep(1)
       setSelectedPost(null)
+      setTrendingPosts([])
       setPostSearch("")
       setSenderId("")
       setListId("")
       setSubject("")
       setRecipientType("leads")
-      // Refresh history
       const params = new URLSearchParams()
       if (clientId) params.set("client_id", clientId)
       fetch(`/api/email/newsletter?${params}`).then(r => r.json()).then(d => setHistory(Array.isArray(d) ? d : []))
@@ -156,13 +195,17 @@ export default function NewsletterPage() {
     }
   }
 
-  const blogBaseUrl = "https://emozidigital.com/blog"
+  const blogBaseUrl = isAgentBazar ? "https://blog.agentbazar.in" : "https://emozidigital.com/blog"
 
   return (
     <div className="max-w-4xl">
       <div className="mb-6">
         <h1 className="text-xl font-semibold text-zinc-900">Newsletter</h1>
-        <p className="text-sm text-zinc-500 mt-1">Send blog posts as email newsletters to leads or contacts via AWS SES</p>
+        <p className="text-sm text-zinc-500 mt-1">
+          {isAgentBazar
+            ? "Send AgentBazar blog posts as branded newsletters via AWS SES"
+            : "Send blog posts as email newsletters to leads or contacts via AWS SES"}
+        </p>
       </div>
 
       {/* Step indicators */}
@@ -182,52 +225,120 @@ export default function NewsletterPage() {
               {step > s ? "✓" : s}
             </button>
             <span className={`text-xs font-medium ${step === s ? "text-zinc-800" : "text-zinc-400"}`}>
-              {s === 1 ? "Pick blog post" : s === 2 ? "Configure" : "Preview & send"}
+              {s === 1 ? (isAgentBazar ? "Pick posts" : "Pick blog post") : s === 2 ? "Configure" : "Preview & send"}
             </span>
             {i < 2 && <span className="text-zinc-200 text-sm mx-1">›</span>}
           </div>
         ))}
       </div>
 
-      {/* Step 1: Pick blog post */}
+      {/* Step 1: Pick blog post(s) */}
       {step === 1 && (
-        <div className="bg-white border border-zinc-200 rounded-xl p-5">
-          <p className="text-sm font-semibold text-zinc-700 mb-3">Select a blog post</p>
-          <input
-            type="text"
-            placeholder="Search by title or category…"
-            value={postSearch}
-            onChange={e => setPostSearch(e.target.value)}
-            className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#003434]/20 mb-3"
-          />
-          {loadingPosts ? (
-            <p className="text-sm text-zinc-400 py-4 text-center">Loading posts…</p>
-          ) : filteredPosts.length === 0 ? (
-            <p className="text-sm text-zinc-400 py-4 text-center">No published posts found.</p>
-          ) : (
-            <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
-              {filteredPosts.map(post => (
-                <button
-                  key={post.id}
-                  onClick={() => handleSelectPost(post)}
-                  className="w-full text-left flex gap-4 p-3 rounded-lg border border-zinc-100 hover:border-[#003434] hover:bg-[#003434]/5 transition-all group"
-                >
-                  {post.cover_image_url && (
-                    <img
-                      src={post.cover_image_url}
-                      alt=""
-                      className="w-16 h-16 object-cover rounded-md shrink-0"
-                    />
-                  )}
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-zinc-800 group-hover:text-[#003434] truncate">{post.title}</p>
-                    <p className="text-xs text-zinc-400 mt-0.5">{post.category} · {post.published_at ? new Date(post.published_at).toLocaleDateString("en-IN") : "No date"}</p>
-                    {post.excerpt && (
-                      <p className="text-xs text-zinc-500 mt-1 line-clamp-2">{post.excerpt}</p>
-                    )}
-                  </div>
-                </button>
-              ))}
+        <div className="bg-white border border-zinc-200 rounded-xl p-5 space-y-4">
+          {/* Hero post section */}
+          <div>
+            <p className="text-sm font-semibold text-zinc-700 mb-1">
+              {isAgentBazar ? "Select hero post (Today's Highlight)" : "Select a blog post"}
+            </p>
+            {isAgentBazar && (
+              <p className="text-xs text-zinc-400 mb-3">This appears as the featured story at the top of the newsletter.</p>
+            )}
+            <input
+              type="text"
+              placeholder="Search by title or category…"
+              value={postSearch}
+              onChange={e => setPostSearch(e.target.value)}
+              className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#003434]/20 mb-3"
+            />
+            {loadingPosts ? (
+              <p className="text-sm text-zinc-400 py-4 text-center">Loading posts…</p>
+            ) : filteredPosts.length === 0 ? (
+              <p className="text-sm text-zinc-400 py-4 text-center">No published posts found.</p>
+            ) : (
+              <div className="space-y-2 max-h-[320px] overflow-y-auto pr-1">
+                {filteredPosts.map(post => {
+                  const isSelected = selectedPost?.id === post.id
+                  return (
+                    <button
+                      key={post.id}
+                      onClick={() => handleSelectHero(post)}
+                      className={`w-full text-left flex gap-4 p-3 rounded-lg border transition-all group ${
+                        isSelected
+                          ? "border-[#003434] bg-[#003434]/5"
+                          : "border-zinc-100 hover:border-[#003434] hover:bg-[#003434]/5"
+                      }`}
+                    >
+                      {post.cover_image_url && (
+                        <img
+                          src={post.cover_image_url}
+                          alt=""
+                          className="w-16 h-16 object-cover rounded-md shrink-0"
+                        />
+                      )}
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-zinc-800 group-hover:text-[#003434] truncate">{post.title}</p>
+                        <p className="text-xs text-zinc-400 mt-0.5">{post.category} · {post.published_at ? new Date(post.published_at).toLocaleDateString("en-IN") : "No date"}</p>
+                        {post.excerpt && (
+                          <p className="text-xs text-zinc-500 mt-1 line-clamp-2">{post.excerpt}</p>
+                        )}
+                      </div>
+                      {isSelected && (
+                        <span className="text-xs font-semibold text-[#003434] shrink-0 self-center">Hero ✓</span>
+                      )}
+                    </button>
+                  )
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Trending posts section (AgentBazar only) */}
+          {isAgentBazar && selectedPost && (
+            <div className="border-t border-zinc-100 pt-4">
+              <p className="text-sm font-semibold text-zinc-700 mb-1">
+                Select up to 2 trending posts
+                <span className="ml-2 text-xs font-normal text-zinc-400">({trendingPosts.length}/2 selected)</span>
+              </p>
+              <p className="text-xs text-zinc-400 mb-3">These appear in the "Trending Today" section below the hero.</p>
+              <div className="space-y-2 max-h-[280px] overflow-y-auto pr-1">
+                {filteredPosts
+                  .filter(p => p.id !== selectedPost.id)
+                  .map(post => {
+                    const isSelected = trendingPosts.some(t => t.id === post.id)
+                    const isDisabled = !isSelected && trendingPosts.length >= 2
+                    return (
+                      <button
+                        key={post.id}
+                        onClick={() => { if (!isDisabled) toggleTrending(post) }}
+                        disabled={isDisabled}
+                        className={`w-full text-left flex gap-4 p-3 rounded-lg border transition-all ${
+                          isSelected
+                            ? "border-[#F47920] bg-orange-50"
+                            : isDisabled
+                            ? "border-zinc-100 opacity-40 cursor-not-allowed"
+                            : "border-zinc-100 hover:border-[#F47920] hover:bg-orange-50/40"
+                        }`}
+                      >
+                        {post.cover_image_url && (
+                          <img src={post.cover_image_url} alt="" className="w-14 h-14 object-cover rounded-md shrink-0" />
+                        )}
+                        <div className="min-w-0 flex-1">
+                          <p className="text-sm font-medium text-zinc-800 truncate">{post.title}</p>
+                          <p className="text-xs text-zinc-400 mt-0.5">{post.category}</p>
+                        </div>
+                        {isSelected && (
+                          <span className="text-xs font-semibold text-[#F47920] shrink-0 self-center">Trending ✓</span>
+                        )}
+                      </button>
+                    )
+                  })}
+              </div>
+              <button
+                onClick={() => setStep(2)}
+                className="mt-4 w-full bg-[#003434] text-white text-sm py-2.5 rounded-lg hover:bg-[#004444] transition-colors font-medium"
+              >
+                Continue to configure →
+              </button>
             </div>
           )}
         </div>
@@ -246,6 +357,16 @@ export default function NewsletterPage() {
             </div>
             <button onClick={() => setStep(1)} className="ml-auto text-xs text-zinc-400 hover:text-zinc-600 shrink-0">Change</button>
           </div>
+
+          {isAgentBazar && trendingPosts.length > 0 && (
+            <div className="flex gap-2 flex-wrap">
+              {trendingPosts.map(p => (
+                <span key={p.id} className="text-xs bg-orange-50 text-orange-700 border border-orange-200 px-2 py-0.5 rounded-full truncate max-w-[200px]">
+                  Trending: {p.title}
+                </span>
+              ))}
+            </div>
+          )}
 
           <div>
             <label className="text-xs font-medium text-zinc-500 block mb-1">Subject line</label>
@@ -275,57 +396,82 @@ export default function NewsletterPage() {
             )}
           </div>
 
-          <div>
-            <label className="text-xs font-medium text-zinc-500 block mb-1">Recipients</label>
-            <div className="flex gap-2">
-              <button
-                onClick={() => setRecipientType("leads")}
-                className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium border transition-colors ${
-                  recipientType === "leads"
-                    ? "bg-[#003434] text-white border-[#003434]"
-                    : "bg-white text-zinc-600 border-zinc-200 hover:border-zinc-300"
-                }`}
-              >
-                Leads
-              </button>
-              <button
-                onClick={() => setRecipientType("list")}
-                className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium border transition-colors ${
-                  recipientType === "list"
-                    ? "bg-[#003434] text-white border-[#003434]"
-                    : "bg-white text-zinc-600 border-zinc-200 hover:border-zinc-300"
-                }`}
-              >
-                Email list
-              </button>
-            </div>
-          </div>
-
-          {recipientType === "list" && (
+          {isAgentBazar ? (
+            /* AgentBazar: contacts list only — greeting personalised from email_contacts.name */
             <div>
-              <label className="text-xs font-medium text-zinc-500 block mb-1">Select list</label>
+              <label className="text-xs font-medium text-zinc-500 block mb-1">Recipient list</label>
               <select
                 value={listId}
                 onChange={e => setListId(e.target.value)}
                 className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#003434]/20 bg-white"
               >
-                <option value="">Choose a list…</option>
+                <option value="">Choose a contact list…</option>
                 {lists.map(l => (
                   <option key={l.id} value={l.id}>{l.name} ({l.contact_count} contacts)</option>
                 ))}
               </select>
+              {lists.length === 0 && (
+                <p className="text-xs text-amber-600 mt-1">No lists found. Create a list and add contacts first.</p>
+              )}
+              <p className="text-xs text-zinc-400 mt-1.5">
+                Sends only to subscribed, non-bounced contacts in this list. Greeting is personalised using each contact&apos;s name.
+              </p>
             </div>
-          )}
+          ) : (
+            <>
+              <div>
+                <label className="text-xs font-medium text-zinc-500 block mb-1">Recipients</label>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setRecipientType("leads")}
+                    className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium border transition-colors ${
+                      recipientType === "leads"
+                        ? "bg-[#003434] text-white border-[#003434]"
+                        : "bg-white text-zinc-600 border-zinc-200 hover:border-zinc-300"
+                    }`}
+                  >
+                    Leads
+                  </button>
+                  <button
+                    onClick={() => setRecipientType("list")}
+                    className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium border transition-colors ${
+                      recipientType === "list"
+                        ? "bg-[#003434] text-white border-[#003434]"
+                        : "bg-white text-zinc-600 border-zinc-200 hover:border-zinc-300"
+                    }`}
+                  >
+                    Email list
+                  </button>
+                </div>
+              </div>
 
-          {recipientType === "leads" && (
-            <p className="text-xs text-zinc-400">
-              Will send to {clientId ? "leads for the selected client" : "all leads"} in the lead_list table.
-            </p>
+              {recipientType === "list" && (
+                <div>
+                  <label className="text-xs font-medium text-zinc-500 block mb-1">Select list</label>
+                  <select
+                    value={listId}
+                    onChange={e => setListId(e.target.value)}
+                    className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#003434]/20 bg-white"
+                  >
+                    <option value="">Choose a list…</option>
+                    {lists.map(l => (
+                      <option key={l.id} value={l.id}>{l.name} ({l.contact_count} contacts)</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              {recipientType === "leads" && (
+                <p className="text-xs text-zinc-400">
+                  Will send to {clientId ? "leads for the selected client" : "all leads"} in the lead_list table.
+                </p>
+              )}
+            </>
           )}
 
           <button
-            onClick={() => { if (senderId && subject && (recipientType === "leads" || listId)) setStep(3) }}
-            disabled={!senderId || !subject || (recipientType === "list" && !listId)}
+            onClick={() => { if (senderId && subject && (isAgentBazar ? listId : (recipientType === "leads" || listId))) setStep(3) }}
+            disabled={!senderId || !subject || (isAgentBazar ? !listId : (recipientType === "list" && !listId))}
             className="w-full bg-[#003434] text-white text-sm py-2.5 rounded-lg hover:bg-[#004444] disabled:opacity-40 transition-colors font-medium"
           >
             Preview newsletter →
@@ -342,32 +488,92 @@ export default function NewsletterPage() {
               <button onClick={() => setStep(2)} className="text-xs text-zinc-400 hover:text-zinc-600">← Edit</button>
             </div>
 
-            {/* Preview card */}
-            <div className="border border-zinc-100 rounded-xl overflow-hidden max-w-lg mx-auto">
-              <div className="bg-[#003434] px-6 py-4">
-                <p className="text-white text-sm font-semibold">
-                  {senders.find(s => s.id === senderId)?.from_name ?? "Sender"}
-                </p>
-              </div>
-              {selectedPost.cover_image_url && (
-                <img src={selectedPost.cover_image_url} alt="" className="w-full h-48 object-cover" />
-              )}
-              <div className="p-6">
-                <p className="text-xs font-semibold text-zinc-400 uppercase tracking-widest mb-2">{selectedPost.category}</p>
-                <h2 className="text-xl font-bold text-zinc-900 mb-3 leading-snug">{selectedPost.title}</h2>
-                {selectedPost.excerpt && (
-                  <p className="text-sm text-zinc-600 mb-5 leading-relaxed">{selectedPost.excerpt}</p>
+            {isAgentBazar ? (
+              /* AgentBazar branded preview */
+              <div className="border border-zinc-100 rounded-xl overflow-hidden max-w-lg mx-auto text-sm">
+                {/* Header */}
+                <div style={{ background: "#001D4A" }} className="px-6 py-3 text-center">
+                  <p className="text-white text-xs font-bold tracking-wider">agentBazar.in</p>
+                </div>
+                {/* Greeting */}
+                <div className="px-6 pt-4 pb-3" style={{ borderBottom: "2px solid #F47920" }}>
+                  <p className="italic text-zinc-700">Hello [subscriber],</p>
+                  <p className="font-bold text-zinc-800 text-xs mt-0.5">Today&apos;s Highlight</p>
+                </div>
+                {/* Hero image */}
+                {selectedPost.cover_image_url && (
+                  <img src={selectedPost.cover_image_url} alt="" className="w-full h-40 object-cover" />
                 )}
-                <span className="inline-block bg-[#003434] text-white text-sm font-semibold px-5 py-2.5 rounded-lg">
-                  Read the full article →
-                </span>
+                {/* Hero content */}
+                <div className="px-6 py-4">
+                  <p style={{ color: "#F47920" }} className="font-bold text-base leading-snug mb-2">{selectedPost.title}</p>
+                  {selectedPost.excerpt && (
+                    <p className="text-zinc-700 text-xs leading-relaxed font-semibold mb-4">{selectedPost.excerpt}</p>
+                  )}
+                  <span style={{ background: "#F47920" }} className="inline-block text-white text-xs font-bold italic px-5 py-2 rounded">
+                    Read Full Blog...
+                  </span>
+                </div>
+                {/* Divider */}
+                <div className="px-6"><hr className="border-zinc-100" /></div>
+                {/* Trending */}
+                {trendingPosts.length > 0 && (
+                  <div className="px-6 py-4">
+                    <p className="font-bold italic underline text-zinc-800 mb-3">Trending Today</p>
+                    <div className="grid grid-cols-2 gap-3">
+                      {trendingPosts.map(p => (
+                        <div key={p.id}>
+                          {p.cover_image_url && (
+                            <img src={p.cover_image_url} alt="" className="w-full h-24 object-cover rounded mb-1.5" />
+                          )}
+                          <p style={{ color: "#F47920" }} className="text-xs font-semibold leading-snug">{p.title}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+                {/* WhatsApp banner */}
+                <div style={{ background: "#1a6b3a" }} className="px-6 py-4 text-center">
+                  <p className="text-white text-xs mb-0.5">For the latest Travel Blog &amp; Updates</p>
+                  <p className="text-white font-bold text-sm mb-2">Join Our WhatsApp Community Now</p>
+                  <span className="inline-block bg-white text-xs font-bold px-5 py-1.5 rounded-full" style={{ color: "#1a6b3a" }}>
+                    ▶ JOIN NOW
+                  </span>
+                </div>
+                {/* Footer */}
+                <div style={{ background: "#001D4A" }} className="px-6 py-4 text-center">
+                  <p className="text-xs text-zinc-400">+91-9435009519 · support@agentbazar.in</p>
+                  <p className="text-xs text-zinc-500 mt-1">© Copyright 2025 by Tripforu Holidays Pvt. Ltd.</p>
+                </div>
               </div>
-              <div className="px-6 py-4 border-t border-zinc-100">
-                <p className="text-xs text-zinc-400 text-center">
-                  You received this email because you subscribed. <span className="underline">Unsubscribe</span>
-                </p>
+            ) : (
+              /* Standard preview */
+              <div className="border border-zinc-100 rounded-xl overflow-hidden max-w-lg mx-auto">
+                <div className="bg-[#003434] px-6 py-4">
+                  <p className="text-white text-sm font-semibold">
+                    {senders.find(s => s.id === senderId)?.from_name ?? "Sender"}
+                  </p>
+                </div>
+                {selectedPost.cover_image_url && (
+                  <img src={selectedPost.cover_image_url} alt="" className="w-full h-48 object-cover" />
+                )}
+                <div className="p-6">
+                  <p className="text-xs font-semibold text-zinc-400 uppercase tracking-widest mb-2">{selectedPost.category}</p>
+                  <h2 className="text-xl font-bold text-zinc-900 mb-3 leading-snug">{selectedPost.title}</h2>
+                  {selectedPost.excerpt && (
+                    <p className="text-sm text-zinc-600 mb-5 leading-relaxed">{selectedPost.excerpt}</p>
+                  )}
+                  <span className="inline-block bg-[#003434] text-white text-sm font-semibold px-5 py-2.5 rounded-lg">
+                    Read the full article →
+                  </span>
+                </div>
+                <div className="px-6 py-4 border-t border-zinc-100">
+                  <p className="text-xs text-zinc-400 text-center">
+                    You received this email because you subscribed. <span className="underline">Unsubscribe</span>
+                  </p>
+                </div>
               </div>
-            </div>
+            )}
 
             {/* Summary */}
             <div className="mt-4 grid grid-cols-3 gap-3 text-center">
@@ -378,7 +584,7 @@ export default function NewsletterPage() {
               <div className="bg-zinc-50 rounded-lg p-3">
                 <p className="text-xs text-zinc-400 mb-0.5">Recipients</p>
                 <p className="text-xs font-medium text-zinc-700 capitalize">
-                  {recipientType === "list"
+                  {(isAgentBazar || recipientType === "list")
                     ? lists.find(l => l.id === listId)?.name ?? "List"
                     : "Leads"}
                 </p>

@@ -18,12 +18,21 @@ async function markdownToHtml(markdown: string): Promise<string> {
 
 export const dynamic = 'force-dynamic';
 
-// Check if a post exists in Agent Bazar blog by slug
+// List published posts or check if a specific slug exists
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url);
   const slug = searchParams.get('slug');
 
-  if (!slug) return NextResponse.json({ exists: false });
+  if (!slug) {
+    const { data, error } = await getAgentBazarSupabase()
+      .from('blog_posts')
+      .select('id, slug, title, category, status, excerpt, cover_image, published_date')
+      .eq('status', 'published')
+      .order('published_date', { ascending: false })
+      .limit(100);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    return NextResponse.json({ posts: data ?? [] });
+  }
 
   const { data } = await getAgentBazarSupabase()
     .from('blog_posts')

@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from "next/server"
 import { supabaseAdmin } from "@/lib/supabase-server"
+import { getAgentBazarSupabase } from "@/lib/supabase-agentbazar"
 import { sesClient, SES_CONFIGURATION_SET } from "@/lib/ses"
 import { SendEmailCommand } from "@aws-sdk/client-ses"
 import { requireAuth } from "@/lib/require-auth"
+
+const AGENTBAZAR_CLIENT_ID = "d5104fcd-defe-4e3d-a4cf-1893dba7b931"
+const AGENTBAZAR_BLOG_URL = "https://blog.agentbazar.in"
 
 function buildNewsletterHtml(opts: {
   senderName: string
@@ -57,12 +61,134 @@ function buildNewsletterHtml(opts: {
 </html>`
 }
 
+function buildAgentBazarNewsletterHtml(opts: {
+  firstName: string
+  hero: { title: string; excerpt: string; coverImage: string | null; url: string }
+  trending: Array<{ title: string; coverImage: string | null; url: string }>
+  unsubscribeUrl: string
+}) {
+  const heroCoverHtml = opts.hero.coverImage
+    ? `<tr><td style="padding:0;"><img src="${opts.hero.coverImage}" alt="${opts.hero.title}" width="600" style="display:block;width:100%;max-width:600px;height:auto;border:0;" /></td></tr>`
+    : ""
+
+  const trendingCols = opts.trending.map(p => `
+    <td width="${Math.floor(100 / opts.trending.length)}%" style="padding:4px;vertical-align:top;">
+      ${p.coverImage ? `<img src="${p.coverImage}" alt="${p.title}" width="272" style="display:block;width:100%;height:auto;margin-bottom:8px;border:0;" />` : ""}
+      <a href="${p.url}" style="font-size:13px;color:#F47920;text-decoration:none;line-height:1.4;font-weight:600;">${p.title}</a>
+    </td>`).join("")
+
+  const trendingSection = opts.trending.length > 0 ? `
+        <tr>
+          <td style="padding:20px 24px 8px;">
+            <p style="margin:0;font-size:16px;font-weight:bold;color:#1a2332;font-style:italic;text-decoration:underline;">Trending Today</p>
+          </td>
+        </tr>
+        <tr>
+          <td style="padding:8px 24px 24px;">
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr>${trendingCols}</tr>
+            </table>
+          </td>
+        </tr>` : ""
+
+  return `<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1.0">
+  <title>${opts.hero.title}</title>
+</head>
+<body style="margin:0;padding:0;background:#f4f6f9;font-family:Arial,Helvetica,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f6f9;padding:20px 0;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;max-width:600px;width:100%;">
+
+        <!-- Logo header -->
+        <tr>
+          <td style="background:#001D4A;padding:14px 24px;text-align:center;">
+            <img src="https://blog.agentbazar.in/new-logo.jpg" alt="AgentBazar" height="48" style="height:48px;max-height:48px;border:0;display:inline-block;" />
+          </td>
+        </tr>
+
+        <!-- Greeting -->
+        <tr>
+          <td style="padding:20px 24px 12px;border-bottom:2px solid #F47920;">
+            <p style="margin:0 0 2px;font-style:italic;font-size:16px;color:#1a2332;">Hello ${opts.firstName},</p>
+            <p style="margin:0;font-size:14px;font-weight:bold;color:#1a2332;">Today&#39;s Highlight</p>
+          </td>
+        </tr>
+
+        <!-- Hero cover image -->
+        ${heroCoverHtml}
+
+        <!-- Hero content -->
+        <tr>
+          <td style="padding:20px 24px 8px;">
+            <a href="${opts.hero.url}" style="display:block;font-size:20px;font-weight:bold;color:#F47920;text-decoration:none;line-height:1.3;margin-bottom:12px;">${opts.hero.title}</a>
+            <p style="margin:0 0 20px;font-size:14px;color:#1a2332;line-height:1.65;font-weight:600;">${opts.hero.excerpt}</p>
+            <a href="${opts.hero.url}" style="display:inline-block;background:#F47920;color:#ffffff;text-decoration:none;padding:10px 28px;border-radius:4px;font-size:14px;font-weight:bold;font-style:italic;">Read Full Blog...</a>
+          </td>
+        </tr>
+
+        <!-- Divider -->
+        <tr>
+          <td style="padding:20px 24px 0;">
+            <hr style="border:none;border-top:1px solid #e8ecf2;margin:0;" />
+          </td>
+        </tr>
+
+        <!-- Trending Today section -->
+        ${trendingSection}
+
+        <!-- WhatsApp community banner -->
+        <tr>
+          <td style="padding:0;">
+            <table width="100%" cellpadding="0" cellspacing="0">
+              <tr>
+                <td style="background:#1a6b3a;padding:28px 24px;text-align:center;">
+                  <p style="margin:0 0 4px;font-size:13px;color:#ffffff;letter-spacing:0.02em;">For the latest Travel Blog &amp; Updates</p>
+                  <p style="margin:0 0 18px;font-size:20px;font-weight:bold;color:#ffffff;line-height:1.3;">Join Our WhatsApp Community Now</p>
+                  <a href="https://wa.me/919435009519" style="display:inline-block;background:#ffffff;color:#1a6b3a;text-decoration:none;padding:10px 36px;border-radius:24px;font-size:14px;font-weight:bold;">&#9654;&nbsp; JOIN NOW</a>
+                  <p style="margin:18px 0 0;font-size:11px;color:rgba(255,255,255,0.75);">Tripforu Holidays Pvt. Ltd. (Guwahati) &nbsp; www.agentbazar.in</p>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- Footer -->
+        <tr>
+          <td style="background:#001D4A;padding:24px;text-align:center;">
+            <p style="margin:0 0 10px;font-size:13px;color:#ffffff;">
+              +91-9435009519 &nbsp;&nbsp; support@agentbazar.in
+            </p>
+            <p style="margin:0 0 14px;">
+              <a href="https://www.agentbazar.in" style="color:#8aaac8;text-decoration:none;font-size:12px;margin:0 8px;">HOME</a>
+              <a href="https://www.agentbazar.in/about-us" style="color:#8aaac8;text-decoration:none;font-size:12px;margin:0 8px;">ABOUT US</a>
+              <a href="https://blog.agentbazar.in" style="color:#8aaac8;text-decoration:none;font-size:12px;margin:0 8px;">BLOG</a>
+              <a href="https://www.agentbazar.in/help" style="color:#8aaac8;text-decoration:none;font-size:12px;margin:0 8px;">HELP</a>
+            </p>
+            <p style="margin:0 0 10px;font-size:11px;color:#6688aa;">
+              <a href="${opts.unsubscribeUrl}" style="color:#6688aa;text-decoration:underline;">Unsubscribe</a>
+            </p>
+            <p style="margin:0;font-size:11px;color:#6688aa;">&copy; Copyright 2025 by Tripforu Holidays Pvt. Ltd.</p>
+          </td>
+        </tr>
+
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`
+}
+
 export async function POST(req: NextRequest) {
   const unauth = await requireAuth()
   if (unauth) return unauth
 
   const body = await req.json()
   const { blog_post_id, sender_id, subject, client_id, recipient_type, list_id } = body
+  const trending_post_ids: string[] = Array.isArray(body.trending_post_ids) ? body.trending_post_ids.slice(0, 2) : []
 
   if (!blog_post_id || !sender_id || !subject || !recipient_type) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
@@ -71,15 +197,40 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "list_id required when recipient_type is list" }, { status: 400 })
   }
 
-  // Fetch blog post
-  const { data: post, error: postErr } = await supabaseAdmin
-    .from("blog_posts")
-    .select("id, title, slug, category, excerpt, cover_image_url, author")
-    .eq("id", blog_post_id)
-    .single()
+  const isAgentBazar = client_id === AGENTBAZAR_CLIENT_ID
 
-  if (postErr || !post) {
-    return NextResponse.json({ error: "Blog post not found" }, { status: 404 })
+  // Fetch hero blog post from correct project
+  let post: { id: string; title: string; slug: string; category: string | null; excerpt: string | null; cover_image_url?: string | null; cover_image?: string | null } | null = null
+
+  if (isAgentBazar) {
+    const { data, error } = await getAgentBazarSupabase()
+      .from("blog_posts")
+      .select("id, title, slug, category, excerpt, cover_image")
+      .eq("id", blog_post_id)
+      .single()
+    if (error || !data) return NextResponse.json({ error: "Blog post not found" }, { status: 404 })
+    post = { ...data, cover_image_url: data.cover_image }
+  } else {
+    const { data, error } = await supabaseAdmin
+      .from("blog_posts")
+      .select("id, title, slug, category, excerpt, cover_image_url, author")
+      .eq("id", blog_post_id)
+      .single()
+    if (error || !data) return NextResponse.json({ error: "Blog post not found" }, { status: 404 })
+    post = data
+  }
+
+  // Fetch up to 2 trending posts (AgentBazar only)
+  type TrendingPost = { id: string; title: string; slug: string; cover_image: string | null }
+  let trendingPosts: TrendingPost[] = []
+  if (isAgentBazar && trending_post_ids.length > 0) {
+    const { data } = await getAgentBazarSupabase()
+      .from("blog_posts")
+      .select("id, title, slug, cover_image")
+      .in("id", trending_post_ids)
+    trendingPosts = data ?? []
+    // preserve order from the request
+    trendingPosts.sort((a, b) => trending_post_ids.indexOf(a.id) - trending_post_ids.indexOf(b.id))
   }
 
   // Fetch sender
@@ -139,8 +290,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Failed to create newsletter record" }, { status: 500 })
   }
 
-  const blogBaseUrl = process.env.BLOG_BASE_URL ?? "https://emozidigital.com/blog"
-  const ctaUrl = `${blogBaseUrl}/${post.slug}`
+  const blogBaseUrl = isAgentBazar ? AGENTBAZAR_BLOG_URL : (process.env.BLOG_BASE_URL ?? "https://emozidigital.com/blog")
+  const ctaUrl = `${blogBaseUrl}/${post!.slug}`
 
   let sent = 0
   let failed = 0
@@ -151,15 +302,36 @@ export async function POST(req: NextRequest) {
     const results = await Promise.allSettled(
       batch.map(async (recipient) => {
         const unsubUrl = `${process.env.NEXTAUTH_URL}/api/email/unsubscribe?email=${encodeURIComponent(recipient.email)}&client=${client_id ?? ""}`
-        const html = buildNewsletterHtml({
-          senderName: sender.from_name,
-          category: post.category ?? "Newsletter",
-          title: post.title,
-          excerpt: post.excerpt ?? "",
-          coverImageUrl: post.cover_image_url ?? null,
-          ctaUrl,
-          unsubscribeUrl: unsubUrl,
-        })
+
+        let html: string
+        if (isAgentBazar) {
+          const firstName = (recipient.name ?? "").trim().split(/\s+/)[0] || "Traveller"
+          html = buildAgentBazarNewsletterHtml({
+            firstName,
+            hero: {
+              title: post!.title,
+              excerpt: post!.excerpt ?? "",
+              coverImage: post!.cover_image_url ?? null,
+              url: ctaUrl,
+            },
+            trending: trendingPosts.map(p => ({
+              title: p.title,
+              coverImage: p.cover_image,
+              url: `${AGENTBAZAR_BLOG_URL}/${p.slug}`,
+            })),
+            unsubscribeUrl: unsubUrl,
+          })
+        } else {
+          html = buildNewsletterHtml({
+            senderName: sender.from_name,
+            category: post!.category ?? "Newsletter",
+            title: post!.title,
+            excerpt: post!.excerpt ?? "",
+            coverImageUrl: post!.cover_image_url ?? null,
+            ctaUrl,
+            unsubscribeUrl: unsubUrl,
+          })
+        }
 
         const cmd = new SendEmailCommand({
           Source: `${sender.from_name} <${sender.from_email}>`,
