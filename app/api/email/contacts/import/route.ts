@@ -9,6 +9,7 @@ export async function POST(req: NextRequest) {
   const formData = await req.formData()
   const clientId = formData.get("client_id") as string
   const file = formData.get("file") as File | null
+  const tagIds = formData.getAll("tag_id") as string[]
 
   if (!clientId || !file) {
     return NextResponse.json({ error: "client_id and file required" }, { status: 400 })
@@ -45,6 +46,23 @@ export async function POST(req: NextRequest) {
     .upsert(contacts, { onConflict: "client_id,email" })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // If tags were provided, assign all of them to all imported contacts
+  if (tagIds.length) {
+    const emails = contacts.map(c => c.email)
+    const { data: rows } = await supabaseAdmin
+      .from("email_contacts")
+      .select("id")
+      .eq("client_id", clientId)
+      .in("email", emails)
+
+    if (rows?.length) {
+      const tagRows = rows.flatMap(r => tagIds.map(tid => ({ contact_id: r.id, tag_id: tid })))
+      await supabaseAdmin
+        .from("email_contact_tags")
+        .upsert(tagRows, { onConflict: "contact_id,tag_id" })
+    }
+  }
 
   return NextResponse.json({ imported: contacts.length })
 }

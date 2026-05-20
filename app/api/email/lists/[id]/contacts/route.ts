@@ -13,13 +13,33 @@ async function syncContactCount(listId: string) {
     .eq("id", listId)
 }
 
+async function autoTagContacts(contactIds: string[], listId: string) {
+  const { data: listTags } = await supabaseAdmin
+    .from("email_list_tags")
+    .select("tag_id")
+    .eq("list_id", listId)
+
+  if (!listTags?.length) return
+
+  const rows = contactIds.flatMap(cid =>
+    listTags.map(lt => ({ contact_id: cid, tag_id: lt.tag_id }))
+  )
+  await supabaseAdmin
+    .from("email_contact_tags")
+    .upsert(rows, { onConflict: "contact_id,tag_id" })
+}
+
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const unauth = await requireAuth()
   if (unauth) return unauth
 
   const body = await req.json()
 
-  const { data: list } = await supabaseAdmin.from("email_lists").select("client_id").eq("id", params.id).single()
+  const { data: list } = await supabaseAdmin
+    .from("email_lists")
+    .select("client_id")
+    .eq("id", params.id)
+    .single()
   if (!list) return NextResponse.json({ error: "list not found" }, { status: 404 })
 
   // Bulk import all eligible contacts for this client
@@ -37,6 +57,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     const rows = contacts.map(c => ({ list_id: params.id, contact_id: c.id }))
     await supabaseAdmin.from("email_list_contacts").upsert(rows, { onConflict: "list_id,contact_id" })
     await syncContactCount(params.id)
+    await autoTagContacts(contacts.map(c => c.id), params.id)
 
     return NextResponse.json({ imported: contacts.length })
   }
@@ -61,6 +82,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   await syncContactCount(params.id)
+  await autoTagContacts([contact.id], params.id)
 
   return NextResponse.json({ ok: true })
 }
