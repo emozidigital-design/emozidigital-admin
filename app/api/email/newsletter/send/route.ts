@@ -178,52 +178,34 @@ function buildAgentBazarNewsletterHtml(opts: {
                 </td>
               </tr>
 
-              <!-- Social icons: black circle + white ring + bold white icon (40x40, table-cell layout) -->
+              <!-- Social icons: PNG images from icons8 (email-client compatible, white icons on black circles) -->
               <tr>
                 <td style="text-align:center;padding-bottom:20px;">
                   <table cellpadding="0" cellspacing="0" style="display:inline-table;">
                     <tr>
                       <td style="padding:0 5px;">
-                        <a href="https://www.facebook.com/people/Agentbazarblogs/" title="Facebook" style="display:block;width:40px;height:40px;text-decoration:none;font-size:0;">
-                          <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40" style="display:block;">
-                            <circle cx="20" cy="20" r="19" fill="#111111" stroke="#ffffff" stroke-width="1.5"/>
-                            <path fill="#ffffff" d="M22 20h-2.5v9H16v-9h-2v-3h2v-1.8C16 12.4 17.4 11 20.3 11c1.3 0 2.7.3 2.7.3V14h-1.5c-1.1 0-1.5.5-1.5 1.3V17H23l-.5 3z"/>
-                          </svg>
+                        <a href="https://www.facebook.com/people/Agentbazarblogs/" title="Facebook" style="display:block;text-decoration:none;">
+                          <img src="https://img.icons8.com/ios-filled/40/ffffff/facebook-new.png" alt="Facebook" width="40" height="40" style="display:block;width:40px;height:40px;background:#111111;border-radius:50%;" />
                         </a>
                       </td>
                       <td style="padding:0 5px;">
-                        <a href="https://x.com/AgentBazar" title="X" style="display:block;width:40px;height:40px;text-decoration:none;font-size:0;">
-                          <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40" style="display:block;">
-                            <circle cx="20" cy="20" r="19" fill="#111111" stroke="#ffffff" stroke-width="1.5"/>
-                            <path fill="#ffffff" d="M22.2 18.7 28.3 11h-1.5l-5.3 6.2-4.2-6.2H12l6.5 9.5-6.5 7.5h1.5l5.7-6.6 4.5 6.6H29l-6.8-9.8zm-2 2.3-.7-1-5.3-7.6h2.3l4.3 6.1.7 1 5.5 7.9H25l-4.8-6.4z"/>
-                          </svg>
+                        <a href="https://x.com/AgentBazar" title="X (Twitter)" style="display:block;text-decoration:none;">
+                          <img src="https://img.icons8.com/ios-filled/40/ffffff/twitterx.png" alt="X" width="40" height="40" style="display:block;width:40px;height:40px;background:#111111;border-radius:50%;" />
                         </a>
                       </td>
                       <td style="padding:0 5px;">
-                        <a href="https://www.instagram.com/agentbazarblogs/" title="Instagram" style="display:block;width:40px;height:40px;text-decoration:none;font-size:0;">
-                          <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40" style="display:block;">
-                            <circle cx="20" cy="20" r="19" fill="#111111" stroke="#ffffff" stroke-width="1.5"/>
-                            <rect x="11" y="11" width="18" height="18" rx="5" ry="5" fill="none" stroke="#ffffff" stroke-width="2"/>
-                            <circle cx="20" cy="20" r="4.5" fill="none" stroke="#ffffff" stroke-width="2"/>
-                            <circle cx="25.5" cy="14.5" r="1.5" fill="#ffffff"/>
-                          </svg>
+                        <a href="https://www.instagram.com/agentbazarblogs/" title="Instagram" style="display:block;text-decoration:none;">
+                          <img src="https://img.icons8.com/ios-filled/40/ffffff/instagram-new.png" alt="Instagram" width="40" height="40" style="display:block;width:40px;height:40px;background:#111111;border-radius:50%;" />
                         </a>
                       </td>
                       <td style="padding:0 5px;">
-                        <a href="https://www.youtube.com/@agentbazar6074" title="YouTube" style="display:block;width:40px;height:40px;text-decoration:none;font-size:0;">
-                          <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40" style="display:block;">
-                            <circle cx="20" cy="20" r="19" fill="#111111" stroke="#ffffff" stroke-width="1.5"/>
-                            <rect x="9" y="14" width="22" height="12" rx="3.5" fill="#ffffff"/>
-                            <path fill="#111111" d="M17 16.8l7.5 3.2-7.5 3.2z"/>
-                          </svg>
+                        <a href="https://www.youtube.com/@agentbazar6074" title="YouTube" style="display:block;text-decoration:none;">
+                          <img src="https://img.icons8.com/ios-filled/40/ffffff/youtube-play.png" alt="YouTube" width="40" height="40" style="display:block;width:40px;height:40px;background:#111111;border-radius:50%;" />
                         </a>
                       </td>
                       <td style="padding:0 5px;">
-                        <a href="https://www.whatsapp.com/channel/0029VaCTkLJBFLgcbBhFnM1C" title="WhatsApp" style="display:block;width:40px;height:40px;text-decoration:none;font-size:0;">
-                          <svg xmlns="http://www.w3.org/2000/svg" width="40" height="40" viewBox="0 0 40 40" style="display:block;">
-                            <circle cx="20" cy="20" r="19" fill="#111111" stroke="#ffffff" stroke-width="1.5"/>
-                            <path fill="#ffffff" d="M20 10a10 10 0 0 0-8.7 14.9L10 30l5.3-1.3A10 10 0 1 0 20 10zm5.1 13.4c-.3.7-1.2 1.2-2 1.3-.5.1-1.2.2-3.4-.8-2.8-1.3-4.6-4.1-4.8-4.3-.1-.2-1-1.5-1-2.9s.8-2.1 1.1-2.3c.3-.3.6-.4.8-.4h.5c.2 0 .4.1.6.6.3.7.9 2.3.9 2.5.1.2.1.4 0 .6-.1.2-.2.4-.4.6-.2.2-.3.4-.2.6.5.8 1.2 1.6 2.1 2.3.7.4 1.3.6 2 .8.3.1.5 0 .6-.2.3-.3.6-.8.9-1.2.2-.2.4-.3.7-.1l2 1c.2.1.4.3.4.4-.1.5-.3 1.1-.6 1.5z"/>
-                          </svg>
+                        <a href="https://www.whatsapp.com/channel/0029VaCTkLJBFLgcbBhFnM1C" title="WhatsApp" style="display:block;text-decoration:none;">
+                          <img src="https://img.icons8.com/ios-filled/40/ffffff/whatsapp.png" alt="WhatsApp" width="40" height="40" style="display:block;width:40px;height:40px;background:#111111;border-radius:50%;" />
                         </a>
                       </td>
                     </tr>
@@ -293,6 +275,7 @@ export async function POST(req: NextRequest) {
   const body = await req.json()
   const { blog_post_id, sender_id, subject, client_id, recipient_type, list_id, newsletter_template_id } = body
   const trending_post_ids: string[] = Array.isArray(body.trending_post_ids) ? body.trending_post_ids.slice(0, 2) : []
+  const tag_ids: string[] = Array.isArray(body.tag_ids) ? body.tag_ids : []
 
   if (!blog_post_id || !sender_id || !subject || !recipient_type) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
@@ -375,14 +358,26 @@ export async function POST(req: NextRequest) {
   } else {
     const { data, error } = await supabaseAdmin
       .from("email_list_contacts")
-      .select("email_contacts(email, name, subscribed, bounced, complained)")
+      .select("email_contacts(id, email, name, subscribed, bounced, complained)")
       .eq("list_id", list_id)
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-    recipients = (data ?? [])
-      .map(r => r.email_contacts as unknown as { email: string; name: string | null; subscribed: boolean; bounced: boolean; complained: boolean })
+    type RawContact = { id: string; email: string; name: string | null; subscribed: boolean; bounced: boolean; complained: boolean }
+    let filtered = (data ?? [])
+      .map(r => r.email_contacts as unknown as RawContact)
       .filter(c => c && c.subscribed && !c.bounced && !c.complained)
+
+    if (tag_ids.length > 0) {
+      const { data: taggedContacts } = await supabaseAdmin
+        .from("email_contact_tags")
+        .select("contact_id")
+        .in("tag_id", tag_ids)
+      const taggedIds = new Set((taggedContacts ?? []).map(r => r.contact_id))
+      filtered = filtered.filter(c => taggedIds.has(c.id))
+    }
+
+    recipients = filtered.map(({ email, name }) => ({ email, name }))
   }
 
   if (recipients.length === 0) {
@@ -487,6 +482,13 @@ export async function POST(req: NextRequest) {
 
     sent += results.filter(r => r.status === "fulfilled").length
     failed += results.filter(r => r.status === "rejected").length
+
+    results.forEach((r, idx) => {
+      if (r.status === "rejected") {
+        const recipient = batch[idx]
+        console.error(`[newsletter] Failed to send to ${recipient?.email}:`, r.reason?.message ?? r.reason)
+      }
+    })
   }
 
   const finalStatus = failed === recipients.length ? "failed" : "sent"
