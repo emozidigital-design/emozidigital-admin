@@ -134,7 +134,7 @@ export async function POST(req: NextRequest) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-5-mini',
+        model: 'gpt-5.5-mini',
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
           {
