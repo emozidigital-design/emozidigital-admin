@@ -1,7 +1,8 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import toast from "react-hot-toast"
+import { MoreVertical } from "lucide-react"
 import { useClient } from "../client-context"
 import EmailEditorModal from "@/components/email/EmailEditorModal"
 
@@ -24,6 +25,10 @@ export default function TemplatesPage() {
   const [editorOpen, setEditorOpen] = useState(false)
   const [editorTemplate, setEditorTemplate] = useState<Template | null>(null)
 
+  // ⋮ dropdown
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
+
   async function fetchTemplates() {
     setLoading(true)
     const params = new URLSearchParams()
@@ -39,16 +44,48 @@ export default function TemplatesPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clientId])
 
+  // Close dropdown on outside click
+  useEffect(() => {
+    if (!openMenuId) return
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) {
+        setOpenMenuId(null)
+      }
+    }
+    document.addEventListener("mousedown", handler)
+    return () => document.removeEventListener("mousedown", handler)
+  }, [openMenuId])
+
   const handleDelete = async (id: string) => {
+    setOpenMenuId(null)
     if (!confirm("Delete this template?")) return
     await fetch(`/api/email/templates/${id}`, { method: "DELETE" })
     setTemplates(prev => prev.filter(t => t.id !== id))
     toast.success("Deleted")
   }
 
+  const handleDuplicate = async (id: string) => {
+    setOpenMenuId(null)
+    try {
+      const res = await fetch(`/api/email/templates/${id}/duplicate`, { method: "POST" })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      setTemplates(prev => [data, ...prev])
+      toast.success("Template duplicated")
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Duplicate error")
+    }
+  }
+
   const startEdit = (t: Template) => {
+    setOpenMenuId(null)
     setEditorTemplate(t)
     setEditorOpen(true)
+  }
+
+  const startPreview = (t: Template) => {
+    setOpenMenuId(null)
+    setPreview(t)
   }
 
   const handleEditorSaved = () => {
@@ -111,29 +148,52 @@ export default function TemplatesPage() {
               key={t.id}
               className="bg-white border border-zinc-200 rounded-xl px-4 py-3 flex items-center justify-between gap-4"
             >
-              <div>
-                <p className="text-sm font-medium text-zinc-800">{t.name}</p>
-                <p className="text-xs text-zinc-400">{t.subject}</p>
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-zinc-800 truncate">{t.name}</p>
+                <p className="text-xs text-zinc-400 truncate">{t.subject}</p>
               </div>
-              <div className="flex items-center gap-2">
+
+              {/* ⋮ dropdown */}
+              <div
+                className="relative shrink-0"
+                ref={openMenuId === t.id ? menuRef : undefined}
+              >
                 <button
-                  onClick={() => setPreview(t)}
-                  className="text-xs text-zinc-400 hover:text-zinc-700 underline underline-offset-2"
+                  onClick={() => setOpenMenuId(openMenuId === t.id ? null : t.id)}
+                  className="w-7 h-7 flex items-center justify-center rounded-lg border border-transparent hover:border-zinc-200 hover:bg-zinc-100 text-zinc-400 hover:text-zinc-700 transition-colors"
                 >
-                  Preview
+                  <MoreVertical className="w-4 h-4" />
                 </button>
-                <button
-                  onClick={() => startEdit(t)}
-                  className="text-xs text-zinc-400 hover:text-zinc-700 underline underline-offset-2"
-                >
-                  Edit
-                </button>
-                <button
-                  onClick={() => handleDelete(t.id)}
-                  className="text-xs text-red-400 hover:text-red-600 underline underline-offset-2"
-                >
-                  Delete
-                </button>
+
+                {openMenuId === t.id && (
+                  <div className="absolute right-0 top-8 z-50 bg-white border border-zinc-200 rounded-xl shadow-xl py-1.5 w-36 ring-1 ring-black/5">
+                    <button
+                      onClick={() => startPreview(t)}
+                      className="w-full text-left px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-50 font-medium"
+                    >
+                      Preview
+                    </button>
+                    <button
+                      onClick={() => startEdit(t)}
+                      className="w-full text-left px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-50 font-medium"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      onClick={() => handleDuplicate(t.id)}
+                      className="w-full text-left px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-50 font-medium"
+                    >
+                      Duplicate
+                    </button>
+                    <div className="border-t border-zinc-100 my-1" />
+                    <button
+                      onClick={() => handleDelete(t.id)}
+                      className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 font-medium"
+                    >
+                      Delete
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           ))}
