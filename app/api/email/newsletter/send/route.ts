@@ -276,6 +276,7 @@ export async function POST(req: NextRequest) {
   const { blog_post_id, sender_id, subject, client_id, recipient_type, list_id, newsletter_template_id } = body
   const trending_post_ids: string[] = Array.isArray(body.trending_post_ids) ? body.trending_post_ids.slice(0, 2) : []
   const tag_ids: string[] = Array.isArray(body.tag_ids) ? body.tag_ids : []
+  const test_email: string | null = typeof body.test_email === "string" && body.test_email ? body.test_email : null
 
   if (!blog_post_id || !sender_id || !subject || !recipient_type) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
@@ -380,7 +381,10 @@ export async function POST(req: NextRequest) {
     recipients = filtered.map(({ email, name }) => ({ email, name }))
   }
 
-  if (recipients.length === 0) {
+  // Test mode: override recipients with a single test address
+  if (test_email) {
+    recipients = [{ email: test_email, name: "Admin (Test)" }]
+  } else if (recipients.length === 0) {
     return NextResponse.json({ error: "No eligible recipients found" }, { status: 400 })
   }
 
@@ -394,7 +398,10 @@ export async function POST(req: NextRequest) {
       subject,
       recipient_type,
       list_id: list_id || null,
-      status: "sending",
+      tag_ids,
+      trending_post_ids,
+      newsletter_template_id: newsletter_template_id || null,
+      status: test_email ? "test" : "sending",
     })
     .select("id")
     .single()
@@ -476,7 +483,16 @@ export async function POST(req: NextRequest) {
           ConfigurationSetName: SES_CONFIGURATION_SET,
         })
 
-        await sesClient.send(cmd)
+        const result = await sesClient.send(cmd)
+        const sesMessageId = result.MessageId ?? null
+        if (sesMessageId) {
+          await supabaseAdmin.from("email_sends").insert({
+            newsletter_send_id: record.id,
+            ses_message_id: sesMessageId,
+            status: "sent",
+            sent_at: new Date().toISOString(),
+          })
+        }
       })
     )
 

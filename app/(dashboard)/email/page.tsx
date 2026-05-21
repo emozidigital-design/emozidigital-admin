@@ -11,6 +11,7 @@ const SECTIONS = [
   { href: "/email/transactional", label: "Transactional", desc: "API-triggered single sends (logs only)", icon: "M13 10V3L4 14h7v7l9-11h-7z" },
   { href: "/email/analytics", label: "Analytics", desc: "Opens, clicks, bounces per campaign", icon: "M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" },
   { href: "/email/newsletter", label: "Newsletter", desc: "Send blog posts as newsletters to leads or contacts", icon: "M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 13a2 2 0 01-2-2V7m2 13a2 2 0 002-2V9a2 2 0 00-2-2h-2m-4-3H9M7 16h6M7 8h6v4H7V8z" },
+  { href: "/email/logs", label: "Logs", desc: "History of all newsletter sendings", icon: "M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" },
 ]
 
 export default function EmailPage() {

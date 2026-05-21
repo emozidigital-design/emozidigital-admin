@@ -176,6 +176,32 @@ function TagsManager({ allTags, contacts, onRename, onDelete, onCreateTag, open,
   )
 }
 
+function AddToListDropdown({ contactEmail, lists }: { contactEmail: string; lists: EmailList[] }) {
+  const [busy, setBusy] = useState(false)
+  if (!lists.length) return null
+  const handleChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const listId = e.target.value
+    if (!listId) return
+    setBusy(true)
+    const res = await fetch(`/api/email/lists/${listId}/contacts`, {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: contactEmail }),
+    })
+    const d = await res.json()
+    if (res.ok) toast.success("Added to list")
+    else toast.error(d.error ?? "Failed to add to list")
+    e.target.value = ""
+    setBusy(false)
+  }
+  return (
+    <select onChange={handleChange} disabled={busy}
+      className="text-xs border border-zinc-200 rounded-lg px-2 py-1 text-zinc-400 bg-white focus:outline-none focus:ring-1 focus:ring-[#003434]/20 disabled:opacity-50 max-w-[110px]">
+      <option value="">+ List</option>
+      {lists.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+    </select>
+  )
+}
+
 // Multi-select dropdown for tag pickers inside forms
 function TagMultiSelect({ allTags, value, onChange, placeholder = "Assign tags (optional)" }: {
   allTags: EmailTag[]; value: string[]; onChange: (ids: string[]) => void; placeholder?: string
@@ -796,6 +822,7 @@ export default function ContactsPage() {
                 <th className="text-left px-4 py-2.5 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Tags</th>
                 <th className="text-left px-4 py-2.5 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Status</th>
                 <th className="text-left px-4 py-2.5 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Added</th>
+                <th className="text-left px-4 py-2.5 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">List</th>
                 <th className="px-4 py-2.5" />
               </tr>
             </thead>
@@ -856,6 +883,7 @@ export default function ContactsPage() {
                     </td>
                     <td className="px-4 py-3">{statusBadge(c)}</td>
                     <td className="px-4 py-3 text-zinc-400 text-xs whitespace-nowrap">{new Date(c.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</td>
+                    <td className="px-4 py-3"><AddToListDropdown contactEmail={c.email} lists={lists} /></td>
                     <td className="px-4 py-3">
                       <div className="flex items-center justify-end gap-3">
                         {!c.bounced && !c.complained && (
