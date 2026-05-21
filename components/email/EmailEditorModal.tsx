@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react"
 import {
-  X, Image as ImageIcon, Type, Square, Minus,
+  X, Image as ImageIcon, Type, Square, Minus, Plus,
   Columns2, LayoutTemplate, ChevronUp, ChevronDown, Trash2,
   AlignLeft, AlignCenter, AlignRight, Grid3X3
 } from "lucide-react"
@@ -176,6 +176,49 @@ function parseBlocksFromHtml(html: string): EmailBlock[] | null {
   }
 }
 
+// ─── Tree helpers (support children inside sections/columns) ─────────────────
+
+function updateBlockInTree(blocks: EmailBlock[], id: string, patch: Partial<EmailBlock>): EmailBlock[] {
+  return blocks.map(b => {
+    if (b.id === id) return { ...b, ...patch }
+    if (b.columnBlocks) {
+      return {
+        ...b,
+        columnBlocks: b.columnBlocks.map(col =>
+          col.map(child => child.id === id ? { ...child, ...patch } : child)
+        ),
+      }
+    }
+    return b
+  })
+}
+
+function deleteBlockInTree(blocks: EmailBlock[], id: string): EmailBlock[] {
+  return blocks
+    .filter(b => b.id !== id)
+    .map(b => {
+      if (!b.columnBlocks) return b
+      return {
+        ...b,
+        columnBlocks: b.columnBlocks.map(col => col.filter(child => child.id !== id)),
+      }
+    })
+}
+
+function findBlockInTree(id: string, blocks: EmailBlock[]): EmailBlock | null {
+  for (const b of blocks) {
+    if (b.id === id) return b
+    if (b.columnBlocks) {
+      for (const col of b.columnBlocks) {
+        for (const child of col) {
+          if (child.id === id) return child
+        }
+      }
+    }
+  }
+  return null
+}
+
 // ─── Sidebar Panel ───────────────────────────────────────────────────────────
 
 const CONTENT_BLOCKS: { type: BlockType; label: string; icon: React.ReactNode }[] = [
@@ -310,54 +353,157 @@ interface CanvasBlockProps {
   isSelected: boolean
   isFirst: boolean
   isLast: boolean
+  selectedId: string | null
   onSelect: () => void
   onMoveUp: () => void
   onMoveDown: () => void
   onDelete: () => void
+  onSelectChild: (id: string) => void
+  onInsertContent: (parentId: string, colIndex: number) => void
+  onDeleteChild: (id: string) => void
+  onMoveChild: (parentId: string, colIndex: number, childIdx: number, dir: -1 | 1) => void
 }
 
-function CanvasBlock({ block, isSelected, isFirst, isLast, onSelect, onMoveUp, onMoveDown, onDelete }: CanvasBlockProps) {
+const CTRL_BTN = "p-1 rounded text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
+const CTRL_DEL = "p-1 rounded text-zinc-400 hover:text-red-600 hover:bg-red-50 transition-colors"
+
+function CanvasBlock({
+  block, isSelected, isFirst, isLast, selectedId,
+  onSelect, onMoveUp, onMoveDown, onDelete,
+  onSelectChild, onInsertContent, onDeleteChild, onMoveChild,
+}: CanvasBlockProps) {
+  const isLayout = block.type === "section" || block.type.startsWith("columns_")
+  const n = block.numColumns || 1
+  const py = block.paddingY ?? 16
+  const px = block.paddingX ?? 32
+  const bg = block.backgroundColor || "#ffffff"
+
   return (
     <div
       className={`relative group cursor-pointer transition-all ${isSelected ? "ring-2 ring-inset ring-[#003434]" : "hover:ring-1 hover:ring-inset hover:ring-[#003434]/40"}`}
       onClick={onSelect}
     >
-      {/* Hover controls */}
+      {/* Top-level block controls */}
       <div className="absolute top-1 right-1 z-20 hidden group-hover:flex gap-1 bg-white rounded-lg shadow-md border border-zinc-200 p-0.5">
-        <button
-          onClick={e => { e.stopPropagation(); onMoveUp() }}
-          disabled={isFirst}
-          className="p-1 rounded text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-          title="Move up"
-        >
+        <button onClick={e => { e.stopPropagation(); onMoveUp() }} disabled={isFirst} className={CTRL_BTN} title="Move up">
           <ChevronUp className="w-3.5 h-3.5" />
         </button>
-        <button
-          onClick={e => { e.stopPropagation(); onMoveDown() }}
-          disabled={isLast}
-          className="p-1 rounded text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
-          title="Move down"
-        >
+        <button onClick={e => { e.stopPropagation(); onMoveDown() }} disabled={isLast} className={CTRL_BTN} title="Move down">
           <ChevronDown className="w-3.5 h-3.5" />
         </button>
         <div className="w-px bg-zinc-200 mx-0.5" />
-        <button
-          onClick={e => { e.stopPropagation(); onDelete() }}
-          className="p-1 rounded text-zinc-400 hover:text-red-600 hover:bg-red-50 transition-colors"
-          title="Delete"
-        >
+        <button onClick={e => { e.stopPropagation(); onDelete() }} className={CTRL_DEL} title="Delete">
           <Trash2 className="w-3.5 h-3.5" />
         </button>
       </div>
 
-      {/* Block type label (show when selected) */}
+      {/* Block type label */}
       {isSelected && (
         <div className="absolute top-0 left-0 z-20 bg-[#003434] text-white text-[10px] font-medium px-2 py-0.5 rounded-br-md leading-tight">
           {block.type.replace(/_/g, " ")}
         </div>
       )}
 
-      <BlockVisual block={block} />
+      {isLayout ? (
+        /* ── Interactive layout: columns with insertable children ── */
+        <div style={{ padding: `${py}px ${px}px`, background: bg, display: "flex", gap: 8 }}>
+          {Array.from({ length: n }).map((_, colIndex) => {
+            const children = block.columnBlocks?.[colIndex] || []
+            return (
+              <div
+                key={colIndex}
+                style={{ flex: 1, minWidth: 0 }}
+                className="border border-dashed border-zinc-300 rounded min-h-[60px] overflow-hidden"
+              >
+                {/* Child blocks */}
+                {children.map((child, childIdx) => (
+                  <div
+                    key={child.id}
+                    className={`relative group/child cursor-pointer transition-all ${selectedId === child.id ? "ring-2 ring-inset ring-[#003434]" : "hover:ring-1 hover:ring-inset hover:ring-[#003434]/40"}`}
+                    onClick={e => { e.stopPropagation(); onSelectChild(child.id) }}
+                  >
+                    {/* Child controls */}
+                    <div className="absolute top-1 right-1 z-30 hidden group-hover/child:flex gap-1 bg-white rounded-lg shadow border border-zinc-200 p-0.5">
+                      <button onClick={e => { e.stopPropagation(); onMoveChild(block.id, colIndex, childIdx, -1) }} disabled={childIdx === 0} className={CTRL_BTN} title="Move up">
+                        <ChevronUp className="w-3 h-3" />
+                      </button>
+                      <button onClick={e => { e.stopPropagation(); onMoveChild(block.id, colIndex, childIdx, 1) }} disabled={childIdx === children.length - 1} className={CTRL_BTN} title="Move down">
+                        <ChevronDown className="w-3 h-3" />
+                      </button>
+                      <div className="w-px bg-zinc-200 mx-0.5" />
+                      <button onClick={e => { e.stopPropagation(); onDeleteChild(child.id) }} className={CTRL_DEL} title="Delete">
+                        <Trash2 className="w-3 h-3" />
+                      </button>
+                    </div>
+                    {selectedId === child.id && (
+                      <div className="absolute top-0 left-0 z-20 bg-[#003434] text-white text-[10px] font-medium px-2 py-0.5 rounded-br-md leading-tight">
+                        {child.type}
+                      </div>
+                    )}
+                    <BlockVisual block={child} />
+                  </div>
+                ))}
+
+                {/* Add content button */}
+                <button
+                  onClick={e => { e.stopPropagation(); onInsertContent(block.id, colIndex) }}
+                  className="w-full py-2 text-[11px] text-zinc-400 hover:text-[#003434] hover:bg-[#003434]/5 flex items-center justify-center gap-1 transition-colors"
+                >
+                  <Plus className="w-3 h-3" />
+                  Add content
+                </button>
+              </div>
+            )
+          })}
+        </div>
+      ) : (
+        /* ── Regular content block ── */
+        <BlockVisual block={block} />
+      )}
+    </div>
+  )
+}
+
+// ─── Insert Content Popup ─────────────────────────────────────────────────────
+
+function InsertContentPopup({
+  onInsert,
+  onClose,
+}: {
+  onInsert: (type: BlockType) => void
+  onClose: () => void
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-[200] bg-black/30 flex items-center justify-center"
+      onClick={onClose}
+    >
+      <div
+        className="bg-white rounded-2xl shadow-2xl p-6 w-[460px]"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-5">
+          <h3 className="text-lg font-semibold text-zinc-800">Insert new content</h3>
+          <button
+            onClick={onClose}
+            className="text-zinc-400 hover:text-zinc-700 p-1 rounded-lg hover:bg-zinc-100 transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+        <div className="grid grid-cols-4 gap-3">
+          {CONTENT_BLOCKS.map(item => (
+            <button
+              key={item.type}
+              onClick={() => onInsert(item.type)}
+              className="flex flex-col items-center gap-2.5 p-4 rounded-xl border border-zinc-200 hover:border-[#003434] hover:bg-[#003434]/5 transition-colors cursor-pointer"
+            >
+              <span className="text-zinc-500">{item.icon}</span>
+              <span className="text-xs text-zinc-600 font-medium leading-none">{item.label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
     </div>
   )
 }
@@ -572,6 +718,7 @@ export default function EmailEditorModal({
 }: EmailEditorModalProps) {
   const [blocks, setBlocks] = useState<EmailBlock[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [insertTarget, setInsertTarget] = useState<{ parentId: string; colIndex: number } | null>(null)
   const [mode, setMode] = useState<"visual" | "html">("visual")
   const [htmlSource, setHtmlSource] = useState("")
   const [name, setName] = useState("")
@@ -620,12 +767,40 @@ export default function EmailEditorModal({
   }
 
   function deleteBlock(id: string) {
-    setBlocks(prev => prev.filter(b => b.id !== id))
+    setBlocks(prev => deleteBlockInTree(prev, id))
     if (selectedId === id) setSelectedId(null)
   }
 
   function updateBlock(id: string, patch: Partial<EmailBlock>) {
-    setBlocks(prev => prev.map(b => (b.id === id ? { ...b, ...patch } : b)))
+    setBlocks(prev => updateBlockInTree(prev, id, patch))
+  }
+
+  function addChildBlock(parentId: string, colIndex: number, type: BlockType) {
+    const newBlock = createBlock(type)
+    setBlocks(prev => prev.map(b => {
+      if (b.id !== parentId || !b.columnBlocks) return b
+      const cols = b.columnBlocks.map((col, ci) =>
+        ci === colIndex ? [...col, newBlock] : col
+      )
+      return { ...b, columnBlocks: cols }
+    }))
+    setSelectedId(newBlock.id)
+    setInsertTarget(null)
+  }
+
+  function moveChildInColumn(parentId: string, colIndex: number, childIdx: number, dir: -1 | 1) {
+    setBlocks(prev => prev.map(b => {
+      if (b.id !== parentId || !b.columnBlocks) return b
+      const cols = b.columnBlocks.map((col, ci) => {
+        if (ci !== colIndex) return col
+        const arr = [...col]
+        const target = childIdx + dir
+        if (target < 0 || target >= arr.length) return arr
+        ;[arr[childIdx], arr[target]] = [arr[target], arr[childIdx]]
+        return arr
+      })
+      return { ...b, columnBlocks: cols }
+    }))
   }
 
   function handleSwitchToHtml() {
@@ -694,7 +869,7 @@ export default function EmailEditorModal({
 
   if (!open) return null
 
-  const selectedBlock = blocks.find(b => b.id === selectedId)
+  const selectedBlock = selectedId ? findBlockInTree(selectedId, blocks) ?? undefined : undefined
 
   return (
     <div className="fixed inset-0 z-[100] bg-zinc-100 flex flex-col">
@@ -783,10 +958,15 @@ export default function EmailEditorModal({
                     isSelected={selectedId === block.id}
                     isFirst={idx === 0}
                     isLast={idx === blocks.length - 1}
+                    selectedId={selectedId}
                     onSelect={() => setSelectedId(block.id)}
                     onMoveUp={() => moveBlock(idx, -1)}
                     onMoveDown={() => moveBlock(idx, 1)}
                     onDelete={() => deleteBlock(block.id)}
+                    onSelectChild={id => setSelectedId(id)}
+                    onInsertContent={(pid, ci) => setInsertTarget({ parentId: pid, colIndex: ci })}
+                    onDeleteChild={id => deleteBlock(id)}
+                    onMoveChild={moveChildInColumn}
                   />
                 ))
               )}
@@ -801,6 +981,14 @@ export default function EmailEditorModal({
           </div>
         )}
       </div>
+
+      {/* Insert content popup */}
+      {insertTarget && (
+        <InsertContentPopup
+          onInsert={type => addChildBlock(insertTarget.parentId, insertTarget.colIndex, type)}
+          onClose={() => setInsertTarget(null)}
+        />
+      )}
     </div>
   )
 }
