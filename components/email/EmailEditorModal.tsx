@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
+import { useRouter } from "next/navigation"
 import {
   X, Image as ImageIcon, Type, Square, Minus, Plus,
   Columns2, LayoutTemplate, ChevronUp, ChevronDown, Trash2,
@@ -766,6 +767,7 @@ export default function EmailEditorModal({
   clientId,
   onSaved,
 }: EmailEditorModalProps) {
+  const router = useRouter()
   const [blocks, setBlocks] = useState<EmailBlock[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [insertTarget, setInsertTarget] = useState<{ parentId: string; colIndex: number } | null>(null)
@@ -1069,6 +1071,7 @@ export default function EmailEditorModal({
               onClick={() => {
                 localStorage.setItem("email_draft_template_id", savedTemplateId)
                 onClose()
+                router.push("/email/campaigns")
               }}
               className="px-5 py-2 text-sm font-semibold bg-[#003434] text-white rounded-xl hover:bg-[#004444] transition-colors"
             >
