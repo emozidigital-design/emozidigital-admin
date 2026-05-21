@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
 
   let query = supabaseAdmin
     .from("email_campaigns")
-    .select("*, email_senders(from_email, from_name), email_templates(name), email_lists(name, contact_count)")
+    .select("*, email_senders(from_email, from_name), email_templates(name, html_body), email_lists(name, contact_count)")
     .order("created_at", { ascending: false })
 
   if (clientId) query = query.eq("client_id", clientId)
@@ -36,7 +36,7 @@ export async function POST(req: NextRequest) {
   const { data, error } = await supabaseAdmin
     .from("email_campaigns")
     .insert({ client_id, sender_id, template_id, list_id, subject, scheduled_at: scheduled_at ?? null })
-    .select()
+    .select("*, email_senders(from_email, from_name), email_templates(name, html_body), email_lists(name, contact_count)")
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
