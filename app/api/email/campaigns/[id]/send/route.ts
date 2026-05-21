@@ -22,20 +22,55 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     return NextResponse.json({ error: "campaign already sent" }, { status: 409 })
   }
 
-  // Get contacts in the list
-  const { data: listContacts, error: lcErr } = await supabaseAdmin
-    .from("email_list_contacts")
-    .select("email_contacts(id, email, name, subscribed, bounced, complained)")
-    .eq("list_id", campaign.list_id)
+  type ContactRow = { id: string; email: string; name: string | null; subscribed: boolean; bounced: boolean; complained: boolean }
 
-  if (lcErr) return NextResponse.json({ error: lcErr.message }, { status: 500 })
+  let contacts: ContactRow[] = []
 
-  const contacts = listContacts
-    ?.map(r => r.email_contacts as unknown as { id: string; email: string; name: string | null; subscribed: boolean; bounced: boolean; complained: boolean })
-    .filter(c => c && c.subscribed && !c.bounced && !c.complained) ?? []
+  if (campaign.list_id) {
+    // List-based audience
+    const { data: listContacts, error: lcErr } = await supabaseAdmin
+      .from("email_list_contacts")
+      .select("email_contacts(id, email, name, subscribed, bounced, complained)")
+      .eq("list_id", campaign.list_id)
+
+    if (lcErr) return NextResponse.json({ error: lcErr.message }, { status: 500 })
+
+    contacts = listContacts
+      ?.map(r => r.email_contacts as unknown as ContactRow)
+      .filter(c => c && c.subscribed && !c.bounced && !c.complained) ?? []
+  } else if (Array.isArray(campaign.tag_ids) && campaign.tag_ids.length > 0) {
+    // Tag-based audience — find lists tagged with any of the tag_ids, then get their contacts
+    const { data: taggedLists, error: tlErr } = await supabaseAdmin
+      .from("email_list_tags")
+      .select("list_id")
+      .in("tag_id", campaign.tag_ids)
+
+    if (tlErr) return NextResponse.json({ error: tlErr.message }, { status: 500 })
+
+    const listIdSet = new Set((taggedLists ?? []).map((r: { list_id: string }) => r.list_id))
+    const listIds = Array.from(listIdSet)
+    if (listIds.length > 0) {
+      const { data: listContacts, error: lcErr } = await supabaseAdmin
+        .from("email_list_contacts")
+        .select("email_contacts(id, email, name, subscribed, bounced, complained)")
+        .in("list_id", listIds)
+
+      if (lcErr) return NextResponse.json({ error: lcErr.message }, { status: 500 })
+
+      const seen = new Set<string>()
+      contacts = (listContacts ?? [])
+        .map(r => r.email_contacts as unknown as ContactRow)
+        .filter(c => {
+          if (!c || !c.subscribed || c.bounced || c.complained) return false
+          if (seen.has(c.id)) return false
+          seen.add(c.id)
+          return true
+        })
+    }
+  }
 
   if (contacts.length === 0) {
-    return NextResponse.json({ error: "no eligible contacts in this list" }, { status: 400 })
+    return NextResponse.json({ error: "no eligible contacts for this campaign" }, { status: 400 })
   }
 
   // Mark campaign as sending

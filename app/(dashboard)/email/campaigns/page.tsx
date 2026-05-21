@@ -25,6 +25,11 @@ interface EmailList {
   contact_count: number
 }
 
+interface EmailTag {
+  id: string
+  name: string
+}
+
 interface Campaign {
   id: string
   client_id: string
@@ -33,6 +38,7 @@ interface Campaign {
   scheduled_at: string | null
   sent_at: string | null
   created_at: string
+  tag_ids: string[]
   email_senders: { from_email: string; from_name: string } | null
   email_templates: { name: string; html_body?: string } | null
   email_lists: { name: string; contact_count: number } | null
@@ -61,12 +67,14 @@ export default function CampaignsPage() {
   const [form, setForm] = useState({
     client_id: "", sender_id: "", template_id: "", list_id: "", subject: "", scheduled_at: "",
   })
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
 
   // Dropdown selects data
   const [senders, setSenders] = useState<Sender[]>([])
   const [templatesList, setTemplatesList] = useState<TemplateOption[]>([])
   const [lists, setLists] = useState<EmailList[]>([])
+  const [tags, setTags] = useState<EmailTag[]>([])
   const [loadingRelated, setLoadingRelated] = useState(false)
 
   // Actions
@@ -119,11 +127,13 @@ export default function CampaignsPage() {
       fetch(`/api/email/senders?${params}`).then(r => r.json()),
       fetch(`/api/email/templates?${params}`).then(r => r.json()),
       fetch(`/api/email/lists?${params}`).then(r => r.json()),
+      fetch(`/api/email/tags?${params}`).then(r => r.json()),
     ])
-      .then(([s, t, l]) => {
+      .then(([s, t, l, tg]) => {
         setSenders(Array.isArray(s) ? s : [])
         setTemplatesList(Array.isArray(t) ? t : [])
         setLists(Array.isArray(l) ? l : [])
+        setTags(Array.isArray(tg) ? tg : [])
       })
       .finally(() => setLoadingRelated(false))
   }, [creating, clientId])
@@ -144,20 +154,29 @@ export default function CampaignsPage() {
 
   function resetForm() {
     setForm({ client_id: clientId, sender_id: "", template_id: "", list_id: "", subject: "", scheduled_at: "" })
+    setSelectedTagIds([])
     setEditingCampaign(null)
     setCreating(false)
+  }
+
+  function toggleTag(id: string) {
+    setSelectedTagIds(prev => prev.includes(id) ? prev.filter(t => t !== id) : [...prev, id])
   }
 
   // ── Handlers ─────────────────────────────────────────────────────────────
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault()
+    if (!form.list_id && selectedTagIds.length === 0) {
+      toast.error("Select a contact list or at least one tag")
+      return
+    }
     setSaving(true)
     try {
       const res = await fetch("/api/email/campaigns", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, scheduled_at: form.scheduled_at || null }),
+        body: JSON.stringify({ ...form, tag_ids: selectedTagIds, scheduled_at: form.scheduled_at || null }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
@@ -176,12 +195,16 @@ export default function CampaignsPage() {
   const handleEdit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!editingCampaign) return
+    if (!form.list_id && selectedTagIds.length === 0) {
+      toast.error("Select a contact list or at least one tag")
+      return
+    }
     setSaving(true)
     try {
       const res = await fetch(`/api/email/campaigns/${editingCampaign.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...form, scheduled_at: form.scheduled_at || null }),
+        body: JSON.stringify({ ...form, tag_ids: selectedTagIds, scheduled_at: form.scheduled_at || null }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
@@ -207,6 +230,7 @@ export default function CampaignsPage() {
       subject: c.subject,
       scheduled_at: c.scheduled_at ? c.scheduled_at.slice(0, 16) : "",
     })
+    setSelectedTagIds(Array.isArray(c.tag_ids) ? c.tag_ids : [])
     setCreating(true)
     setOpenMenuId(null)
   }
@@ -357,12 +381,13 @@ export default function CampaignsPage() {
 
               {/* List select */}
               <div>
-                <label className="text-xs text-zinc-500 mb-1 block">Contact list</label>
+                <label className="text-xs text-zinc-500 mb-1 block">
+                  Contact list <span className="text-zinc-400">(or use tags below)</span>
+                </label>
                 <select
                   value={form.list_id}
                   onChange={e => setForm(f => ({ ...f, list_id: e.target.value }))}
                   className={INPUT_CLS}
-                  required
                 >
                   <option value="">Select list…</option>
                   {lists.map(l => (
@@ -384,6 +409,40 @@ export default function CampaignsPage() {
                   required
                 />
               </div>
+            </div>
+          )}
+
+          {/* Tag selector */}
+          {tags.length > 0 && (
+            <div>
+              <label className="text-xs text-zinc-500 mb-2 block">
+                Target tags <span className="text-zinc-400">(optional — contacts in lists with these tags)</span>
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {tags.map(tag => {
+                  const active = selectedTagIds.includes(tag.id)
+                  return (
+                    <button
+                      key={tag.id}
+                      type="button"
+                      onClick={() => toggleTag(tag.id)}
+                      className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${
+                        active
+                          ? "bg-[#003434] border-[#003434] text-white"
+                          : "bg-white border-zinc-200 text-zinc-600 hover:border-[#003434]/40 hover:text-[#003434]"
+                      }`}
+                    >
+                      {active && <span className="text-[10px] leading-none">✓</span>}
+                      {tag.name}
+                    </button>
+                  )
+                })}
+              </div>
+              {selectedTagIds.length > 0 && (
+                <p className="text-xs text-zinc-400 mt-1.5">
+                  {selectedTagIds.length} tag{selectedTagIds.length > 1 ? "s" : ""} selected
+                </p>
+              )}
             </div>
           )}
 
@@ -431,8 +490,12 @@ export default function CampaignsPage() {
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-zinc-800 truncate">{c.subject}</p>
                   <p className="text-xs text-zinc-400 mt-0.5">
-                    {c.email_senders?.from_name} · {c.email_templates?.name} · {c.email_lists?.name}{" "}
-                    {c.email_lists?.contact_count != null && `(${c.email_lists.contact_count} contacts)`}
+                    {c.email_senders?.from_name} · {c.email_templates?.name}
+                    {c.email_lists ? (
+                      <> · {c.email_lists.name}{c.email_lists.contact_count != null && ` (${c.email_lists.contact_count})`}</>
+                    ) : Array.isArray(c.tag_ids) && c.tag_ids.length > 0 ? (
+                      <> · <span className="text-[#003434]">{c.tag_ids.length} tag{c.tag_ids.length > 1 ? "s" : ""}</span></>
+                    ) : null}
                   </p>
                   {c.sent_at && (
                     <p className="text-xs text-zinc-400">
@@ -531,13 +594,21 @@ export default function CampaignsPage() {
                 </p>
               </div>
               <div>
-                <p className="text-[11px] text-zinc-400 font-semibold uppercase tracking-wider">List</p>
-                <p className="text-xs text-zinc-700 font-semibold mt-0.5">
-                  {previewCampaign.email_lists?.name ?? "—"}
-                  {previewCampaign.email_lists?.contact_count != null && (
-                    <span className="text-zinc-400 font-normal"> ({previewCampaign.email_lists.contact_count})</span>
-                  )}
-                </p>
+                <p className="text-[11px] text-zinc-400 font-semibold uppercase tracking-wider">Audience</p>
+                {previewCampaign.email_lists ? (
+                  <p className="text-xs text-zinc-700 font-semibold mt-0.5">
+                    {previewCampaign.email_lists.name}
+                    {previewCampaign.email_lists.contact_count != null && (
+                      <span className="text-zinc-400 font-normal"> ({previewCampaign.email_lists.contact_count})</span>
+                    )}
+                  </p>
+                ) : Array.isArray(previewCampaign.tag_ids) && previewCampaign.tag_ids.length > 0 ? (
+                  <p className="text-xs text-[#003434] font-semibold mt-0.5">
+                    {previewCampaign.tag_ids.length} tag{previewCampaign.tag_ids.length > 1 ? "s" : ""}
+                  </p>
+                ) : (
+                  <p className="text-xs text-zinc-400 mt-0.5">—</p>
+                )}
               </div>
             </div>
 

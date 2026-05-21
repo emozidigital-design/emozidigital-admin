@@ -11,7 +11,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (body.subject !== undefined) updates.subject = body.subject
   if (body.sender_id !== undefined) updates.sender_id = body.sender_id
   if (body.template_id !== undefined) updates.template_id = body.template_id
-  if (body.list_id !== undefined) updates.list_id = body.list_id
+  if (body.list_id !== undefined) updates.list_id = body.list_id || null
+  if (body.tag_ids !== undefined) updates.tag_ids = body.tag_ids ?? []
   if (body.scheduled_at !== undefined) updates.scheduled_at = body.scheduled_at
 
   const { data, error } = await supabaseAdmin
