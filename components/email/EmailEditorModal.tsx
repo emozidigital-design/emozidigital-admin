@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useRef } from "react"
 import {
   X, Image as ImageIcon, Type, Square, Minus, Plus,
   Columns2, LayoutTemplate, ChevronUp, ChevronDown, Trash2,
@@ -588,6 +588,56 @@ function PPPaddingFields({ b, id, updateBlock }: { b: EmailBlock; id: string; up
   )
 }
 
+function PPImageUploadField({ value, onChange }: { value: string; onChange: (url: string) => void }) {
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [uploading, setUploading] = useState(false)
+
+  async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploading(true)
+    try {
+      const fd = new FormData()
+      fd.append("file", file)
+      const res = await fetch("/api/email/upload-image", { method: "POST", body: fd })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      onChange(data.url)
+    } catch (err) {
+      alert(err instanceof Error ? err.message : "Upload failed")
+    } finally {
+      setUploading(false)
+      if (fileRef.current) fileRef.current.value = ""
+    }
+  }
+
+  return (
+    <div className="space-y-2">
+      <div className="flex gap-2">
+        <input
+          type="text"
+          value={value}
+          onChange={e => onChange(e.target.value)}
+          placeholder="https://..."
+          className="flex-1 border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#003434]/20 min-w-0"
+        />
+        <button
+          type="button"
+          onClick={() => fileRef.current?.click()}
+          disabled={uploading}
+          className="shrink-0 border border-zinc-200 rounded-lg px-3 py-2 text-xs font-medium text-zinc-600 hover:border-[#003434] hover:text-[#003434] hover:bg-[#003434]/5 disabled:opacity-50 transition-colors whitespace-nowrap"
+        >
+          {uploading ? "Uploading…" : "Upload"}
+        </button>
+      </div>
+      {value && (
+        <img src={value} alt="preview" className="w-full rounded-lg border border-zinc-100 object-cover max-h-24" />
+      )}
+      <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={handleFile} />
+    </div>
+  )
+}
+
 // ─── Properties Panel ─────────────────────────────────────────────────────────
 
 function PropertiesPanel({
@@ -642,8 +692,8 @@ function PropertiesPanel({
 
       {b.type === "image" && (
         <>
-          <PPField label="Image URL">
-            <PPTextInput value={b.src || ""} onChange={v => updateBlock(id, { src: v })} placeholder="https://..." />
+          <PPField label="Image">
+            <PPImageUploadField value={b.src || ""} onChange={v => updateBlock(id, { src: v })} />
           </PPField>
           <PPField label="Alt Text">
             <PPTextInput value={b.alt || ""} onChange={v => updateBlock(id, { alt: v })} placeholder="Image description" />
@@ -804,13 +854,16 @@ export default function EmailEditorModal({
   }
 
   function handleSwitchToHtml() {
-    setHtmlSource(blocksToHtml(blocks))
+    // Embed blocks-json comment so switching back to Visual is always lossless
+    const html = blocksToHtml(blocks) + `\n<!-- blocks-json:${JSON.stringify(blocks)} -->`
+    setHtmlSource(html)
     setMode("html")
   }
 
   function handleSwitchToVisual() {
     const parsed = parseBlocksFromHtml(htmlSource)
     if (parsed) {
+      // blocks-json comment found — seamless round-trip
       setBlocks(parsed)
       setSelectedId(null)
       setMode("visual")
