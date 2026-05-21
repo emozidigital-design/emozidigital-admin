@@ -508,6 +508,86 @@ function InsertContentPopup({
   )
 }
 
+// ─── Properties Panel helpers (module-level to prevent remount on each render) ─
+
+function PPField({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="space-y-1">
+      <label className="text-[11px] font-semibold text-zinc-500 uppercase tracking-wider">{label}</label>
+      {children}
+    </div>
+  )
+}
+
+function PPTextInput({ value, onChange, placeholder, type = "text" }: { value: string; onChange: (v: string) => void; placeholder?: string; type?: string }) {
+  return (
+    <input
+      type={type}
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      placeholder={placeholder}
+      className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#003434]/20"
+    />
+  )
+}
+
+function PPColorInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  return (
+    <div className="flex gap-2 items-center">
+      <input type="color" value={value} onChange={e => onChange(e.target.value)} className="w-9 h-9 rounded-lg border border-zinc-200 cursor-pointer p-0.5 shrink-0" />
+      <input type="text" value={value} onChange={e => onChange(e.target.value)} className="flex-1 border border-zinc-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#003434]/20" placeholder="#000000" />
+    </div>
+  )
+}
+
+function PPNumberInput({ value, onChange, min, max, unit }: { value: number; onChange: (v: number) => void; min?: number; max?: number; unit?: string }) {
+  return (
+    <div className="flex items-center gap-2">
+      <input
+        type="number"
+        value={value}
+        onChange={e => onChange(Number(e.target.value))}
+        min={min}
+        max={max}
+        className="flex-1 border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#003434]/20"
+      />
+      {unit && <span className="text-xs text-zinc-400 shrink-0">{unit}</span>}
+    </div>
+  )
+}
+
+function PPAlignButtons({ value, onChange }: { value: string; onChange: (v: "left" | "center" | "right") => void }) {
+  return (
+    <div className="flex gap-1">
+      {(["left", "center", "right"] as const).map(a => (
+        <button
+          key={a}
+          onClick={() => onChange(a)}
+          className={`flex-1 flex items-center justify-center py-1.5 rounded-lg text-xs transition-colors ${value === a ? "bg-[#003434] text-white" : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"}`}
+        >
+          {a === "left" ? <AlignLeft className="w-3.5 h-3.5" /> : a === "center" ? <AlignCenter className="w-3.5 h-3.5" /> : <AlignRight className="w-3.5 h-3.5" />}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+function PPPaddingFields({ b, id, updateBlock }: { b: EmailBlock; id: string; updateBlock: (id: string, patch: Partial<EmailBlock>) => void }) {
+  return (
+    <>
+      <PPField label="Padding Y">
+        <PPNumberInput value={b.paddingY ?? 16} onChange={v => updateBlock(id, { paddingY: v })} min={0} unit="px" />
+      </PPField>
+      <PPField label="Padding X">
+        <PPNumberInput value={b.paddingX ?? 32} onChange={v => updateBlock(id, { paddingX: v })} min={0} unit="px" />
+      </PPField>
+      <PPField label="Background">
+        <PPColorInput value={b.backgroundColor || "#ffffff"} onChange={v => updateBlock(id, { backgroundColor: v })} />
+      </PPField>
+    </>
+  )
+}
+
 // ─── Properties Panel ─────────────────────────────────────────────────────────
 
 function PropertiesPanel({
@@ -529,88 +609,8 @@ function PropertiesPanel({
     )
   }
 
-  // Narrowed reference — TS can't narrow outer param inside nested functions
   const b = block
   const id = b.id
-
-  function AlignButtons({ value, onChange }: { value: string; onChange: (v: "left" | "center" | "right") => void }) {
-    return (
-      <div className="flex gap-1">
-        {(["left", "center", "right"] as const).map(a => (
-          <button
-            key={a}
-            onClick={() => onChange(a)}
-            className={`flex-1 flex items-center justify-center py-1.5 rounded-lg text-xs transition-colors ${value === a ? "bg-[#003434] text-white" : "bg-zinc-100 text-zinc-600 hover:bg-zinc-200"}`}
-          >
-            {a === "left" ? <AlignLeft className="w-3.5 h-3.5" /> : a === "center" ? <AlignCenter className="w-3.5 h-3.5" /> : <AlignRight className="w-3.5 h-3.5" />}
-          </button>
-        ))}
-      </div>
-    )
-  }
-
-  function Field({ label, children }: { label: string; children: React.ReactNode }) {
-    return (
-      <div className="space-y-1">
-        <label className="text-[11px] font-semibold text-zinc-500 uppercase tracking-wider">{label}</label>
-        {children}
-      </div>
-    )
-  }
-
-  function TextInput({ value, onChange, placeholder, type = "text" }: { value: string; onChange: (v: string) => void; placeholder?: string; type?: string }) {
-    return (
-      <input
-        type={type}
-        value={value}
-        onChange={e => onChange(e.target.value)}
-        placeholder={placeholder}
-        className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#003434]/20"
-      />
-    )
-  }
-
-  function ColorInput({ value, onChange }: { value: string; onChange: (v: string) => void }) {
-    return (
-      <div className="flex gap-2 items-center">
-        <input type="color" value={value} onChange={e => onChange(e.target.value)} className="w-9 h-9 rounded-lg border border-zinc-200 cursor-pointer p-0.5 shrink-0" />
-        <input type="text" value={value} onChange={e => onChange(e.target.value)} className="flex-1 border border-zinc-200 rounded-lg px-3 py-2 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-[#003434]/20" placeholder="#000000" />
-      </div>
-    )
-  }
-
-  function NumberInput({ value, onChange, min, max, unit }: { value: number; onChange: (v: number) => void; min?: number; max?: number; unit?: string }) {
-    return (
-      <div className="flex items-center gap-2">
-        <input
-          type="number"
-          value={value}
-          onChange={e => onChange(Number(e.target.value))}
-          min={min}
-          max={max}
-          className="flex-1 border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#003434]/20"
-        />
-        {unit && <span className="text-xs text-zinc-400 shrink-0">{unit}</span>}
-      </div>
-    )
-  }
-
-  // Shared padding fields
-  function PaddingFields() {
-    return (
-      <>
-        <Field label="Padding Y">
-          <NumberInput value={b.paddingY ?? 16} onChange={v => updateBlock(id, { paddingY: v })} min={0} unit="px" />
-        </Field>
-        <Field label="Padding X">
-          <NumberInput value={b.paddingX ?? 32} onChange={v => updateBlock(id, { paddingX: v })} min={0} unit="px" />
-        </Field>
-        <Field label="Background">
-          <ColorInput value={b.backgroundColor || "#ffffff"} onChange={v => updateBlock(id, { backgroundColor: v })} />
-        </Field>
-      </>
-    )
-  }
 
   return (
     <div className="space-y-4">
@@ -618,7 +618,7 @@ function PropertiesPanel({
 
       {b.type === "text" && (
         <>
-          <Field label="Content (HTML)">
+          <PPField label="Content (HTML)">
             <textarea
               value={b.html || ""}
               onChange={e => updateBlock(id, { html: e.target.value })}
@@ -626,81 +626,81 @@ function PropertiesPanel({
               className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-xs font-mono focus:outline-none focus:ring-2 focus:ring-[#003434]/20 resize-y"
               placeholder="<p>Your text here…</p>"
             />
-          </Field>
-          <Field label="Font Size">
-            <NumberInput value={b.fontSize ?? 16} onChange={v => updateBlock(id, { fontSize: v })} min={8} max={72} unit="px" />
-          </Field>
-          <Field label="Color">
-            <ColorInput value={b.color || "#333333"} onChange={v => updateBlock(id, { color: v })} />
-          </Field>
-          <Field label="Alignment">
-            <AlignButtons value={b.align || "left"} onChange={v => updateBlock(id, { align: v })} />
-          </Field>
-          <PaddingFields />
+          </PPField>
+          <PPField label="Font Size">
+            <PPNumberInput value={b.fontSize ?? 16} onChange={v => updateBlock(id, { fontSize: v })} min={8} max={72} unit="px" />
+          </PPField>
+          <PPField label="Color">
+            <PPColorInput value={b.color || "#333333"} onChange={v => updateBlock(id, { color: v })} />
+          </PPField>
+          <PPField label="Alignment">
+            <PPAlignButtons value={b.align || "left"} onChange={v => updateBlock(id, { align: v })} />
+          </PPField>
+          <PPPaddingFields b={b} id={id} updateBlock={updateBlock} />
         </>
       )}
 
       {b.type === "image" && (
         <>
-          <Field label="Image URL">
-            <TextInput value={b.src || ""} onChange={v => updateBlock(id, { src: v })} placeholder="https://..." />
-          </Field>
-          <Field label="Alt Text">
-            <TextInput value={b.alt || ""} onChange={v => updateBlock(id, { alt: v })} placeholder="Image description" />
-          </Field>
-          <Field label="Width">
-            <TextInput value={b.imgWidth || "100%"} onChange={v => updateBlock(id, { imgWidth: v })} placeholder="100% or 300px" />
-          </Field>
-          <Field label="Link URL (optional)">
-            <TextInput value={b.href || ""} onChange={v => updateBlock(id, { href: v })} placeholder="https://..." />
-          </Field>
-          <Field label="Alignment">
-            <AlignButtons value={b.align || "center"} onChange={v => updateBlock(id, { align: v })} />
-          </Field>
-          <PaddingFields />
+          <PPField label="Image URL">
+            <PPTextInput value={b.src || ""} onChange={v => updateBlock(id, { src: v })} placeholder="https://..." />
+          </PPField>
+          <PPField label="Alt Text">
+            <PPTextInput value={b.alt || ""} onChange={v => updateBlock(id, { alt: v })} placeholder="Image description" />
+          </PPField>
+          <PPField label="Width">
+            <PPTextInput value={b.imgWidth || "100%"} onChange={v => updateBlock(id, { imgWidth: v })} placeholder="100% or 300px" />
+          </PPField>
+          <PPField label="Link URL (optional)">
+            <PPTextInput value={b.href || ""} onChange={v => updateBlock(id, { href: v })} placeholder="https://..." />
+          </PPField>
+          <PPField label="Alignment">
+            <PPAlignButtons value={b.align || "center"} onChange={v => updateBlock(id, { align: v })} />
+          </PPField>
+          <PPPaddingFields b={b} id={id} updateBlock={updateBlock} />
         </>
       )}
 
       {b.type === "button" && (
         <>
-          <Field label="Button Label">
-            <TextInput value={b.label || ""} onChange={v => updateBlock(id, { label: v })} placeholder="Click Here" />
-          </Field>
-          <Field label="Link URL">
-            <TextInput value={b.btnHref || ""} onChange={v => updateBlock(id, { btnHref: v })} placeholder="https://..." />
-          </Field>
-          <Field label="Background Color">
-            <ColorInput value={b.bgColor || "#003434"} onChange={v => updateBlock(id, { bgColor: v })} />
-          </Field>
-          <Field label="Text Color">
-            <ColorInput value={b.textColor || "#ffffff"} onChange={v => updateBlock(id, { textColor: v })} />
-          </Field>
-          <Field label="Border Radius">
-            <NumberInput value={b.borderRadius ?? 6} onChange={v => updateBlock(id, { borderRadius: v })} min={0} max={50} unit="px" />
-          </Field>
-          <Field label="Alignment">
-            <AlignButtons value={b.align || "center"} onChange={v => updateBlock(id, { align: v })} />
-          </Field>
-          <PaddingFields />
+          <PPField label="Button Label">
+            <PPTextInput value={b.label || ""} onChange={v => updateBlock(id, { label: v })} placeholder="Click Here" />
+          </PPField>
+          <PPField label="Link URL">
+            <PPTextInput value={b.btnHref || ""} onChange={v => updateBlock(id, { btnHref: v })} placeholder="https://..." />
+          </PPField>
+          <PPField label="Background Color">
+            <PPColorInput value={b.bgColor || "#003434"} onChange={v => updateBlock(id, { bgColor: v })} />
+          </PPField>
+          <PPField label="Text Color">
+            <PPColorInput value={b.textColor || "#ffffff"} onChange={v => updateBlock(id, { textColor: v })} />
+          </PPField>
+          <PPField label="Border Radius">
+            <PPNumberInput value={b.borderRadius ?? 6} onChange={v => updateBlock(id, { borderRadius: v })} min={0} max={50} unit="px" />
+          </PPField>
+          <PPField label="Alignment">
+            <PPAlignButtons value={b.align || "center"} onChange={v => updateBlock(id, { align: v })} />
+          </PPField>
+          <PPPaddingFields b={b} id={id} updateBlock={updateBlock} />
         </>
       )}
 
       {b.type === "divider" && (
         <>
-          <Field label="Color">
-            <ColorInput value={b.dividerColor || "#e4e4e7"} onChange={v => updateBlock(id, { dividerColor: v })} />
-          </Field>
-          <Field label="Thickness">
-            <NumberInput value={b.thickness ?? 1} onChange={v => updateBlock(id, { thickness: v })} min={1} max={10} unit="px" />
-          </Field>
-          <PaddingFields />
+          <PPField label="Color">
+            <PPColorInput value={b.dividerColor || "#e4e4e7"} onChange={v => updateBlock(id, { dividerColor: v })} />
+          </PPField>
+          <PPField label="Thickness">
+            <PPNumberInput value={b.thickness ?? 1} onChange={v => updateBlock(id, { thickness: v })} min={1} max={10} unit="px" />
+          </PPField>
+          <PPPaddingFields b={b} id={id} updateBlock={updateBlock} />
         </>
       )}
 
       {(b.type === "section" || b.type === "columns_2" || b.type === "columns_3" || b.type === "columns_4") && (
         <>
           <p className="text-xs text-zinc-400">Layout container — add blocks by clicking inside columns in the canvas.</p>
-          <PaddingFields />
+          <PPPaddingFields b={b} id={id} updateBlock={updateBlock} />
         </>
       )}
     </div>
