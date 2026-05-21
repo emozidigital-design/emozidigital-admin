@@ -771,6 +771,7 @@ export default function EmailEditorModal({
   const [insertTarget, setInsertTarget] = useState<{ parentId: string; colIndex: number } | null>(null)
   const [mode, setMode] = useState<"visual" | "html">("visual")
   const [htmlSource, setHtmlSource] = useState("")
+  const [savedTemplateId, setSavedTemplateId] = useState<string | null>(null)
   const [name, setName] = useState("")
   const [subject, setSubject] = useState("")
   const [saving, setSaving] = useState(false)
@@ -799,6 +800,7 @@ export default function EmailEditorModal({
       setMode("visual")
     }
     setSelectedId(null)
+    setSavedTemplateId(null)
   }, [open, initialTemplate])
 
   function addBlock(block: EmailBlock) {
@@ -909,10 +911,9 @@ export default function EmailEditorModal({
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
-      localStorage.setItem("email_draft_template_id", data.id)
       toast.success(initialTemplate?.id ? "Template updated" : "Template created")
+      setSavedTemplateId(data.id)
       onSaved?.(data.id)
-      onClose()
     } catch (err) {
       toast.error(err instanceof Error ? err.message : "Save error")
     } finally {
@@ -1041,6 +1042,40 @@ export default function EmailEditorModal({
           onInsert={type => addChildBlock(insertTarget.parentId, insertTarget.colIndex, type)}
           onClose={() => setInsertTarget(null)}
         />
+      )}
+
+      {/* ── Post-save action bar ── */}
+      {savedTemplateId && (
+        <div className="shrink-0 border-t border-zinc-200 bg-white px-6 py-4 flex items-center justify-between gap-4 shadow-[0_-4px_16px_rgba(0,0,0,0.06)]">
+          <div className="flex items-center gap-2.5">
+            <div className="w-7 h-7 rounded-full bg-emerald-100 flex items-center justify-center shrink-0">
+              <svg className="w-3.5 h-3.5 text-emerald-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" /></svg>
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-zinc-800">Template saved! What&apos;s next?</p>
+              <p className="text-xs text-zinc-400">Create a campaign using this template, or exit back to the templates list.</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <button
+              onClick={() => {
+                onClose()
+              }}
+              className="px-4 py-2 text-sm font-medium text-zinc-600 border border-zinc-200 rounded-xl hover:bg-zinc-50 transition-colors"
+            >
+              Exit
+            </button>
+            <button
+              onClick={() => {
+                localStorage.setItem("email_draft_template_id", savedTemplateId)
+                onClose()
+              }}
+              className="px-5 py-2 text-sm font-semibold bg-[#003434] text-white rounded-xl hover:bg-[#004444] transition-colors"
+            >
+              Create Campaign →
+            </button>
+          </div>
+        </div>
       )}
     </div>
   )

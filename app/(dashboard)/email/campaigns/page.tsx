@@ -61,6 +61,10 @@ export default function CampaignsPage() {
   const [campaigns, setCampaigns] = useState<Campaign[]>([])
   const [loading, setLoading] = useState(true)
 
+  // Filter / sort
+  const [filterStatus, setFilterStatus] = useState("all")
+  const [sortOrder, setSortOrder] = useState<"desc" | "asc">("desc")
+
   // Create / edit form
   const [creating, setCreating] = useState(false)
   const [editingCampaign, setEditingCampaign] = useState<Campaign | null>(null)
@@ -310,6 +314,16 @@ export default function CampaignsPage() {
     }
   }
 
+  // ── Derived ──────────────────────────────────────────────────────────────
+
+  const filteredCampaigns = campaigns
+    .filter(c => filterStatus === "all" || c.status === filterStatus)
+    .sort((a, b) => {
+      const ta = new Date(a.created_at).getTime()
+      const tb = new Date(b.created_at).getTime()
+      return sortOrder === "desc" ? tb - ta : ta - tb
+    })
+
   // ── Render ────────────────────────────────────────────────────────────────
 
   return (
@@ -477,14 +491,55 @@ export default function CampaignsPage() {
         </form>
       )}
 
+      {/* ── Filter / sort bar ── */}
+      {!loading && campaigns.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2 mb-4">
+          {/* Status pills */}
+          <div className="flex items-center gap-1.5 bg-white border border-zinc-200 rounded-xl p-1">
+            {(["all", "draft", "scheduled", "sent", "failed"] as const).map(s => (
+              <button
+                key={s}
+                onClick={() => setFilterStatus(s)}
+                className={`px-3 py-1 rounded-lg text-xs font-medium transition-colors capitalize ${
+                  filterStatus === s
+                    ? "bg-[#003434] text-white"
+                    : "text-zinc-500 hover:bg-zinc-100"
+                }`}
+              >
+                {s === "all" ? "All" : s}
+              </button>
+            ))}
+          </div>
+
+          {/* Sort toggle */}
+          <button
+            onClick={() => setSortOrder(o => o === "desc" ? "asc" : "desc")}
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-white border border-zinc-200 rounded-xl text-xs font-medium text-zinc-600 hover:border-zinc-300 transition-colors"
+          >
+            <svg className={`w-3.5 h-3.5 transition-transform ${sortOrder === "asc" ? "rotate-180" : ""}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
+            </svg>
+            {sortOrder === "desc" ? "Newest first" : "Oldest first"}
+          </button>
+
+          {filterStatus !== "all" && (
+            <span className="text-xs text-zinc-400">
+              {filteredCampaigns.length} result{filteredCampaigns.length !== 1 ? "s" : ""}
+            </span>
+          )}
+        </div>
+      )}
+
       {/* ── Campaign list ── */}
       {loading ? (
         <p className="text-sm text-zinc-400">Loading…</p>
       ) : campaigns.length === 0 ? (
         <p className="text-sm text-zinc-400">No campaigns yet.</p>
+      ) : filteredCampaigns.length === 0 ? (
+        <p className="text-sm text-zinc-400">No {filterStatus} campaigns found.</p>
       ) : (
         <div className="space-y-2">
-          {campaigns.map(c => (
+          {filteredCampaigns.map(c => (
             <div key={c.id} className="bg-white border border-zinc-200 rounded-xl px-4 py-3">
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
