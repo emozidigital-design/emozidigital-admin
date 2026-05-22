@@ -290,12 +290,14 @@ function SidebarFilters({ filters, allTags, onChange, savedFilters, onSave, onLo
   filters: SidebarFilters; allTags: EmailTag[]
   onChange: (f: SidebarFilters) => void
   savedFilters: SavedFilter[]
-  onSave: () => void
+  onSave: (pending: SidebarFilters) => void
   onLoadFilter: (f: SavedFilter) => void
   onDeleteFilter: (id: string) => void
   onReset: () => void
 }) {
   const [tab, setTab] = useState<"filter" | "saved">("filter")
+  // Local pending state — only pushed to parent on Apply
+  const [pending, setPending] = useState<SidebarFilters>(filters)
   type Section = "email" | "firstName" | "lastName" | "phone" | "company" | "city" | "stateProvince" | "country" | "agentId" | "userType" | "agentName" | "userName" | "language" | "tag" | "date" | "status"
   const [expanded, setExpanded] = useState<Partial<Record<Section, boolean>>>({ email: true })
   const tog = (s: Section) => setExpanded(p => ({ ...p, [s]: !p[s] }))
@@ -318,8 +320,8 @@ function SidebarFilters({ filters, allTags, onChange, savedFilters, onSave, onLo
           <input
             className="w-full border border-zinc-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#003434]/20"
             placeholder={`Search ${placeholder.toLowerCase()}…`}
-            value={filters[field] as string}
-            onChange={e => onChange({ ...filters, [field]: e.target.value })}
+            value={pending[field] as string}
+            onChange={e => setPending(p => ({ ...p, [field]: e.target.value }))}
           />
         </div>
       )}
@@ -355,8 +357,8 @@ function SidebarFilters({ filters, allTags, onChange, savedFilters, onSave, onLo
               <div className="px-4 pb-2.5 pt-1">
                 <select
                   className="w-full border border-zinc-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#003434]/20 bg-white"
-                  value={filters.country}
-                  onChange={e => onChange({ ...filters, country: e.target.value })}
+                  value={pending.country}
+                  onChange={e => setPending(p => ({ ...p, country: e.target.value }))}
                 >
                   <option value="">All countries</option>
                   {["India","United States","United Kingdom","Australia","Canada","Singapore","UAE","Germany","France","Netherlands","Other"].map(c => (
@@ -379,8 +381,8 @@ function SidebarFilters({ filters, allTags, onChange, savedFilters, onSave, onLo
               <div className="px-4 pb-2.5 pt-1">
                 <select
                   className="w-full border border-zinc-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#003434]/20 bg-white"
-                  value={filters.language}
-                  onChange={e => onChange({ ...filters, language: e.target.value })}
+                  value={pending.language}
+                  onChange={e => setPending(p => ({ ...p, language: e.target.value }))}
                 >
                   <option value="">All languages</option>
                   {["English","Hindi","Marathi","Tamil","Telugu","Kannada","Bengali","Gujarati","Other"].map(l => (
@@ -401,12 +403,12 @@ function SidebarFilters({ filters, allTags, onChange, savedFilters, onSave, onLo
                   <label key={tag.id} className="flex items-center gap-2.5 py-1 cursor-pointer">
                     <input
                       type="checkbox"
-                      checked={filters.tagIds.includes(tag.id)}
+                      checked={pending.tagIds.includes(tag.id)}
                       onChange={() => {
-                        const next = filters.tagIds.includes(tag.id)
-                          ? filters.tagIds.filter(id => id !== tag.id)
-                          : [...filters.tagIds, tag.id]
-                        onChange({ ...filters, tagIds: next })
+                        const next = pending.tagIds.includes(tag.id)
+                          ? pending.tagIds.filter(id => id !== tag.id)
+                          : [...pending.tagIds, tag.id]
+                        setPending(p => ({ ...p, tagIds: next }))
                       }}
                       className="w-3.5 h-3.5 rounded border-zinc-300 accent-[#003434] cursor-pointer"
                     />
@@ -424,11 +426,11 @@ function SidebarFilters({ filters, allTags, onChange, savedFilters, onSave, onLo
               <div className="px-4 pb-2.5 pt-1 space-y-2">
                 <div>
                   <label className="text-[10px] text-zinc-400 uppercase tracking-wide mb-1 block">From</label>
-                  <input type="date" className="w-full border border-zinc-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#003434]/20" value={filters.dateFrom} onChange={e => onChange({ ...filters, dateFrom: e.target.value })} />
+                  <input type="date" className="w-full border border-zinc-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#003434]/20" value={pending.dateFrom} onChange={e => setPending(p => ({ ...p, dateFrom: e.target.value }))} />
                 </div>
                 <div>
                   <label className="text-[10px] text-zinc-400 uppercase tracking-wide mb-1 block">To</label>
-                  <input type="date" className="w-full border border-zinc-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#003434]/20" value={filters.dateTo} onChange={e => onChange({ ...filters, dateTo: e.target.value })} />
+                  <input type="date" className="w-full border border-zinc-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#003434]/20" value={pending.dateTo} onChange={e => setPending(p => ({ ...p, dateTo: e.target.value }))} />
                 </div>
               </div>
             )}
@@ -441,7 +443,7 @@ function SidebarFilters({ filters, allTags, onChange, savedFilters, onSave, onLo
               <div className="px-4 pb-2.5 pt-1 space-y-1.5">
                 {(["all", "subscribed", "unsubscribed", "bounced", "complained"] as const).map(s => (
                   <label key={s} className="flex items-center gap-2.5 py-0.5 cursor-pointer">
-                    <input type="radio" name="sidebar-status" checked={filters.status === s} onChange={() => onChange({ ...filters, status: s })} className="w-3.5 h-3.5 border-zinc-300 accent-[#003434] cursor-pointer" />
+                    <input type="radio" name="sidebar-status" checked={pending.status === s} onChange={() => setPending(p => ({ ...p, status: s }))} className="w-3.5 h-3.5 border-zinc-300 accent-[#003434] cursor-pointer" />
                     <span className="text-xs text-zinc-700 capitalize">{s === "all" ? "All" : s}</span>
                   </label>
                 ))}
@@ -456,7 +458,7 @@ function SidebarFilters({ filters, allTags, onChange, savedFilters, onSave, onLo
           {savedFilters.length === 0 && <p className="text-xs text-zinc-400 text-center py-4">No saved filters yet</p>}
           {savedFilters.map(sf => (
             <div key={sf.id} className="flex items-center gap-2 bg-zinc-50 rounded-lg px-3 py-2 border border-zinc-100">
-              <button className="flex-1 text-left text-xs text-zinc-700 font-medium hover:text-[#003434] truncate" onClick={() => onLoadFilter(sf)}>{sf.label}</button>
+              <button className="flex-1 text-left text-xs text-zinc-700 font-medium hover:text-[#003434] truncate" onClick={() => { setPending(sf.filters); onLoadFilter(sf) }}>{sf.label}</button>
               <button onClick={() => onDeleteFilter(sf.id)} className="text-zinc-300 hover:text-red-400 transition-colors">
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
               </button>
@@ -467,12 +469,18 @@ function SidebarFilters({ filters, allTags, onChange, savedFilters, onSave, onLo
 
       {/* Footer */}
       <div className="border-t border-zinc-100 p-3 space-y-2">
-        {tab === "filter" && (
-          <button onClick={onSave} className="w-full text-sm py-2 rounded-lg border border-zinc-200 text-zinc-700 hover:bg-zinc-50 transition-colors font-medium">
+        {tab === "filter" && (<>
+          <button
+            onClick={() => onChange(pending)}
+            className="w-full text-sm py-2 rounded-lg bg-[#003434] text-white hover:bg-[#004444] transition-colors font-medium"
+          >
+            Apply filter
+          </button>
+          <button onClick={() => onSave(pending)} className="w-full text-sm py-2 rounded-lg border border-zinc-200 text-zinc-700 hover:bg-zinc-50 transition-colors font-medium">
             Save filter
           </button>
-        )}
-        <button onClick={onReset} className="w-full text-xs text-zinc-400 hover:text-zinc-600 transition-colors">Reset</button>
+        </>)}
+        <button onClick={() => { setPending(DEFAULT_FILTERS); onReset() }} className="w-full text-xs text-zinc-400 hover:text-zinc-600 transition-colors">Reset</button>
         <button
           onClick={() => toast("Soft delete not configured — contacts are permanently deleted")}
           className="w-full text-xs text-zinc-400 hover:text-zinc-600 transition-colors flex items-center justify-center gap-1.5"
@@ -561,6 +569,189 @@ function CustomFieldModal({ onClose, onSave }: { onClose: () => void; onSave: (f
           >
             {busy && <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
             {busy ? "Creating…" : "Save"}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Column mapping constants ─────────────────────────────────────────────────
+
+const CONTACT_FIELD_OPTIONS: { value: string; label: string }[] = [
+  { value: "email", label: "Email *" },
+  { value: "first_name", label: "First name" },
+  { value: "last_name", label: "Last name" },
+  { value: "phone", label: "Phone number" },
+  { value: "alternate_phone", label: "Alternate phone" },
+  { value: "company", label: "Company" },
+  { value: "street_address", label: "Street address" },
+  { value: "street_number", label: "Street number" },
+  { value: "neighborhood", label: "Neighborhood" },
+  { value: "postal_code", label: "Postal code" },
+  { value: "city", label: "City" },
+  { value: "state_province", label: "State / Province" },
+  { value: "country", label: "Country" },
+  { value: "tax_number", label: "Tax number" },
+  { value: "language", label: "Language" },
+  { value: "user_name", label: "User name" },
+  { value: "user_type", label: "User type" },
+  { value: "agent_name", label: "Agent name" },
+  { value: "agent_id", label: "Agent ID" },
+  { value: "agent_registered_date", label: "Agent registered date" },
+  { value: "agent_pancard_no", label: "Agent PAN card no." },
+  { value: "agent_gst_number", label: "Agent GST number" },
+]
+
+const FIELD_ALIASES: Record<string, string> = {
+  email: "email", emailaddress: "email",
+  firstname: "first_name", first: "first_name",
+  lastname: "last_name", last: "last_name",
+  phone: "phone", phonenumber: "phone", mobile: "phone",
+  alternatephone: "alternate_phone", altphone: "alternate_phone",
+  company: "company", organization: "company",
+  streetaddress: "street_address", address: "street_address",
+  streetnumber: "street_number",
+  neighborhood: "neighborhood",
+  postalcode: "postal_code", zip: "postal_code", zipcode: "postal_code",
+  city: "city",
+  stateprovince: "state_province", state: "state_province", province: "state_province",
+  country: "country",
+  taxnumber: "tax_number", vat: "tax_number",
+  language: "language",
+  username: "user_name",
+  usertype: "user_type",
+  agentname: "agent_name",
+  agentid: "agent_id",
+  agentregistereddate: "agent_registered_date",
+  agentpancardno: "agent_pancard_no", pancard: "agent_pancard_no",
+  agentgstnumber: "agent_gst_number", gst: "agent_gst_number",
+}
+
+function autoDetectField(h: string): string {
+  const key = h.toLowerCase().replace(/[\s_\-]/g, "")
+  return FIELD_ALIASES[key] ?? ""
+}
+
+// ─── Column mapping step ──────────────────────────────────────────────────────
+
+function ColumnMappingStep({ csvPreview, columnMap, onMapChange, csvEditMode, csvEditRows, onEditRowChange, onToggleEditMode, onPrevious, onImport, importBusy }: {
+  csvPreview: { headers: string[]; rows: string[][] }
+  columnMap: Record<number, string>
+  onMapChange: (colIdx: number, fieldKey: string) => void
+  csvEditMode: boolean
+  csvEditRows: string[][]
+  onEditRowChange: (rowIdx: number, colIdx: number, val: string) => void
+  onToggleEditMode: () => void
+  onPrevious: () => void
+  onImport: () => void
+  importBusy: boolean
+}) {
+  const usedFields = new Set(Object.values(columnMap).filter(v => v !== ""))
+
+  return (
+    <div className="w-full">
+      <p className="text-sm text-zinc-600 mb-4">
+        Below is a sample from your file. Please select the data type for each column.
+      </p>
+
+      <div className="bg-white border border-zinc-200 rounded-xl overflow-hidden mb-4">
+        <div className="overflow-x-auto max-h-[60vh]">
+          <table className="w-full text-sm border-collapse">
+            <thead className="sticky top-0 z-10 bg-white">
+              {/* Dropdown row */}
+              <tr className="border-b border-zinc-200">
+                {csvPreview.headers.map((_, colIdx) => {
+                  const selected = columnMap[colIdx] ?? ""
+                  return (
+                    <th key={colIdx} className="px-3 py-2.5 text-left font-normal min-w-[160px]">
+                      <select
+                        value={selected}
+                        onChange={e => onMapChange(colIdx, e.target.value)}
+                        className="w-full border border-zinc-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#003434]/20 bg-white"
+                      >
+                        <option value="">Select (skip)</option>
+                        {CONTACT_FIELD_OPTIONS.map(opt => (
+                          <option
+                            key={opt.value}
+                            value={opt.value}
+                            disabled={opt.value !== selected && usedFields.has(opt.value)}
+                          >
+                            {opt.label}
+                          </option>
+                        ))}
+                      </select>
+                    </th>
+                  )
+                })}
+              </tr>
+              {/* CSV header name row */}
+              <tr className="border-b border-zinc-100 bg-zinc-50/50">
+                {csvPreview.headers.map((h, colIdx) => (
+                  <th key={colIdx} className="px-3 py-2 text-left text-[11px] font-normal text-zinc-400 whitespace-nowrap">
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {(csvEditMode ? csvEditRows : csvPreview.rows).map((row, rowIdx) => (
+                <tr key={rowIdx} className={`border-b border-zinc-50 ${rowIdx % 2 === 1 ? "bg-zinc-50/40" : ""}`}>
+                  {csvPreview.headers.map((_, colIdx) => {
+                    const val = (csvEditMode ? csvEditRows : csvPreview.rows)[rowIdx]?.[colIdx] ?? ""
+                    return (
+                      <td key={colIdx} className="px-3 py-2.5 text-xs text-zinc-700 min-w-[160px]">
+                        {csvEditMode ? (
+                          <input
+                            value={val}
+                            onChange={e => onEditRowChange(rowIdx, colIdx, e.target.value)}
+                            className="w-full border border-zinc-200 rounded px-2 py-1 text-xs focus:outline-none focus:ring-1 focus:ring-[#003434]/20"
+                          />
+                        ) : (
+                          <span className="block truncate max-w-[200px]">{val || <span className="text-zinc-300">—</span>}</span>
+                        )}
+                      </td>
+                    )
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between">
+        <button
+          type="button"
+          onClick={onToggleEditMode}
+          className={`inline-flex items-center gap-1.5 text-sm px-4 py-2 rounded-lg border transition-colors ${
+            csvEditMode ? "border-[#003434] text-[#003434] bg-[#003434]/5" : "border-zinc-200 text-zinc-600 hover:bg-zinc-50"
+          }`}
+        >
+          <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
+          {csvEditMode ? "Done editing" : "Edit"}
+        </button>
+        <div className="flex items-center gap-2">
+          <button type="button" onClick={onPrevious} className="text-sm px-4 py-2 rounded-lg border border-zinc-200 text-zinc-600 hover:bg-zinc-50 transition-colors">
+            Previous
+          </button>
+          <button
+            type="button"
+            onClick={onImport}
+            disabled={importBusy}
+            className="inline-flex items-center gap-2 bg-[#003434] text-white text-sm px-5 py-2 rounded-lg hover:bg-[#004444] disabled:opacity-40 transition-colors"
+          >
+            {importBusy ? (
+              <>
+                <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                Importing…
+              </>
+            ) : (
+              <>
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+                Import
+              </>
+            )}
           </button>
         </div>
       </div>
@@ -689,6 +880,13 @@ export default function ContactsPage() {
   const [importBusy, setImportBusy] = useState(false)
   const fileRef = useRef<HTMLInputElement>(null)
 
+  // ── Column mapping state ──
+  const [importStep, setImportStep] = useState<"upload" | "map">("upload")
+  const [csvPreview, setCsvPreview] = useState<{ headers: string[]; rows: string[][] } | null>(null)
+  const [columnMap, setColumnMap] = useState<Record<number, string>>({})
+  const [csvEditMode, setCsvEditMode] = useState(false)
+  const [csvEditRows, setCsvEditRows] = useState<string[][]>([])
+
   // ── Load saved filters from localStorage ──
   useEffect(() => {
     try {
@@ -771,10 +969,10 @@ export default function ContactsPage() {
   const toggleAll = () => { if (allSelected) setSelected(new Set()); else setSelected(new Set(paginatedContacts.map(c => c.id))) }
 
   // ── Saved filter management ──
-  const handleSaveFilter = () => {
+  const handleSaveFilter = (pending: SidebarFilters) => {
     const label = prompt("Name this filter:")
     if (!label?.trim()) return
-    const newFilter: SavedFilter = { id: Date.now().toString(), label: label.trim(), filters: { ...sidebarFilters } }
+    const newFilter: SavedFilter = { id: Date.now().toString(), label: label.trim(), filters: { ...pending } }
     const next = [...savedFilters, newFilter]
     setSavedFilters(next)
     localStorage.setItem("emozi-contact-filters", JSON.stringify(next))
@@ -968,15 +1166,35 @@ export default function ContactsPage() {
     finally { setCreateBusy(false) }
   }
 
-  // ── Import handler ──
+  // ── Import handler (upload step → parse CSV + advance to map step) ──
   const handleImport = async () => {
-    if (!importFile || !clientId) { toast.error("Select a CSV file"); return }
+    if (!importFile) { toast.error("Select a CSV file"); return }
+    const text = await importFile.text()
+    const lines = text.split("\n").map(l => l.trim()).filter(Boolean)
+    if (lines.length < 2) { toast.error("CSV must have a header row + at least one data row"); return }
+    const headers = lines[0].split(importDelimiter).map(h => h.replace(/^"|"$/g, "").trim())
+    const dataRows = lines.slice(1, 5).map(l => l.split(importDelimiter).map(c => c.replace(/^"|"$/g, "").trim()))
+    const auto: Record<number, string> = {}
+    headers.forEach((h, i) => { const k = autoDetectField(h); if (k) auto[i] = k })
+    setCsvPreview({ headers, rows: dataRows })
+    setCsvEditRows(dataRows)
+    setColumnMap(auto)
+    setCsvEditMode(false)
+    setImportStep("map")
+  }
+
+  // ── Mapped import handler (map step → actual API call) ──
+  const handleMappedImport = async () => {
+    if (!importFile || !clientId) return
+    const hasEmail = Object.values(columnMap).includes("email")
+    if (!hasEmail) { toast.error("Please map a column to Email before importing"); return }
     setImportBusy(true)
     try {
       const fd = new FormData()
       fd.append("client_id", clientId)
       fd.append("file", importFile)
       fd.append("delimiter", importDelimiter)
+      fd.append("column_map", JSON.stringify(columnMap))
       importTagIds.forEach(id => fd.append("tag_id", id))
       const res = await fetch("/api/email/contacts/import", { method: "POST", body: fd })
       const data = await res.json()
@@ -985,8 +1203,13 @@ export default function ContactsPage() {
       setImportFile(null)
       if (fileRef.current) fileRef.current.value = ""
       setImportTagIds([])
+      setImportStep("upload")
+      setCsvPreview(null)
+      setColumnMap({})
+      setCsvEditMode(false)
       loadImportLogs()
       load()
+      setView("list")
     } catch (err: unknown) { toast.error(err instanceof Error ? err.message : "Import error") }
     finally { setImportBusy(false) }
   }
@@ -1179,13 +1402,39 @@ export default function ContactsPage() {
       ? allTags.filter(t => t.name.toLowerCase().includes(importTagSearch.toLowerCase()))
       : allTags
 
+    const resetImportState = () => {
+      setImportStep("upload")
+      setCsvPreview(null)
+      setColumnMap({})
+      setCsvEditMode(false)
+    }
+
     return (
       <div className="w-full">
         {/* Back button */}
-        <button onClick={() => setView("list")} className="inline-flex items-center gap-1.5 text-sm text-zinc-500 hover:text-zinc-800 mb-5 transition-colors">
+        <button onClick={() => { resetImportState(); setView("list") }} className="inline-flex items-center gap-1.5 text-sm text-zinc-500 hover:text-zinc-800 mb-5 transition-colors">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
           Back to Contacts
         </button>
+
+        {/* Column mapping step */}
+        {importStep === "map" && csvPreview && (
+          <ColumnMappingStep
+            csvPreview={csvPreview}
+            columnMap={columnMap}
+            onMapChange={(colIdx, fieldKey) => setColumnMap(prev => ({ ...prev, [colIdx]: fieldKey }))}
+            csvEditMode={csvEditMode}
+            csvEditRows={csvEditRows}
+            onEditRowChange={(rowIdx, colIdx, val) => setCsvEditRows(prev => prev.map((r, ri) => ri === rowIdx ? r.map((c, ci) => ci === colIdx ? val : c) : r))}
+            onToggleEditMode={() => setCsvEditMode(v => !v)}
+            onPrevious={() => setImportStep("upload")}
+            onImport={handleMappedImport}
+            importBusy={importBusy}
+          />
+        )}
+
+        {/* Upload step */}
+        {importStep === "upload" && (<>
 
         <div className="grid lg:grid-cols-5 gap-5 mb-6">
           {/* Warnings panel */}
@@ -1213,7 +1462,7 @@ export default function ContactsPage() {
                           i === 0 ? "rounded-l-lg" : i === 2 ? "rounded-r-lg" : ""
                         } ${
                           active
-                            ? "bg-[#003434] text-white border-[#003434] z-10"
+                            ? "bg-[#003434] text-white border-[#003434]"
                             : "bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50"
                         }`}
                       >
@@ -1358,6 +1607,7 @@ export default function ContactsPage() {
             </table>
           )}
         </div>
+        </>)}
       </div>
     )
   }
