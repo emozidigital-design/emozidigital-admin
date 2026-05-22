@@ -917,7 +917,7 @@ export default function ContactsPage() {
 
   if (view === "create") {
     return (
-      <div className="max-w-2xl">
+      <div className="w-full">
         {dialog && <ConfirmDialog {...dialog} onCancel={() => setDialog(null)} />}
         {showCustomFieldModal && (
           <CustomFieldModal
@@ -1094,7 +1094,7 @@ export default function ContactsPage() {
       : allTags
 
     return (
-      <div className="max-w-4xl">
+      <div className="w-full">
         {/* Back button */}
         <button onClick={() => setView("list")} className="inline-flex items-center gap-1.5 text-sm text-zinc-500 hover:text-zinc-800 mb-5 transition-colors">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>

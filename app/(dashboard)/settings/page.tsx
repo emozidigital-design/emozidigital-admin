@@ -47,7 +47,7 @@ export default function SettingsPage() {
   const CURRENCIES = ["INR", "USD", "AED", "GBP", "EUR"]
 
   return (
-    <div className="space-y-6 pb-20 lg:pb-4 max-w-2xl">
+    <div className="space-y-6 pb-20 lg:pb-4 w-full">
       {/* Header */}
       <div>
         <h1 className="text-zinc-900 text-xl font-bold tracking-tight">Settings</h1>

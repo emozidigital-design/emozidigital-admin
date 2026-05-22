@@ -93,7 +93,7 @@ export default function TemplatesPage() {
   }
 
   return (
-    <div className="max-w-4xl">
+    <div className="w-full">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-xl font-semibold text-zinc-900">Templates</h1>

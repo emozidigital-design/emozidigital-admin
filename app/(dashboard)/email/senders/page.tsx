@@ -76,7 +76,7 @@ export default function SendersPage() {
   }
 
   return (
-    <div className="max-w-3xl">
+    <div className="w-full">
       <div className="mb-6">
         <h1 className="text-xl font-semibold text-zinc-900">Senders</h1>
         <p className="text-sm text-zinc-500 mt-1">Verify sending domains via AWS SES DKIM</p>

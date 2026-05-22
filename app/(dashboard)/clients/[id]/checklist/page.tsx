@@ -293,7 +293,7 @@ export default function ChecklistPage({ params }: { params: { id: string } }) {
         }
       `}</style>
 
-      <div className="space-y-5 pb-20 lg:pb-4 max-w-4xl print-page">
+      <div className="space-y-5 pb-20 lg:pb-4 w-full print-page">
         {/* Breadcrumb */}
         <nav className="flex items-center gap-1.5 text-sm text-zinc-500 print:hidden flex-wrap">
           <Link href="/dashboard" className="hover:text-white transition-colors">Dashboard</Link>

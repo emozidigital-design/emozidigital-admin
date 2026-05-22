@@ -50,7 +50,7 @@ export default function AnalyticsPage() {
   const pct = (n: number, total: number) => total ? `${((n / total) * 100).toFixed(1)}%` : "—"
 
   return (
-    <div className="max-w-4xl">
+    <div className="w-full">
       <div className="mb-6">
         <h1 className="text-xl font-semibold text-zinc-900">Analytics</h1>
         <p className="text-sm text-zinc-500 mt-1">Opens, clicks, bounces per sent campaign</p>

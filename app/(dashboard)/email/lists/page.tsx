@@ -384,7 +384,7 @@ export default function ListsPage() {
   }
 
   return (
-    <div className="max-w-3xl">
+    <div className="w-full">
       {dialog && <ConfirmDialog {...dialog} onCancel={() => setDialog(null)} />}
       <div className="mb-6">
         <h1 className="text-xl font-semibold text-zinc-900">Lists</h1>

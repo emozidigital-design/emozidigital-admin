@@ -30,7 +30,7 @@ export default function TransactionalPage() {
   }, [])
 
   return (
-    <div className="max-w-4xl">
+    <div className="w-full">
       <div className="mb-6">
         <h1 className="text-xl font-semibold text-zinc-900">Transactional</h1>
         <p className="text-sm text-zinc-500 mt-1">SNS event log — bounces, complaints, deliveries, opens, clicks</p>

@@ -115,25 +115,25 @@ export default function Sidebar() {
     href === "/dashboard" ? pathname === "/dashboard" : pathname.startsWith(href)
 
   // Avoid layout shift before localStorage is read
-  if (!mounted) return <aside className="hidden lg:flex flex-col w-56 bg-white border-r border-zinc-200 shrink-0" />
+  if (!mounted) return <aside className="hidden lg:flex flex-col w-56 bg-zinc-950 border-r border-zinc-800 shrink-0" />
 
   return (
     <>
       {/* Desktop sidebar */}
       <aside
-        className={`hidden lg:flex flex-col bg-white border-r border-zinc-200 shrink-0 transition-all duration-300 ease-in-out ${collapsed ? "w-14" : "w-56"}`}
+        className={`hidden lg:flex flex-col bg-zinc-950 border-r border-zinc-800 shrink-0 transition-all duration-300 ease-in-out ${collapsed ? "w-14" : "w-56"}`}
       >
         {/* Brand + toggle */}
-        <div className="h-14 flex items-center border-b border-zinc-200 px-3 gap-2 overflow-hidden">
+        <div className="h-14 flex items-center border-b border-zinc-800 px-3 gap-2 overflow-hidden">
           <Link href="/dashboard" className="flex items-center gap-2.5 min-w-0">
             <img src="/Emozi.png" alt="Emozi Logo" className="w-8 h-8 object-contain shrink-0" />
             {!collapsed && (
-              <span className="text-[#003434] font-semibold text-sm tracking-tight truncate">Emozi Admin</span>
+              <span className="text-white font-semibold text-sm tracking-tight truncate">Emozi Admin</span>
             )}
           </Link>
           <button
             onClick={toggle}
-            className="ml-auto shrink-0 w-6 h-6 flex items-center justify-center rounded-md text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 transition-colors"
+            className="ml-auto shrink-0 w-6 h-6 flex items-center justify-center rounded-md text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
             aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
           >
             {collapsed ? (
@@ -151,7 +151,7 @@ export default function Sidebar() {
         {/* Nav */}
         <nav className="flex-1 p-2 space-y-0.5 overflow-hidden">
           {!collapsed && (
-            <p className="text-zinc-500 text-[9px] font-bold uppercase tracking-[0.15em] px-2 mb-2 mt-1">
+            <p className="text-zinc-400 text-[9px] font-bold uppercase tracking-[0.15em] px-2 mb-2 mt-1">
               Navigation
             </p>
           )}
@@ -165,8 +165,8 @@ export default function Sidebar() {
                     collapsed ? "justify-center" : ""
                   } ${
                     active
-                      ? "bg-[#003434] text-white border border-[#003434] shadow-sm shadow-[#003434]/20"
-                      : "text-zinc-700 hover:text-zinc-900 hover:bg-zinc-100 border border-transparent"
+                      ? "bg-zinc-800 text-white border border-zinc-700 shadow-sm shadow-black/40"
+                      : "text-zinc-300 hover:text-white hover:bg-zinc-900/60 border border-transparent"
                   }`}
                 >
                   <span className={active ? "text-emerald-400" : ""}>{item.icon}</span>
@@ -188,19 +188,19 @@ export default function Sidebar() {
         </nav>
 
         {/* Footer */}
-        <div className={`p-3 border-t border-zinc-100 ${collapsed ? "flex justify-center" : ""}`}>
+        <div className={`p-3 border-t border-zinc-800 ${collapsed ? "flex justify-center" : ""}`}>
           {collapsed ? (
-            <div className="w-6 h-6 rounded-full bg-zinc-100 flex items-center justify-center">
-              <span className="text-[9px] font-bold text-zinc-400">E</span>
+            <div className="w-6 h-6 rounded-full bg-zinc-900 flex items-center justify-center">
+              <span className="text-[9px] font-bold text-zinc-500">E</span>
             </div>
           ) : (
-            <p className="text-zinc-400 text-[10px] text-center font-mono">© 2025 Emozi Digital</p>
+            <p className="text-zinc-500 text-[10px] text-center font-mono">© 2025 Emozi Digital</p>
           )}
         </div>
       </aside>
 
       {/* Mobile bottom nav */}
-      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-20 bg-white border-t border-zinc-200 flex">
+      <div className="lg:hidden fixed bottom-0 left-0 right-0 z-20 bg-zinc-950 border-t border-zinc-800 flex">
         {MOBILE_NAV.map((item) => {
           const active = isActive(item.href)
           return (
@@ -208,10 +208,10 @@ export default function Sidebar() {
               key={item.href}
               href={item.href}
               className={`flex-1 flex flex-col items-center gap-1 py-3 text-[10px] font-medium transition-colors ${
-                active ? "text-[#003434]" : "text-zinc-400"
+                active ? "text-white" : "text-zinc-400"
               }`}
             >
-              <span className={active ? "text-[#70BF4B]" : ""}>{item.icon}</span>
+              <span className={active ? "text-emerald-400" : ""}>{item.icon}</span>
               {item.label}
             </Link>
           )

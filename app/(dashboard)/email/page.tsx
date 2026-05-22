@@ -16,7 +16,7 @@ const SECTIONS = [
 
 export default function EmailPage() {
   return (
-    <div className="max-w-4xl">
+    <div className="w-full">
       <div className="mb-8">
         <h1 className="text-xl font-semibold text-zinc-900">Email</h1>
         <p className="text-sm text-zinc-500 mt-1">Manage campaigns, contacts, and transactional sends via AWS SES</p>

@@ -541,7 +541,7 @@ export default function NewsletterPage() {
 
   if (view === "dashboard") {
     return (
-      <div className="max-w-5xl">
+      <div className="w-full">
         {/* Header */}
         <div className="flex items-center justify-between mb-7">
           <div>
@@ -816,7 +816,7 @@ export default function NewsletterPage() {
   // ── Wizard view ─────────────────────────────────────────────────────────────
 
   return (
-    <div className="max-w-4xl">
+    <div className="w-full">
       {/* Back link + header */}
       <div className="flex items-center gap-3 mb-6">
         <button

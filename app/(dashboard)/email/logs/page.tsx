@@ -85,7 +85,7 @@ export default function NewsletterLogsPage() {
   ]
 
   return (
-    <div className="max-w-5xl">
+    <div className="w-full">
       {/* Header */}
       <div className="mb-6">
         <h1 className="text-xl font-semibold text-zinc-900">Logs</h1>

@@ -2246,7 +2246,7 @@ export default function ClientDetailPage({ params }: { params: { id: string } })
   }
 
   return (
-    <div className="space-y-5 pb-20 lg:pb-4 max-w-6xl mx-auto">
+    <div className="space-y-5 pb-20 lg:pb-4 w-full">
       {/* Header Utilities */}
       <div className="flex items-center justify-between">
         <Link href="/clients" className="inline-flex items-center gap-1.5 text-zinc-500 hover:text-[#003434] text-sm transition-colors">
