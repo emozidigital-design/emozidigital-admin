@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
     .from("email_contacts")
     .select("*, email_contact_tags(tag_id, email_tags(id, name))")
     .order("created_at", { ascending: false })
-    .limit(500)
+    .limit(2000)
 
   if (clientId) query = query.eq("client_id", clientId)
   if (search) query = query.ilike("email", `%${search}%`)

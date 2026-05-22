@@ -851,7 +851,7 @@ export default function ContactsPage() {
   const [sidebarFilters, setSidebarFilters] = useState<SidebarFilters>(DEFAULT_FILTERS)
   const [savedFilters, setSavedFilters] = useState<SavedFilter[]>([])
   const [page, setPage] = useState(1)
-  const [pageSize, setPageSize] = useState<10 | 25 | 50>(10)
+  const [pageSize, setPageSize] = useState<50 | 100 | 200>(50)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [bulkTagOpen, setBulkTagOpen] = useState(false)
   const [bulkBusy, setBulkBusy] = useState(false)
@@ -1798,7 +1798,7 @@ export default function ContactsPage() {
             <div className="flex items-center justify-between mt-3 px-1">
               <div className="flex items-center gap-1">
                 <span className="text-xs text-zinc-400 mr-2">Rows per page:</span>
-                {([10, 25, 50] as const).map(n => (
+                {([50, 100, 200] as const).map(n => (
                   <button key={n} onClick={() => { setPageSize(n); setPage(1) }}
                     className={`w-8 h-8 text-xs rounded-lg transition-colors ${pageSize === n ? "bg-[#003434] text-white" : "text-zinc-500 hover:bg-zinc-100"}`}>
                     {n}
