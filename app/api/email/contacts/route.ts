@@ -10,11 +10,22 @@ export async function GET(req: NextRequest) {
   const clientId = searchParams.get("client_id")
   const search = searchParams.get("search")
 
+  // Get total count first so we can fetch all rows without a hardcoded cap
+  let countQuery = supabaseAdmin
+    .from("email_contacts")
+    .select("*", { count: "exact", head: true })
+
+  if (clientId) countQuery = countQuery.eq("client_id", clientId)
+  if (search) countQuery = countQuery.ilike("email", `%${search}%`)
+
+  const { count, error: countError } = await countQuery
+  if (countError) return NextResponse.json({ error: countError.message }, { status: 500 })
+
   let query = supabaseAdmin
     .from("email_contacts")
     .select("*, email_contact_tags(tag_id, email_tags(id, name))")
     .order("created_at", { ascending: false })
-    .limit(2000)
+    .limit(count ?? 10000)
 
   if (clientId) query = query.eq("client_id", clientId)
   if (search) query = query.ilike("email", `%${search}%`)
