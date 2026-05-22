@@ -38,10 +38,27 @@ interface SidebarFilters {
   dateFrom: string
   dateTo: string
   status: "all" | "subscribed" | "unsubscribed" | "bounced" | "complained"
+  firstName: string
+  lastName: string
+  phone: string
+  company: string
+  city: string
+  stateProvince: string
+  country: string
+  agentId: string
+  userType: string
+  agentName: string
+  userName: string
+  language: string
 }
 interface SavedFilter { id: string; label: string; filters: SidebarFilters }
 
-const DEFAULT_FILTERS: SidebarFilters = { emailSearch: "", tagIds: [], dateFrom: "", dateTo: "", status: "all" }
+const DEFAULT_FILTERS: SidebarFilters = {
+  emailSearch: "", tagIds: [], dateFrom: "", dateTo: "", status: "all",
+  firstName: "", lastName: "", phone: "", company: "", city: "",
+  stateProvince: "", country: "", agentId: "", userType: "",
+  agentName: "", userName: "", language: "",
+}
 
 // ─── Reusable hooks ────────────────────────────────────────────────────────────
 
@@ -279,17 +296,34 @@ function SidebarFilters({ filters, allTags, onChange, savedFilters, onSave, onLo
   onReset: () => void
 }) {
   const [tab, setTab] = useState<"filter" | "saved">("filter")
-  const [expandedSections, setExpandedSections] = useState({ email: true, tag: false, date: false, status: false })
-  const toggle = (s: keyof typeof expandedSections) => setExpandedSections(p => ({ ...p, [s]: !p[s] }))
+  type Section = "email" | "firstName" | "lastName" | "phone" | "company" | "city" | "stateProvince" | "country" | "agentId" | "userType" | "agentName" | "userName" | "language" | "tag" | "date" | "status"
+  const [expanded, setExpanded] = useState<Partial<Record<Section, boolean>>>({ email: true })
+  const tog = (s: Section) => setExpanded(p => ({ ...p, [s]: !p[s] }))
 
-  const SectionHeader = ({ label, section }: { label: string; section: keyof typeof expandedSections }) => (
+  const Hdr = ({ label, section }: { label: string; section: Section }) => (
     <button
-      className={`w-full flex items-center justify-between px-4 py-3 text-sm text-zinc-700 hover:bg-zinc-50 transition-colors ${expandedSections[section] ? "border-l-2 border-[#003434] bg-[#003434]/5" : ""}`}
-      onClick={() => toggle(section)}
+      className={`w-full flex items-center justify-between px-4 py-2.5 text-sm text-zinc-700 hover:bg-zinc-50 transition-colors ${expanded[section] ? "border-l-2 border-[#003434] bg-[#003434]/5" : ""}`}
+      onClick={() => tog(section)}
     >
       <span className="font-medium text-sm">{label}</span>
-      <svg className={`w-3.5 h-3.5 text-zinc-400 transition-transform ${expandedSections[section] ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+      <svg className={`w-3.5 h-3.5 text-zinc-400 transition-transform ${expanded[section] ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
     </button>
+  )
+
+  const TextFilter = ({ section, placeholder, field }: { section: Section; placeholder: string; field: keyof SidebarFilters }) => (
+    <div>
+      <Hdr label={placeholder} section={section} />
+      {expanded[section] && (
+        <div className="px-4 pb-2.5 pt-1">
+          <input
+            className="w-full border border-zinc-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#003434]/20"
+            placeholder={`Search ${placeholder.toLowerCase()}…`}
+            value={filters[field] as string}
+            onChange={e => onChange({ ...filters, [field]: e.target.value })}
+          />
+        </div>
+      )}
+    </div>
   )
 
   return (
@@ -305,27 +339,63 @@ function SidebarFilters({ filters, allTags, onChange, savedFilters, onSave, onLo
       </div>
 
       {tab === "filter" && (
-        <div className="flex-1 divide-y divide-zinc-100">
-          {/* Email */}
+        <div className="flex-1 divide-y divide-zinc-100 max-h-[70vh] overflow-y-auto">
+          <TextFilter section="email" placeholder="Email" field="emailSearch" />
+          <TextFilter section="firstName" placeholder="First name" field="firstName" />
+          <TextFilter section="lastName" placeholder="Last name" field="lastName" />
+          <TextFilter section="phone" placeholder="Phone number" field="phone" />
+          <TextFilter section="company" placeholder="Company name" field="company" />
+          <TextFilter section="city" placeholder="City" field="city" />
+          <TextFilter section="stateProvince" placeholder="State / Province" field="stateProvince" />
+
+          {/* Country */}
           <div>
-            <SectionHeader label="Email" section="email" />
-            {expandedSections.email && (
-              <div className="px-4 pb-3 pt-1">
-                <input
-                  className="w-full border border-zinc-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#003434]/20"
-                  placeholder="Search email…"
-                  value={filters.emailSearch}
-                  onChange={e => onChange({ ...filters, emailSearch: e.target.value })}
-                />
+            <Hdr label="Country" section="country" />
+            {expanded.country && (
+              <div className="px-4 pb-2.5 pt-1">
+                <select
+                  className="w-full border border-zinc-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#003434]/20 bg-white"
+                  value={filters.country}
+                  onChange={e => onChange({ ...filters, country: e.target.value })}
+                >
+                  <option value="">All countries</option>
+                  {["India","United States","United Kingdom","Australia","Canada","Singapore","UAE","Germany","France","Netherlands","Other"].map(c => (
+                    <option key={c} value={c}>{c}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+          </div>
+
+          <TextFilter section="agentId" placeholder="Agent Id" field="agentId" />
+          <TextFilter section="userType" placeholder="User Type" field="userType" />
+          <TextFilter section="agentName" placeholder="Agent Name" field="agentName" />
+          <TextFilter section="userName" placeholder="User Name" field="userName" />
+
+          {/* Language */}
+          <div>
+            <Hdr label="Language" section="language" />
+            {expanded.language && (
+              <div className="px-4 pb-2.5 pt-1">
+                <select
+                  className="w-full border border-zinc-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#003434]/20 bg-white"
+                  value={filters.language}
+                  onChange={e => onChange({ ...filters, language: e.target.value })}
+                >
+                  <option value="">All languages</option>
+                  {["English","Hindi","Marathi","Tamil","Telugu","Kannada","Bengali","Gujarati","Other"].map(l => (
+                    <option key={l} value={l}>{l}</option>
+                  ))}
+                </select>
               </div>
             )}
           </div>
 
           {/* Tag */}
           <div>
-            <SectionHeader label="Tag" section="tag" />
-            {expandedSections.tag && (
-              <div className="px-4 pb-3 pt-1 max-h-40 overflow-y-auto space-y-1">
+            <Hdr label="Tag" section="tag" />
+            {expanded.tag && (
+              <div className="px-4 pb-2.5 pt-1 max-h-40 overflow-y-auto space-y-1">
                 {allTags.length === 0 && <p className="text-xs text-zinc-400">No tags yet</p>}
                 {allTags.map(tag => (
                   <label key={tag.id} className="flex items-center gap-2.5 py-1 cursor-pointer">
@@ -349,9 +419,9 @@ function SidebarFilters({ filters, allTags, onChange, savedFilters, onSave, onLo
 
           {/* Date added */}
           <div>
-            <SectionHeader label="Date added" section="date" />
-            {expandedSections.date && (
-              <div className="px-4 pb-3 pt-1 space-y-2">
+            <Hdr label="Date added" section="date" />
+            {expanded.date && (
+              <div className="px-4 pb-2.5 pt-1 space-y-2">
                 <div>
                   <label className="text-[10px] text-zinc-400 uppercase tracking-wide mb-1 block">From</label>
                   <input type="date" className="w-full border border-zinc-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#003434]/20" value={filters.dateFrom} onChange={e => onChange({ ...filters, dateFrom: e.target.value })} />
@@ -366,9 +436,9 @@ function SidebarFilters({ filters, allTags, onChange, savedFilters, onSave, onLo
 
           {/* Contact state */}
           <div>
-            <SectionHeader label="Contact state" section="status" />
-            {expandedSections.status && (
-              <div className="px-4 pb-3 pt-1 space-y-1.5">
+            <Hdr label="Contact state" section="status" />
+            {expanded.status && (
+              <div className="px-4 pb-2.5 pt-1 space-y-1.5">
                 {(["all", "subscribed", "unsubscribed", "bounced", "complained"] as const).map(s => (
                   <label key={s} className="flex items-center gap-2.5 py-0.5 cursor-pointer">
                     <input type="radio" name="sidebar-status" checked={filters.status === s} onChange={() => onChange({ ...filters, status: s })} className="w-3.5 h-3.5 border-zinc-300 accent-[#003434] cursor-pointer" />
@@ -654,7 +724,8 @@ export default function ContactsPage() {
     fetch(`/api/email/lists?client_id=${clientId}`).then(r => r.json()).then(d => setLists(Array.isArray(d) ? d : []))
   }, [clientId])
 
-  // Load import logs when switching to import view
+  // Load import logs on client change and when switching to import view
+  useEffect(() => { loadImportLogs() }, [loadImportLogs])
   useEffect(() => { if (view === "import") loadImportLogs() }, [view, loadImportLogs])
 
   // Reset page when filters change
@@ -663,15 +734,30 @@ export default function ContactsPage() {
 
   // ── Filtered + paginated contacts ──
   const filteredContacts = useMemo(() => {
+    const sf = sidebarFilters
+    const m = (val: string | null | undefined, q: string) =>
+      !q || (val ?? "").toLowerCase().includes(q.toLowerCase())
     return contacts.filter(c => {
-      if (sidebarFilters.emailSearch && !c.email.toLowerCase().includes(sidebarFilters.emailSearch.toLowerCase())) return false
-      if (sidebarFilters.tagIds.length && !sidebarFilters.tagIds.some(tid => c.tags.some(t => t.id === tid))) return false
-      if (sidebarFilters.dateFrom && new Date(c.created_at) < new Date(sidebarFilters.dateFrom)) return false
-      if (sidebarFilters.dateTo && new Date(c.created_at) > new Date(sidebarFilters.dateTo + "T23:59:59")) return false
-      if (sidebarFilters.status === "subscribed" && !c.subscribed) return false
-      if (sidebarFilters.status === "unsubscribed" && c.subscribed) return false
-      if (sidebarFilters.status === "bounced" && !c.bounced) return false
-      if (sidebarFilters.status === "complained" && !c.complained) return false
+      if (!m(c.email, sf.emailSearch)) return false
+      if (!m(c.first_name, sf.firstName)) return false
+      if (!m(c.last_name, sf.lastName)) return false
+      if (!m(c.phone, sf.phone)) return false
+      if (!m(c.company, sf.company)) return false
+      if (!m(c.city, sf.city)) return false
+      if (!m(c.state_province, sf.stateProvince)) return false
+      if (!m(c.country, sf.country)) return false
+      if (!m(c.agent_id, sf.agentId)) return false
+      if (!m(c.user_type, sf.userType)) return false
+      if (!m(c.agent_name, sf.agentName)) return false
+      if (!m(c.user_name, sf.userName)) return false
+      if (sf.language && c.language !== sf.language) return false
+      if (sf.tagIds.length && !sf.tagIds.some(tid => c.tags.some(t => t.id === tid))) return false
+      if (sf.dateFrom && new Date(c.created_at) < new Date(sf.dateFrom)) return false
+      if (sf.dateTo && new Date(c.created_at) > new Date(sf.dateTo + "T23:59:59")) return false
+      if (sf.status === "subscribed" && !c.subscribed) return false
+      if (sf.status === "unsubscribed" && c.subscribed) return false
+      if (sf.status === "bounced" && !c.bounced) return false
+      if (sf.status === "complained" && !c.complained) return false
       return true
     })
   }, [contacts, sidebarFilters])
@@ -1238,28 +1324,33 @@ export default function ContactsPage() {
             <table className="w-full text-sm">
               <thead>
                 <tr className="border-b border-zinc-100 bg-zinc-50/50">
-                  <th className="text-left px-5 py-3 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Date</th>
-                  <th className="text-left px-5 py-3 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">File</th>
-                  <th className="text-left px-5 py-3 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Registered</th>
-                  <th className="text-left px-5 py-3 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Invalid data</th>
-                  <th className="text-left px-5 py-3 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Status</th>
+                  <th className="text-left px-5 py-3 text-[11px] font-semibold text-zinc-500 tracking-wider">Date</th>
+                  <th className="text-left px-5 py-3 text-[11px] font-semibold text-zinc-500 tracking-wider">Registered</th>
+                  <th className="text-left px-5 py-3 text-[11px] font-semibold text-zinc-500 tracking-wider">Status</th>
+                  <th className="text-left px-5 py-3 text-[11px] font-semibold text-zinc-500 tracking-wider flex items-center gap-1">
+                    Invalid data
+                    <span className="w-3.5 h-3.5 rounded-full bg-zinc-200 text-zinc-500 inline-flex items-center justify-center text-[9px] font-bold shrink-0">?</span>
+                  </th>
                 </tr>
               </thead>
               <tbody>
                 {importLogs.map(log => (
                   <tr key={log.id} className="border-b border-zinc-50 hover:bg-zinc-50/60 transition-colors">
-                    <td className="px-5 py-3 text-xs text-zinc-600 whitespace-nowrap">
+                    <td className="px-5 py-3.5 text-xs text-zinc-600 whitespace-nowrap">
                       {new Date(log.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" })},&nbsp;
                       {new Date(log.created_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })}
                     </td>
-                    <td className="px-5 py-3 text-xs text-zinc-600 max-w-[160px] truncate">{log.file_name ?? "—"}</td>
-                    <td className="px-5 py-3 text-xs text-zinc-600">{log.imported}/{log.total_rows}</td>
-                    <td className="px-5 py-3 text-xs">{log.invalid > 0 ? <span className="text-orange-500">{log.invalid} invalid rows</span> : <span className="text-zinc-400">—</span>}</td>
-                    <td className="px-5 py-3">
-                      <span className={`inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full border ${log.status === "completed" ? "bg-emerald-50 text-emerald-600 border-emerald-200" : "bg-red-50 text-red-600 border-red-200"}`}>
-                        <span className={`w-1.5 h-1.5 rounded-full inline-block ${log.status === "completed" ? "bg-[#70BF4B]" : "bg-red-400"}`} />
+                    <td className="px-5 py-3.5 text-xs text-zinc-600">{log.imported}/{log.total_rows}</td>
+                    <td className="px-5 py-3.5">
+                      <span className={`text-xs ${log.status === "completed" ? "text-zinc-700" : "text-red-500"}`}>
                         {log.status === "completed" ? "Approved" : "Failed"}
                       </span>
+                    </td>
+                    <td className="px-5 py-3.5 text-xs">
+                      {log.invalid > 0
+                        ? <span className="text-[#003434] hover:underline cursor-pointer">Download {log.invalid} invalid rows</span>
+                        : <span className="text-zinc-400">—</span>
+                      }
                     </td>
                   </tr>
                 ))}
@@ -1357,6 +1448,7 @@ export default function ContactsPage() {
                     </th>
                     <th className="text-left px-4 py-3 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Date registered</th>
                     <th className="text-left px-4 py-3 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Email address</th>
+                    <th className="text-left px-4 py-3 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Phone number</th>
                     <th className="text-left px-4 py-3 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Tags</th>
                     <th className="px-4 py-3 w-8" />
                   </tr>
@@ -1380,9 +1472,14 @@ export default function ContactsPage() {
                             </div>
                             <div>
                               <p className="text-xs font-medium text-[#003434]">{c.email}</p>
-                              {c.name && <p className="text-[11px] text-zinc-400">{c.name}</p>}
+                              {(c.first_name || c.last_name) && (
+                                <p className="text-[11px] text-zinc-400">{[c.first_name, c.last_name].filter(Boolean).join(" ")}</p>
+                              )}
                             </div>
                           </div>
+                        </td>
+                        <td className="px-4 py-3.5 text-xs text-zinc-500 whitespace-nowrap">
+                          {c.phone ?? <span className="text-zinc-300">—</span>}
                         </td>
                         <td className="px-4 py-3.5">
                           <div className="flex flex-wrap items-center gap-1">
