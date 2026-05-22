@@ -1,0 +1,23 @@
+-- Add standard contact detail columns to email_contacts
+alter table email_contacts
+  add column if not exists first_name        text,
+  add column if not exists last_name         text,
+  add column if not exists phone             text,
+  add column if not exists alternate_phone   text,
+  add column if not exists company           text,
+  add column if not exists street_address    text,
+  add column if not exists street_number     text,
+  add column if not exists neighborhood      text,
+  add column if not exists postal_code       text,
+  add column if not exists city              text,
+  add column if not exists state_province    text,
+  add column if not exists country           text,
+  add column if not exists tax_number        text,
+  add column if not exists language          text default 'English',
+  add column if not exists user_name         text,
+  add column if not exists user_type         text,
+  add column if not exists agent_name        text,
+  add column if not exists agent_id          text,
+  add column if not exists agent_registered_date text,
+  add column if not exists agent_pancard_no  text,
+  add column if not exists agent_gst_number  text;

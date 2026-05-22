@@ -40,15 +40,37 @@ export async function POST(req: NextRequest) {
   if (unauth) return unauth
 
   const body = await req.json()
-  const { client_id, email, name, metadata, tag_ids } = body
+  const {
+    client_id, email, name, metadata, tag_ids,
+    first_name, last_name, phone, alternate_phone, company,
+    street_address, street_number, neighborhood, postal_code, city,
+    state_province, country, tax_number, language,
+    user_name, user_type, agent_name, agent_id, agent_registered_date,
+    agent_pancard_no, agent_gst_number,
+    ...rest
+  } = body
 
   if (!client_id || !email) {
     return NextResponse.json({ error: "client_id and email required" }, { status: 400 })
   }
 
+  // Collect any dynamic custom_ columns passed in rest
+  const customCols: Record<string, unknown> = {}
+  for (const [k, v] of Object.entries(rest)) {
+    if (k.startsWith("custom_")) customCols[k] = v
+  }
+
   const { data, error } = await supabaseAdmin
     .from("email_contacts")
-    .upsert({ client_id, email, name, metadata: metadata ?? {} }, { onConflict: "client_id,email" })
+    .upsert({
+      client_id, email, name, metadata: metadata ?? {},
+      first_name, last_name, phone, alternate_phone, company,
+      street_address, street_number, neighborhood, postal_code, city,
+      state_province, country, tax_number, language,
+      user_name, user_type, agent_name, agent_id, agent_registered_date,
+      agent_pancard_no, agent_gst_number,
+      ...customCols,
+    }, { onConflict: "client_id,email" })
     .select()
     .single()
 

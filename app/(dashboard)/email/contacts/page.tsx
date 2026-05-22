@@ -1,22 +1,49 @@
 "use client"
 
-import { useState, useEffect, useRef, useCallback } from "react"
+import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import toast from "react-hot-toast"
 import { useClient } from "../client-context"
+
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 interface EmailTag { id: string; name: string }
 interface Contact {
   id: string; client_id: string; email: string; name: string | null
+  first_name: string | null; last_name: string | null
+  phone: string | null; alternate_phone: string | null; company: string | null
+  street_address: string | null; street_number: string | null
+  neighborhood: string | null; postal_code: string | null; city: string | null
+  state_province: string | null; country: string | null; tax_number: string | null
+  language: string | null; user_name: string | null; user_type: string | null
+  agent_name: string | null; agent_id: string | null; agent_registered_date: string | null
+  agent_pancard_no: string | null; agent_gst_number: string | null
   subscribed: boolean; bounced: boolean; complained: boolean
   created_at: string; tags: EmailTag[]
+  [key: string]: unknown
 }
 interface EmailList { id: string; name: string }
-
+interface ImportLog {
+  id: string; file_name: string | null; delimiter: string
+  total_rows: number; imported: number; invalid: number
+  status: string; created_at: string
+}
+interface CustomField { key: string; label: string; value: string }
+type View = "list" | "create" | "import"
 type DialogState = {
   title: string; message: string; confirmLabel?: string; danger?: boolean; onConfirm: () => void
 } | null
+interface SidebarFilters {
+  emailSearch: string
+  tagIds: string[]
+  dateFrom: string
+  dateTo: string
+  status: "all" | "subscribed" | "unsubscribed" | "bounced" | "complained"
+}
+interface SavedFilter { id: string; label: string; filters: SidebarFilters }
 
-const TAG_VISIBLE_LIMIT = 5
+const DEFAULT_FILTERS: SidebarFilters = { emailSearch: "", tagIds: [], dateFrom: "", dateTo: "", status: "all" }
+
+// ─── Reusable hooks ────────────────────────────────────────────────────────────
 
 function useFlipUp(ref: React.RefObject<HTMLDivElement>) {
   const [flipUp, setFlipUp] = useState(false)
@@ -27,6 +54,8 @@ function useFlipUp(ref: React.RefObject<HTMLDivElement>) {
   })
   return flipUp
 }
+
+// ─── Shared sub-components ────────────────────────────────────────────────────
 
 function ConfirmDialog({ title, message, confirmLabel = "Delete", danger = true, onConfirm, onCancel }: {
   title: string; message: string; confirmLabel?: string; danger?: boolean
@@ -56,153 +85,6 @@ function ConfirmDialog({ title, message, confirmLabel = "Delete", danger = true,
   )
 }
 
-// Central tag management — the ONLY place for permanent deletion
-function TagsManager({ allTags, contacts, onRename, onDelete, onCreateTag, open, onToggle }: {
-  allTags: EmailTag[]; contacts: Contact[]
-  onRename: (id: string, name: string) => Promise<void>
-  onDelete: (id: string) => void
-  onCreateTag: (name: string) => Promise<void>
-  open: boolean; onToggle: () => void
-}) {
-  const [renamingId, setRenamingId] = useState<string | null>(null)
-  const [renameVal, setRenameVal] = useState("")
-  const [renameBusy, setRenameBusy] = useState(false)
-  const [newTagVal, setNewTagVal] = useState("")
-  const [creating, setCreating] = useState(false)
-  const [createBusy, setCreateBusy] = useState(false)
-
-  const submitRename = async (id: string) => {
-    const t = renameVal.trim()
-    if (!t || t === allTags.find(tag => tag.id === id)?.name) { setRenamingId(null); return }
-    setRenameBusy(true); await onRename(id, t); setRenameBusy(false); setRenamingId(null)
-  }
-
-  const submitCreate = async () => {
-    const name = newTagVal.trim()
-    if (!name) return
-    setCreateBusy(true); await onCreateTag(name); setCreateBusy(false)
-    setNewTagVal(""); setCreating(false)
-  }
-
-  if (allTags.length === 0 && !creating) {
-    return (
-      <div className="bg-white border border-zinc-200 rounded-xl px-4 py-3 mb-3 flex items-center justify-between">
-        <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wide">Tags</span>
-        <button onClick={() => setCreating(true)} className="inline-flex items-center gap-1.5 text-xs text-[#003434] hover:underline">
-          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-          New tag
-        </button>
-      </div>
-    )
-  }
-
-  return (
-    <div className="bg-white border border-zinc-200 rounded-xl mb-3 overflow-hidden">
-      <div className="px-4 py-3 flex items-center justify-between">
-        <button onClick={onToggle} className="flex items-center gap-2 text-left">
-          <svg className="w-3.5 h-3.5 text-teal-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg>
-          <span className="text-sm font-semibold text-zinc-700">Tags</span>
-          <span className="text-xs text-zinc-400">({allTags.length})</span>
-        </button>
-        <div className="flex items-center gap-2">
-          {creating ? (
-            <div className="flex items-center gap-1.5">
-              <input
-                autoFocus
-                className="border border-zinc-200 rounded-lg px-2.5 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-[#003434]/20 w-32"
-                placeholder="Tag name…"
-                value={newTagVal}
-                onChange={e => setNewTagVal(e.target.value)}
-                onKeyDown={e => { if (e.key === "Enter") submitCreate(); if (e.key === "Escape") { setCreating(false); setNewTagVal("") } }}
-              />
-              <button onClick={submitCreate} disabled={createBusy || !newTagVal.trim()} className="text-xs bg-[#003434] text-white px-2.5 py-1 rounded-lg hover:bg-[#004444] disabled:opacity-40">{createBusy ? "…" : "Create"}</button>
-              <button onClick={() => { setCreating(false); setNewTagVal("") }} className="text-xs text-zinc-400 hover:text-zinc-600">Cancel</button>
-            </div>
-          ) : (
-            <button onClick={() => setCreating(true)} className="inline-flex items-center gap-1.5 text-xs text-zinc-500 hover:text-[#003434] border border-dashed border-zinc-300 hover:border-[#003434] px-2.5 py-1 rounded-full transition-colors">
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-              New tag
-            </button>
-          )}
-          <button onClick={onToggle} className="text-zinc-400 hover:text-zinc-600 p-0.5">
-            <svg className={`w-4 h-4 transition-transform ${open ? "" : "rotate-180"}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg>
-          </button>
-        </div>
-      </div>
-      {open && (
-        <div className="border-t border-zinc-100 divide-y divide-zinc-50">
-          {allTags.map(tag => {
-            const count = contacts.filter(c => c.tags.some(t => t.id === tag.id)).length
-            return (
-              <div key={tag.id} className="px-4 py-2.5 flex items-center gap-3">
-                <span className="w-1.5 h-1.5 rounded-full bg-teal-400 shrink-0" />
-                {renamingId === tag.id ? (
-                  <input
-                    autoFocus
-                    className="flex-1 border border-zinc-200 rounded-lg px-2.5 py-1 text-xs focus:outline-none focus:ring-2 focus:ring-[#003434]/20 max-w-[180px]"
-                    value={renameVal}
-                    onChange={e => setRenameVal(e.target.value)}
-                    onKeyDown={e => { if (e.key === "Enter") submitRename(tag.id); if (e.key === "Escape") setRenamingId(null) }}
-                    onBlur={() => submitRename(tag.id)}
-                  />
-                ) : (
-                  <span className="flex-1 text-sm text-zinc-700">{tag.name}</span>
-                )}
-                <span className="text-xs text-zinc-400 shrink-0 min-w-[60px]">{count} contact{count !== 1 ? "s" : ""}</span>
-                {renamingId === tag.id ? (
-                  <button onClick={() => submitRename(tag.id)} disabled={renameBusy} className="text-xs bg-[#003434] text-white px-2.5 py-1 rounded-lg hover:bg-[#004444] disabled:opacity-40 shrink-0">{renameBusy ? "…" : "Save"}</button>
-                ) : (
-                  <button
-                    onClick={() => { setRenamingId(tag.id); setRenameVal(tag.name) }}
-                    className="text-xs text-zinc-400 hover:text-[#003434] flex items-center gap-1 shrink-0 px-2 py-1 rounded-lg hover:bg-zinc-50 transition-colors"
-                  >
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                    Rename
-                  </button>
-                )}
-                <button
-                  onClick={() => onDelete(tag.id)}
-                  className="text-xs text-red-400 hover:text-red-600 flex items-center gap-1 shrink-0 px-2 py-1 rounded-lg hover:bg-red-50 transition-colors"
-                >
-                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                  Delete
-                </button>
-              </div>
-            )
-          })}
-        </div>
-      )}
-    </div>
-  )
-}
-
-function AddToListDropdown({ contactEmail, lists }: { contactEmail: string; lists: EmailList[] }) {
-  const [busy, setBusy] = useState(false)
-  if (!lists.length) return null
-  const handleChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const listId = e.target.value
-    if (!listId) return
-    setBusy(true)
-    const res = await fetch(`/api/email/lists/${listId}/contacts`, {
-      method: "POST", headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email: contactEmail }),
-    })
-    const d = await res.json()
-    if (res.ok) toast.success("Added to list")
-    else toast.error(d.error ?? "Failed to add to list")
-    e.target.value = ""
-    setBusy(false)
-  }
-  return (
-    <select onChange={handleChange} disabled={busy}
-      className="text-xs border border-zinc-200 rounded-lg px-2 py-1 text-zinc-400 bg-white focus:outline-none focus:ring-1 focus:ring-[#003434]/20 disabled:opacity-50 max-w-[110px]">
-      <option value="">+ List</option>
-      {lists.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
-    </select>
-  )
-}
-
-// Multi-select dropdown for tag pickers inside forms
 function TagMultiSelect({ allTags, value, onChange, placeholder = "Assign tags (optional)" }: {
   allTags: EmailTag[]; value: string[]; onChange: (ids: string[]) => void; placeholder?: string
 }) {
@@ -236,31 +118,25 @@ function TagMultiSelect({ allTags, value, onChange, placeholder = "Assign tags (
   )
 }
 
-// Tag pill dropdown — Rename / Remove from contact only (no global delete)
 function TagPillDropdown({ tag, onRename, onRemove, onClose }: {
-  tag: EmailTag
-  onRename: (id: string, newName: string) => Promise<void>
-  onRemove: () => Promise<void>
-  onClose: () => void
+  tag: EmailTag; onRename: (id: string, newName: string) => Promise<void>
+  onRemove: () => Promise<void>; onClose: () => void
 }) {
   const [mode, setMode] = useState<"menu" | "rename">("menu")
   const [val, setVal] = useState(tag.name)
   const [busy, setBusy] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
   const flipUp = useFlipUp(ref)
-
   useEffect(() => {
     const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) onClose() }
     document.addEventListener("mousedown", h)
     return () => document.removeEventListener("mousedown", h)
   }, [onClose])
-
   const submit = async () => {
     const t = val.trim()
     if (!t || t === tag.name) { onClose(); return }
     setBusy(true); await onRename(tag.id, t); setBusy(false); onClose()
   }
-
   return (
     <div ref={ref} className={`absolute z-50 ${flipUp ? "bottom-full mb-1" : "top-full mt-1"} left-0 bg-white border border-zinc-200 rounded-xl shadow-xl py-1.5 min-w-[156px]`} onClick={e => e.stopPropagation()}>
       {mode === "menu" ? (
@@ -285,12 +161,10 @@ function TagPillDropdown({ tag, onRename, onRemove, onClose }: {
   )
 }
 
-// Multi-select popover for adding/removing tags on a single contact
 function AddTagPopover({ contactId, clientId, allTags, contactTags, onApply, onNewTag, onClose }: {
   contactId: string; clientId: string; allTags: EmailTag[]; contactTags: EmailTag[]
   onApply: (contactId: string, toAdd: string[], toRemove: string[]) => Promise<void>
-  onNewTag: (tag: EmailTag) => void
-  onClose: () => void
+  onNewTag: (tag: EmailTag) => void; onClose: () => void
 }) {
   const [checked, setChecked] = useState<Set<string>>(new Set(contactTags.map(t => t.id)))
   const [input, setInput] = useState("")
@@ -298,22 +172,18 @@ function AddTagPopover({ contactId, clientId, allTags, contactTags, onApply, onN
   const ref = useRef<HTMLDivElement>(null)
   const flipUp = useFlipUp(ref)
   const filtered = input.trim() ? allTags.filter(t => t.name.toLowerCase().includes(input.toLowerCase())) : allTags
-
   useEffect(() => {
     const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) onClose() }
     document.addEventListener("mousedown", h)
     return () => document.removeEventListener("mousedown", h)
   }, [onClose])
-
   const toggle = (id: string) => setChecked(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n })
-
   const apply = async () => {
     const toAdd = Array.from(checked).filter(id => !contactTags.find(t => t.id === id))
     const toRemove = contactTags.filter(t => !checked.has(t.id)).map(t => t.id)
     if (!toAdd.length && !toRemove.length) { onClose(); return }
     setBusy(true); await onApply(contactId, toAdd, toRemove); setBusy(false); onClose()
   }
-
   const create = async (name: string) => {
     setBusy(true)
     const res = await fetch("/api/email/tags", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ client_id: clientId, name }) })
@@ -323,7 +193,6 @@ function AddTagPopover({ contactId, clientId, allTags, contactTags, onApply, onN
     setChecked(prev => new Set(Array.from(prev).concat(data.id)))
     setInput(""); setBusy(false)
   }
-
   return (
     <div ref={ref} className={`absolute z-50 ${flipUp ? "bottom-full mb-1.5" : "top-full mt-1.5"} left-0 bg-white border border-zinc-200 rounded-xl shadow-xl w-52`} onClick={e => e.stopPropagation()}>
       <div className="p-2 border-b border-zinc-100">
@@ -355,11 +224,8 @@ function AddTagPopover({ contactId, clientId, allTags, contactTags, onApply, onN
   )
 }
 
-// Multi-select popover for bulk-adding tags to selected contacts
 function BulkTagPopover({ allTags, onApply, onClose }: {
-  allTags: EmailTag[]
-  onApply: (tagIds: string[]) => Promise<void>
-  onClose: () => void
+  allTags: EmailTag[]; onApply: (tagIds: string[]) => Promise<void>; onClose: () => void
 }) {
   const [checked, setChecked] = useState<Set<string>>(new Set())
   const [input, setInput] = useState("")
@@ -367,20 +233,16 @@ function BulkTagPopover({ allTags, onApply, onClose }: {
   const ref = useRef<HTMLDivElement>(null)
   const flipUp = useFlipUp(ref)
   const filtered = input.trim() ? allTags.filter(t => t.name.toLowerCase().includes(input.toLowerCase())) : allTags
-
   useEffect(() => {
     const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) onClose() }
     document.addEventListener("mousedown", h)
     return () => document.removeEventListener("mousedown", h)
   }, [onClose])
-
   const toggle = (id: string) => setChecked(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n })
-
   const apply = async () => {
     if (!checked.size) { onClose(); return }
     setBusy(true); await onApply(Array.from(checked)); setBusy(false); onClose()
   }
-
   return (
     <div ref={ref} className={`absolute z-50 ${flipUp ? "bottom-full mb-1.5" : "top-full mt-1.5"} left-0 bg-white border border-zinc-200 rounded-xl shadow-xl w-52`} onClick={e => e.stopPropagation()}>
       <div className="p-2 border-b border-zinc-100">
@@ -405,52 +267,374 @@ function BulkTagPopover({ allTags, onApply, onClose }: {
   )
 }
 
+// ─── Sidebar filter panel ─────────────────────────────────────────────────────
+
+function SidebarFilters({ filters, allTags, onChange, savedFilters, onSave, onLoadFilter, onDeleteFilter, onReset }: {
+  filters: SidebarFilters; allTags: EmailTag[]
+  onChange: (f: SidebarFilters) => void
+  savedFilters: SavedFilter[]
+  onSave: () => void
+  onLoadFilter: (f: SavedFilter) => void
+  onDeleteFilter: (id: string) => void
+  onReset: () => void
+}) {
+  const [tab, setTab] = useState<"filter" | "saved">("filter")
+  const [expandedSections, setExpandedSections] = useState({ email: true, tag: false, date: false, status: false })
+  const toggle = (s: keyof typeof expandedSections) => setExpandedSections(p => ({ ...p, [s]: !p[s] }))
+
+  const SectionHeader = ({ label, section }: { label: string; section: keyof typeof expandedSections }) => (
+    <button
+      className={`w-full flex items-center justify-between px-4 py-3 text-sm text-zinc-700 hover:bg-zinc-50 transition-colors ${expandedSections[section] ? "border-l-2 border-[#003434] bg-[#003434]/5" : ""}`}
+      onClick={() => toggle(section)}
+    >
+      <span className="font-medium text-sm">{label}</span>
+      <svg className={`w-3.5 h-3.5 text-zinc-400 transition-transform ${expandedSections[section] ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+    </button>
+  )
+
+  return (
+    <div className="bg-white border border-zinc-200 rounded-xl overflow-hidden flex flex-col h-fit">
+      {/* Tabs */}
+      <div className="flex border-b border-zinc-100">
+        {(["filter", "saved"] as const).map(t => (
+          <button key={t} onClick={() => setTab(t)}
+            className={`flex-1 py-3 text-sm font-medium transition-colors ${tab === t ? "text-[#003434] border-b-2 border-[#003434]" : "text-zinc-500 hover:text-zinc-700"}`}>
+            {t === "filter" ? "Filter by" : "Saved filters"}
+          </button>
+        ))}
+      </div>
+
+      {tab === "filter" && (
+        <div className="flex-1 divide-y divide-zinc-100">
+          {/* Email */}
+          <div>
+            <SectionHeader label="Email" section="email" />
+            {expandedSections.email && (
+              <div className="px-4 pb-3 pt-1">
+                <input
+                  className="w-full border border-zinc-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#003434]/20"
+                  placeholder="Search email…"
+                  value={filters.emailSearch}
+                  onChange={e => onChange({ ...filters, emailSearch: e.target.value })}
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Tag */}
+          <div>
+            <SectionHeader label="Tag" section="tag" />
+            {expandedSections.tag && (
+              <div className="px-4 pb-3 pt-1 max-h-40 overflow-y-auto space-y-1">
+                {allTags.length === 0 && <p className="text-xs text-zinc-400">No tags yet</p>}
+                {allTags.map(tag => (
+                  <label key={tag.id} className="flex items-center gap-2.5 py-1 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={filters.tagIds.includes(tag.id)}
+                      onChange={() => {
+                        const next = filters.tagIds.includes(tag.id)
+                          ? filters.tagIds.filter(id => id !== tag.id)
+                          : [...filters.tagIds, tag.id]
+                        onChange({ ...filters, tagIds: next })
+                      }}
+                      className="w-3.5 h-3.5 rounded border-zinc-300 accent-[#003434] cursor-pointer"
+                    />
+                    <span className="text-xs text-zinc-700">{tag.name}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Date added */}
+          <div>
+            <SectionHeader label="Date added" section="date" />
+            {expandedSections.date && (
+              <div className="px-4 pb-3 pt-1 space-y-2">
+                <div>
+                  <label className="text-[10px] text-zinc-400 uppercase tracking-wide mb-1 block">From</label>
+                  <input type="date" className="w-full border border-zinc-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#003434]/20" value={filters.dateFrom} onChange={e => onChange({ ...filters, dateFrom: e.target.value })} />
+                </div>
+                <div>
+                  <label className="text-[10px] text-zinc-400 uppercase tracking-wide mb-1 block">To</label>
+                  <input type="date" className="w-full border border-zinc-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#003434]/20" value={filters.dateTo} onChange={e => onChange({ ...filters, dateTo: e.target.value })} />
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Contact state */}
+          <div>
+            <SectionHeader label="Contact state" section="status" />
+            {expandedSections.status && (
+              <div className="px-4 pb-3 pt-1 space-y-1.5">
+                {(["all", "subscribed", "unsubscribed", "bounced", "complained"] as const).map(s => (
+                  <label key={s} className="flex items-center gap-2.5 py-0.5 cursor-pointer">
+                    <input type="radio" name="sidebar-status" checked={filters.status === s} onChange={() => onChange({ ...filters, status: s })} className="w-3.5 h-3.5 border-zinc-300 accent-[#003434] cursor-pointer" />
+                    <span className="text-xs text-zinc-700 capitalize">{s === "all" ? "All" : s}</span>
+                  </label>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {tab === "saved" && (
+        <div className="flex-1 p-3 space-y-2 min-h-[120px]">
+          {savedFilters.length === 0 && <p className="text-xs text-zinc-400 text-center py-4">No saved filters yet</p>}
+          {savedFilters.map(sf => (
+            <div key={sf.id} className="flex items-center gap-2 bg-zinc-50 rounded-lg px-3 py-2 border border-zinc-100">
+              <button className="flex-1 text-left text-xs text-zinc-700 font-medium hover:text-[#003434] truncate" onClick={() => onLoadFilter(sf)}>{sf.label}</button>
+              <button onClick={() => onDeleteFilter(sf.id)} className="text-zinc-300 hover:text-red-400 transition-colors">
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Footer */}
+      <div className="border-t border-zinc-100 p-3 space-y-2">
+        {tab === "filter" && (
+          <button onClick={onSave} className="w-full text-sm py-2 rounded-lg border border-zinc-200 text-zinc-700 hover:bg-zinc-50 transition-colors font-medium">
+            Save filter
+          </button>
+        )}
+        <button onClick={onReset} className="w-full text-xs text-zinc-400 hover:text-zinc-600 transition-colors">Reset</button>
+        <button
+          onClick={() => toast("Soft delete not configured — contacts are permanently deleted")}
+          className="w-full text-xs text-zinc-400 hover:text-zinc-600 transition-colors flex items-center justify-center gap-1.5"
+        >
+          <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+          Recently deleted
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ─── Custom field modal ───────────────────────────────────────────────────────
+
+function CustomFieldModal({ onClose, onSave }: { onClose: () => void; onSave: (field: CustomField) => void }) {
+  const [name, setName] = useState("")
+  const [busy, setBusy] = useState(false)
+  const [manualSql, setManualSql] = useState("")
+  const columnName = "custom_" + name.trim().toLowerCase().replace(/\s+/g, "_").replace(/[^a-z0-9_]/g, "")
+
+  const handleSave = async () => {
+    if (!name.trim()) return
+    setBusy(true)
+    try {
+      const res = await fetch("/api/email/contacts/add-column", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ column_name: columnName, label: name.trim() }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      if (data.manual) {
+        // exec_sql RPC not available — show the SQL for manual run, but still add to form
+        setManualSql(data.sql)
+        toast(`Run this SQL in Supabase: ${data.sql}`, { duration: 10000 })
+      }
+      onSave({ key: columnName, label: name.trim(), value: "" })
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Failed to create column")
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={onClose} />
+      <div className="relative bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 border border-zinc-100">
+        <div className="flex items-center justify-between mb-5">
+          <h3 className="text-base font-semibold text-zinc-900">Create custom field</h3>
+          <button onClick={onClose} className="text-zinc-400 hover:text-zinc-600">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+        <div className="space-y-4">
+          <div>
+            <label className="text-sm font-medium text-zinc-700 block mb-1.5">Name</label>
+            <input
+              autoFocus
+              className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#003434]/20"
+              placeholder="e.g. Company Size"
+              value={name}
+              onChange={e => setName(e.target.value)}
+              onKeyDown={e => e.key === "Enter" && name.trim() && handleSave()}
+            />
+          </div>
+          <div>
+            <label className="text-sm font-medium text-zinc-700 block mb-1.5">
+              Unique key
+              <span className="ml-1.5 text-xs font-normal text-zinc-400">(auto-generated, saved as column)</span>
+            </label>
+            <input className="w-full border border-zinc-100 rounded-lg px-3 py-2 text-sm bg-zinc-50 text-zinc-400 cursor-not-allowed font-mono" value={columnName || "custom_field_name"} readOnly />
+          </div>
+          {manualSql && (
+            <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+              <p className="text-xs font-semibold text-amber-700 mb-1">Run this SQL in Supabase SQL editor:</p>
+              <code className="text-[11px] text-amber-800 break-all">{manualSql}</code>
+            </div>
+          )}
+        </div>
+        <div className="mt-5 flex justify-end">
+          <button
+            onClick={handleSave}
+            disabled={!name.trim() || busy}
+            className="bg-[#003434] text-white text-sm px-5 py-2 rounded-lg hover:bg-[#004444] disabled:opacity-40 transition-colors inline-flex items-center gap-2"
+          >
+            {busy && <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+            {busy ? "Creating…" : "Save"}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Import warnings panel ────────────────────────────────────────────────────
+
+function ImportWarningsPanel() {
+  return (
+    <div className="bg-amber-50 border-l-4 border-amber-400 rounded-xl p-5">
+      <div className="flex items-start gap-2 mb-3">
+        <svg className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+        <p className="text-sm font-semibold text-amber-800">Important: read before importing</p>
+      </div>
+      <ul className="space-y-3">
+        {[
+          { icon: "M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z", title: "Explicit consent is required", body: "Only import contacts who have agreed to receive your emails." },
+          { icon: "M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2", title: "Clean your list", body: "Ensure there are no invalid or inactive email addresses." },
+          { icon: "M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z", title: "Invalid emails skipped", body: "Rows without a valid @ address will be skipped automatically." },
+          { icon: "M13 10V3L4 14h7v7l9-11h-7z", title: "Warm-up", body: "Large imports may be sent gradually to protect your deliverability." },
+        ].map((item, i) => (
+          <li key={i} className="flex items-start gap-2.5">
+            <div className="w-5 h-5 rounded-full bg-amber-100 flex items-center justify-center shrink-0 mt-0.5">
+              <svg className="w-3 h-3 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={item.icon} /></svg>
+            </div>
+            <div>
+              <p className="text-xs font-semibold text-amber-800">{item.title}</p>
+              <p className="text-xs text-amber-700 mt-0.5">{item.body}</p>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </div>
+  )
+}
+
+// ─── Row actions kebab menu ───────────────────────────────────────────────────
+
+function RowActions({ contact, onToggleSubscribe, onDelete }: {
+  contact: Contact; onToggleSubscribe: () => void; onDelete: () => void
+}) {
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
+    document.addEventListener("mousedown", h)
+    return () => document.removeEventListener("mousedown", h)
+  }, [])
+  return (
+    <div className="relative" ref={ref}>
+      <button onClick={() => setOpen(v => !v)} className="w-7 h-7 rounded-lg flex items-center justify-center text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 transition-colors">
+        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.5" /><circle cx="12" cy="12" r="1.5" /><circle cx="12" cy="19" r="1.5" /></svg>
+      </button>
+      {open && (
+        <div className="absolute z-50 right-0 top-full mt-1 bg-white border border-zinc-200 rounded-xl shadow-xl py-1.5 min-w-[160px]">
+          {!contact.bounced && !contact.complained && (
+            <button
+              className="w-full text-left px-3 py-1.5 text-xs text-zinc-700 hover:bg-zinc-50 flex items-center gap-2"
+              onClick={() => { setOpen(false); onToggleSubscribe() }}
+            >
+              <svg className="w-3 h-3 text-zinc-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
+              {contact.subscribed ? "Unsubscribe" : "Re-subscribe"}
+            </button>
+          )}
+          <div className="my-1 border-t border-zinc-100" />
+          <button
+            className="w-full text-left px-3 py-1.5 text-xs text-red-500 hover:bg-red-50 flex items-center gap-2"
+            onClick={() => { setOpen(false); onDelete() }}
+          >
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+            Delete
+          </button>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Main page ────────────────────────────────────────────────────────────────
+
 export default function ContactsPage() {
   const { clientId } = useClient()
+
+  // ── Shared data ──
   const [contacts, setContacts] = useState<Contact[]>([])
-  const [lists, setLists] = useState<EmailList[]>([])
   const [allTags, setAllTags] = useState<EmailTag[]>([])
+  const [lists, setLists] = useState<EmailList[]>([])
+  const [importLogs, setImportLogs] = useState<ImportLog[]>([])
   const [loading, setLoading] = useState(true)
-  const [search, setSearch] = useState("")
-  const [form, setForm] = useState({ client_id: "", email: "", name: "", list_id: "", tagIds: [] as string[] })
-  const [adding, setAdding] = useState(false)
-  const [importing, setImporting] = useState(false)
-  const [importClientId, setImportClientId] = useState("")
-  const [importListId, setImportListId] = useState("")
-  const [importTagIds, setImportTagIds] = useState<string[]>([])
-  const fileRef = useRef<HTMLInputElement>(null)
 
-  // Confirm dialog
-  const [dialog, setDialog] = useState<DialogState>(null)
+  // ── View router ──
+  const [view, setView] = useState<View>("list")
 
-  // Multi-select contacts
+  // ── List view state ──
+  const [sidebarFilters, setSidebarFilters] = useState<SidebarFilters>(DEFAULT_FILTERS)
+  const [savedFilters, setSavedFilters] = useState<SavedFilter[]>([])
+  const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState<10 | 25 | 50>(10)
   const [selected, setSelected] = useState<Set<string>>(new Set())
   const [bulkTagOpen, setBulkTagOpen] = useState(false)
   const [bulkBusy, setBulkBusy] = useState(false)
-
-  // Tags manager
-  const [tagsOpen, setTagsOpen] = useState(true)
-
-  // Tag filter bar
-  const [filterTag, setFilterTag] = useState<string | null>(null)
-  const [showOverflow, setShowOverflow] = useState(false)
-  const [showCreateTag, setShowCreateTag] = useState(false)
-  const [newGlobalTag, setNewGlobalTag] = useState("")
-  const overflowRef = useRef<HTMLDivElement>(null)
-  const createTagRef = useRef<HTMLDivElement>(null)
-  const bulkTagRef = useRef<HTMLDivElement>(null)
-
-  // Per-row tag UI
   const [openPillDropdown, setOpenPillDropdown] = useState<{ contactId: string; tag: EmailTag } | null>(null)
   const [openAddTag, setOpenAddTag] = useState<string | null>(null)
+  const bulkTagRef = useRef<HTMLDivElement>(null)
+  const [dialog, setDialog] = useState<DialogState>(null)
 
-  useEffect(() => {
-    if (clientId) { setForm(f => ({ ...f, client_id: clientId, list_id: "", tagIds: [] })); setImportClientId(clientId); setImportListId(""); setImportTagIds([]) }
-  }, [clientId])
+  // ── Create view state ──
+  const [createForm, setCreateForm] = useState({
+    email: "", firstName: "", lastName: "", phone: "", alternatePhone: "",
+    company: "", streetAddress: "", streetNumber: "", neighborhood: "",
+    postalCode: "", city: "", stateProvince: "", country: "", taxNumber: "",
+    language: "English", userName: "", userType: "", agentName: "", agentId: "",
+    agentRegisteredDate: "", agentPancardNo: "", agentGstNumber: "",
+    tagIds: [] as string[], customFields: [] as CustomField[],
+  })
+  const [createBusy, setCreateBusy] = useState(false)
+  const [showCustomFieldModal, setShowCustomFieldModal] = useState(false)
 
+  // ── Import view state ──
+  const [importFile, setImportFile] = useState<File | null>(null)
+  const [importDelimiter, setImportDelimiter] = useState<"," | ";" | "|">(",")
+  const [importTagIds, setImportTagIds] = useState<string[]>([])
+  const [importTagSearch, setImportTagSearch] = useState("")
+  const [importBusy, setImportBusy] = useState(false)
+  const fileRef = useRef<HTMLInputElement>(null)
+
+  // ── Load saved filters from localStorage ──
   useEffect(() => {
-    if (!clientId) { setLists([]); return }
-    fetch(`/api/email/lists?client_id=${clientId}`).then(r => r.json()).then(d => setLists(Array.isArray(d) ? d : []))
+    try {
+      const raw = localStorage.getItem("emozi-contact-filters")
+      if (raw) setSavedFilters(JSON.parse(raw))
+    } catch { /* ignore */ }
+  }, [])
+
+  // ── Data fetching ──
+  const load = useCallback(() => {
+    if (!clientId) { setContacts([]); setLoading(false); return }
+    setLoading(true)
+    fetch(`/api/email/contacts?client_id=${clientId}`)
+      .then(r => r.json())
+      .then(d => setContacts(Array.isArray(d) ? d : []))
+      .finally(() => setLoading(false))
   }, [clientId])
 
   const loadTags = useCallback(() => {
@@ -458,59 +642,66 @@ export default function ContactsPage() {
     fetch(`/api/email/tags?client_id=${clientId}`).then(r => r.json()).then(d => setAllTags(Array.isArray(d) ? d : []))
   }, [clientId])
 
-  useEffect(() => { loadTags() }, [loadTags])
-
-  const load = useCallback(() => {
-    setLoading(true)
-    const p = new URLSearchParams()
-    if (search) p.set("search", search)
-    if (clientId) p.set("client_id", clientId)
-    fetch(`/api/email/contacts?${p}`).then(r => r.json()).then(d => setContacts(Array.isArray(d) ? d : [])).finally(() => setLoading(false))
-  }, [search, clientId])
+  const loadImportLogs = useCallback(() => {
+    if (!clientId) { setImportLogs([]); return }
+    fetch(`/api/email/contacts/import-logs?client_id=${clientId}`).then(r => r.json()).then(d => setImportLogs(Array.isArray(d) ? d : []))
+  }, [clientId])
 
   useEffect(() => { load() }, [load])
-  useEffect(() => { setSelected(new Set()) }, [search, filterTag])
-
+  useEffect(() => { loadTags() }, [loadTags])
   useEffect(() => {
-    const h = (e: MouseEvent) => {
-      if (overflowRef.current && !overflowRef.current.contains(e.target as Node)) setShowOverflow(false)
-      if (createTagRef.current && !createTagRef.current.contains(e.target as Node)) { setShowCreateTag(false); setNewGlobalTag("") }
-      if (bulkTagRef.current && !bulkTagRef.current.contains(e.target as Node)) setBulkTagOpen(false)
-    }
-    document.addEventListener("mousedown", h)
-    return () => document.removeEventListener("mousedown", h)
-  }, [])
+    if (!clientId) { setLists([]); return }
+    fetch(`/api/email/lists?client_id=${clientId}`).then(r => r.json()).then(d => setLists(Array.isArray(d) ? d : []))
+  }, [clientId])
 
-  const visibleContacts = filterTag ? contacts.filter(c => c.tags.some(t => t.id === filterTag)) : contacts
-  const allSelected = visibleContacts.length > 0 && visibleContacts.every(c => selected.has(c.id))
+  // Load import logs when switching to import view
+  useEffect(() => { if (view === "import") loadImportLogs() }, [view, loadImportLogs])
+
+  // Reset page when filters change
+  useEffect(() => { setPage(1) }, [sidebarFilters, pageSize])
+  useEffect(() => { setSelected(new Set()) }, [sidebarFilters])
+
+  // ── Filtered + paginated contacts ──
+  const filteredContacts = useMemo(() => {
+    return contacts.filter(c => {
+      if (sidebarFilters.emailSearch && !c.email.toLowerCase().includes(sidebarFilters.emailSearch.toLowerCase())) return false
+      if (sidebarFilters.tagIds.length && !sidebarFilters.tagIds.some(tid => c.tags.some(t => t.id === tid))) return false
+      if (sidebarFilters.dateFrom && new Date(c.created_at) < new Date(sidebarFilters.dateFrom)) return false
+      if (sidebarFilters.dateTo && new Date(c.created_at) > new Date(sidebarFilters.dateTo + "T23:59:59")) return false
+      if (sidebarFilters.status === "subscribed" && !c.subscribed) return false
+      if (sidebarFilters.status === "unsubscribed" && c.subscribed) return false
+      if (sidebarFilters.status === "bounced" && !c.bounced) return false
+      if (sidebarFilters.status === "complained" && !c.complained) return false
+      return true
+    })
+  }, [contacts, sidebarFilters])
+
+  const totalPages = Math.ceil(filteredContacts.length / pageSize)
+  const paginatedContacts = filteredContacts.slice((page - 1) * pageSize, page * pageSize)
+  const allSelected = paginatedContacts.length > 0 && paginatedContacts.every(c => selected.has(c.id))
   const someSelected = selected.size > 0
 
   const toggleSelect = (id: string) => setSelected(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n })
-  const toggleAll = () => { if (allSelected) setSelected(new Set()); else setSelected(new Set(visibleContacts.map(c => c.id))) }
+  const toggleAll = () => { if (allSelected) setSelected(new Set()); else setSelected(new Set(paginatedContacts.map(c => c.id))) }
 
-  // ─── Handlers ───
-
-  const handleAdd = async (e: React.FormEvent) => {
-    e.preventDefault(); setAdding(true)
-    try {
-      const res = await fetch("/api/email/contacts", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ client_id: form.client_id, email: form.email, name: form.name, tag_ids: form.tagIds }) })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error)
-      const extras: string[] = []
-      if (form.tagIds.length) {
-        const names = form.tagIds.map(id => allTags.find(t => t.id === id)?.name).filter(Boolean)
-        if (names.length) extras.push(`tagged: ${names.join(", ")}`)
-      }
-      if (form.list_id) {
-        const lr = await fetch(`/api/email/lists/${form.list_id}/contacts`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ email: form.email }) })
-        if (!lr.ok) { const le = await lr.json(); toast.error(`Contact added but list failed: ${le.error}`) }
-        else extras.push("added to list")
-      }
-      toast.success(extras.length ? `Contact added — ${extras.join(", ")}` : "Contact added")
-      setForm({ client_id: clientId, email: "", name: "", list_id: form.list_id, tagIds: form.tagIds }); load()
-    } catch (err: unknown) { toast.error(err instanceof Error ? err.message : "Error") }
-    finally { setAdding(false) }
+  // ── Saved filter management ──
+  const handleSaveFilter = () => {
+    const label = prompt("Name this filter:")
+    if (!label?.trim()) return
+    const newFilter: SavedFilter = { id: Date.now().toString(), label: label.trim(), filters: { ...sidebarFilters } }
+    const next = [...savedFilters, newFilter]
+    setSavedFilters(next)
+    localStorage.setItem("emozi-contact-filters", JSON.stringify(next))
+    toast.success("Filter saved")
   }
+
+  const handleDeleteSavedFilter = (id: string) => {
+    const next = savedFilters.filter(f => f.id !== id)
+    setSavedFilters(next)
+    localStorage.setItem("emozi-contact-filters", JSON.stringify(next))
+  }
+
+  // ── Handlers ──
 
   const handleToggleSubscribe = async (id: string, current: boolean) => {
     const res = await fetch(`/api/email/contacts/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ subscribed: !current }) })
@@ -532,33 +723,6 @@ export default function ContactsPage() {
         toast.success("Contact deleted")
       },
     })
-  }
-
-  const handleImport = async () => {
-    const file = fileRef.current?.files?.[0]
-    if (!file || !importClientId) { toast.error("Select a client ID and CSV file"); return }
-    setImporting(true)
-    try {
-      const fd = new FormData(); fd.append("client_id", importClientId); fd.append("file", file)
-      importTagIds.forEach(id => fd.append("tag_id", id))
-      const res = await fetch("/api/email/contacts/import", { method: "POST", body: fd })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error)
-      const importExtras: string[] = []
-      if (importTagIds.length) {
-        const names = importTagIds.map(id => allTags.find(t => t.id === id)?.name).filter(Boolean)
-        if (names.length) importExtras.push(`tagged: ${names.join(", ")}`)
-      }
-      if (importListId) {
-        const lr = await fetch(`/api/email/lists/${importListId}/contacts`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ all: true }) })
-        const ld = await lr.json()
-        if (!lr.ok) toast.error(`Imported ${data.imported} contacts but list failed`)
-        else importExtras.push(`${ld.imported} in list`)
-      }
-      toast.success(`Imported ${data.imported} contacts${importExtras.length ? ` — ${importExtras.join(", ")}` : ""}`)
-      if (fileRef.current) fileRef.current.value = ""; load()
-    } catch (err: unknown) { toast.error(err instanceof Error ? err.message : "Import error") }
-    finally { setImporting(false) }
   }
 
   const handleApplyTags = async (contactId: string, toAdd: string[], toRemove: string[]) => {
@@ -585,7 +749,6 @@ export default function ContactsPage() {
     if (!res.ok) { toast.error("Failed to rename tag"); return }
     setAllTags(prev => prev.map(t => t.id === tagId ? { ...t, name: newName } : t))
     setContacts(prev => prev.map(c => ({ ...c, tags: c.tags.map(t => t.id === tagId ? { ...t, name: newName } : t) })))
-    if (filterTag === tagId) setFilterTag(null)
     toast.success("Tag renamed")
   }
 
@@ -601,7 +764,6 @@ export default function ContactsPage() {
         if (!res.ok) { toast.error("Failed to delete tag"); return }
         setAllTags(prev => prev.filter(t => t.id !== tagId))
         setContacts(prev => prev.map(c => ({ ...c, tags: c.tags.filter(t => t.id !== tagId) })))
-        if (filterTag === tagId) setFilterTag(null)
         toast.success("Tag deleted")
       },
     })
@@ -614,15 +776,8 @@ export default function ContactsPage() {
     if (!res.ok) { toast.error(res.status === 409 ? "Tag already exists" : data.error); return }
     setAllTags(prev => [...prev, data].sort((a, b) => a.name.localeCompare(b.name)))
     toast.success(`Tag "${name}" created`)
+    return data as EmailTag
   }
-
-  const handleCreateGlobalTag = async () => {
-    const name = newGlobalTag.trim()
-    await handleCreateTag(name)
-    setNewGlobalTag(""); setShowCreateTag(false)
-  }
-
-  // ─── Bulk handlers ───
 
   const bulkAddTags = async (tagIds: string[]) => {
     setBulkBusy(true)
@@ -636,7 +791,7 @@ export default function ContactsPage() {
       ? { ...c, tags: [...c.tags, ...tags.filter(t => !c.tags.find(ct => ct.id === t.id))] }
       : c
     ))
-    toast.success(`Tagged ${selected.size} contact${selected.size !== 1 ? "s" : ""} with ${tagIds.length} tag${tagIds.length !== 1 ? "s" : ""}`)
+    toast.success(`Tagged ${selected.size} contact${selected.size !== 1 ? "s" : ""}`)
     setBulkBusy(false)
   }
 
@@ -665,241 +820,664 @@ export default function ContactsPage() {
     })
   }
 
-  const visibleTags = allTags.slice(0, TAG_VISIBLE_LIMIT)
-  const overflowTags = allTags.slice(TAG_VISIBLE_LIMIT)
+  // ── Create contact handler ──
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!createForm.email || !clientId) return
+    setCreateBusy(true)
+    try {
+      const name = [createForm.firstName, createForm.lastName].filter(Boolean).join(" ") || null
+      // Build custom field metadata for dynamic columns
+      const customMetadata: Record<string, string> = {}
+      createForm.customFields.forEach(f => { if (f.value) customMetadata[f.key] = f.value })
 
-  const listSelect = (value: string, onChange: (v: string) => void, ph = "Add to list (optional)") =>
-    lists.length > 0 ? (
-      <select value={value} onChange={e => onChange(e.target.value)} className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#003434]/20 text-zinc-700 bg-white">
-        <option value="">{ph}</option>
-        {lists.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
-      </select>
-    ) : null
+      const payload = {
+        client_id: clientId,
+        email: createForm.email,
+        name,
+        first_name: createForm.firstName || null,
+        last_name: createForm.lastName || null,
+        phone: createForm.phone || null,
+        alternate_phone: createForm.alternatePhone || null,
+        company: createForm.company || null,
+        street_address: createForm.streetAddress || null,
+        street_number: createForm.streetNumber || null,
+        neighborhood: createForm.neighborhood || null,
+        postal_code: createForm.postalCode || null,
+        city: createForm.city || null,
+        state_province: createForm.stateProvince || null,
+        country: createForm.country || null,
+        tax_number: createForm.taxNumber || null,
+        language: createForm.language || "English",
+        user_name: createForm.userName || null,
+        user_type: createForm.userType || null,
+        agent_name: createForm.agentName || null,
+        agent_id: createForm.agentId || null,
+        agent_registered_date: createForm.agentRegisteredDate || null,
+        agent_pancard_no: createForm.agentPancardNo || null,
+        agent_gst_number: createForm.agentGstNumber || null,
+        tag_ids: createForm.tagIds,
+        metadata: customMetadata,
+      }
 
-  const statusBadge = (c: Contact) => {
-    if (c.bounced) return <span className="inline-flex items-center gap-1 text-xs bg-red-50 text-red-600 border border-red-200 px-2 py-0.5 rounded-full"><span className="w-1 h-1 rounded-full bg-red-400 inline-block" />bounced</span>
-    if (c.complained) return <span className="inline-flex items-center gap-1 text-xs bg-orange-50 text-orange-600 border border-orange-200 px-2 py-0.5 rounded-full"><span className="w-1 h-1 rounded-full bg-orange-400 inline-block" />complained</span>
-    if (c.subscribed) return <span className="inline-flex items-center gap-1 text-xs bg-emerald-50 text-emerald-600 border border-emerald-200 px-2 py-0.5 rounded-full"><span className="w-1 h-1 rounded-full bg-emerald-400 inline-block" />subscribed</span>
-    return <span className="inline-flex items-center gap-1 text-xs bg-zinc-100 text-zinc-500 border border-zinc-200 px-2 py-0.5 rounded-full"><span className="w-1 h-1 rounded-full bg-zinc-400 inline-block" />unsubscribed</span>
+      const res = await fetch("/api/email/contacts", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      toast.success("Contact created")
+      setCreateForm({
+        email: "", firstName: "", lastName: "", phone: "", alternatePhone: "",
+        company: "", streetAddress: "", streetNumber: "", neighborhood: "",
+        postalCode: "", city: "", stateProvince: "", country: "", taxNumber: "",
+        language: "English", userName: "", userType: "", agentName: "", agentId: "",
+        agentRegisteredDate: "", agentPancardNo: "", agentGstNumber: "",
+        tagIds: [], customFields: [],
+      })
+      setView("list")
+      load()
+    } catch (err: unknown) { toast.error(err instanceof Error ? err.message : "Error") }
+    finally { setCreateBusy(false) }
   }
 
-  return (
-    <div className="max-w-5xl">
-      {dialog && <ConfirmDialog {...dialog} onCancel={() => setDialog(null)} />}
+  // ── Import handler ──
+  const handleImport = async () => {
+    if (!importFile || !clientId) { toast.error("Select a CSV file"); return }
+    setImportBusy(true)
+    try {
+      const fd = new FormData()
+      fd.append("client_id", clientId)
+      fd.append("file", importFile)
+      fd.append("delimiter", importDelimiter)
+      importTagIds.forEach(id => fd.append("tag_id", id))
+      const res = await fetch("/api/email/contacts/import", { method: "POST", body: fd })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      toast.success(`Imported ${data.imported} contacts${data.invalid ? ` (${data.invalid} invalid skipped)` : ""}`)
+      setImportFile(null)
+      if (fileRef.current) fileRef.current.value = ""
+      setImportTagIds([])
+      loadImportLogs()
+      load()
+    } catch (err: unknown) { toast.error(err instanceof Error ? err.message : "Import error") }
+    finally { setImportBusy(false) }
+  }
 
-      <div className="mb-6">
-        <h1 className="text-xl font-semibold text-zinc-900">Contacts</h1>
-        <p className="text-sm text-zinc-500 mt-1">Subscriber list — CSV import, manual add, or synced from leads</p>
-      </div>
+  // ── Status badge helper ──
+  const statusBadge = (c: Contact) => {
+    if (c.bounced) return <span className="inline-flex items-center gap-1 text-[11px] bg-red-50 text-red-600 border border-red-200 px-2 py-0.5 rounded-full"><span className="w-1.5 h-1.5 rounded-full bg-red-400 inline-block" />bounced</span>
+    if (c.complained) return <span className="inline-flex items-center gap-1 text-[11px] bg-orange-50 text-orange-600 border border-orange-200 px-2 py-0.5 rounded-full"><span className="w-1.5 h-1.5 rounded-full bg-orange-400 inline-block" />complained</span>
+    if (c.subscribed) return <span className="inline-flex items-center gap-1 text-[11px] bg-emerald-50 text-emerald-600 border border-emerald-200 px-2 py-0.5 rounded-full"><span className="w-1.5 h-1.5 rounded-full bg-[#70BF4B] inline-block" />subscribed</span>
+    return <span className="inline-flex items-center gap-1 text-[11px] bg-zinc-100 text-zinc-500 border border-zinc-200 px-2 py-0.5 rounded-full"><span className="w-1.5 h-1.5 rounded-full bg-zinc-400 inline-block" />unsubscribed</span>
+  }
 
-      {/* Add contact + CSV import */}
-      <div className="grid sm:grid-cols-2 gap-4 mb-5">
-        <form onSubmit={handleAdd} className="bg-white border border-zinc-200 rounded-xl p-4 space-y-3">
-          <p className="text-sm font-semibold text-zinc-700">Add contact</p>
-          <input className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#003434]/20" placeholder="Client ID" value={form.client_id} onChange={e => setForm(f => ({ ...f, client_id: e.target.value }))} required />
-          <input className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#003434]/20" placeholder="email@example.com" type="email" value={form.email} onChange={e => setForm(f => ({ ...f, email: e.target.value }))} required />
-          <input className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#003434]/20" placeholder="Name (optional)" value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} />
-          {listSelect(form.list_id, v => setForm(f => ({ ...f, list_id: v })))}
-          <TagMultiSelect allTags={allTags} value={form.tagIds} onChange={v => setForm(f => ({ ...f, tagIds: v }))} />
-          <button type="submit" disabled={adding} className="bg-[#003434] text-white text-sm px-4 py-2 rounded-lg hover:bg-[#004444] transition-colors disabled:opacity-50 w-full">{adding ? "Adding…" : "Add contact"}</button>
-        </form>
-        <div className="bg-white border border-zinc-200 rounded-xl p-4 space-y-3">
-          <p className="text-sm font-semibold text-zinc-700">CSV import</p>
-          <p className="text-xs text-zinc-400">CSV must have an <code className="bg-zinc-100 px-1 rounded">email</code> column. Optional: <code className="bg-zinc-100 px-1 rounded">name</code>.</p>
-          <input className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#003434]/20" placeholder="Client ID" value={importClientId} onChange={e => setImportClientId(e.target.value)} />
-          {listSelect(importListId, setImportListId)}
-          <TagMultiSelect allTags={allTags} value={importTagIds} onChange={setImportTagIds} />
-          <input ref={fileRef} type="file" accept=".csv" className="w-full text-sm text-zinc-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-medium file:bg-zinc-100 file:text-zinc-700 hover:file:bg-zinc-200" />
-          <button onClick={handleImport} disabled={importing} className="bg-[#003434] text-white text-sm px-4 py-2 rounded-lg hover:bg-[#004444] transition-colors disabled:opacity-50 w-full">{importing ? "Importing…" : "Import CSV"}</button>
+  // ─── View: Create Contact ───────────────────────────────────────────────────
+
+  if (view === "create") {
+    return (
+      <div className="max-w-2xl">
+        {dialog && <ConfirmDialog {...dialog} onCancel={() => setDialog(null)} />}
+        {showCustomFieldModal && (
+          <CustomFieldModal
+            onClose={() => setShowCustomFieldModal(false)}
+            onSave={field => {
+              setCreateForm(f => ({ ...f, customFields: [...f.customFields, field] }))
+              setShowCustomFieldModal(false)
+            }}
+          />
+        )}
+
+        {/* Breadcrumb header */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-2 text-sm">
+            <button onClick={() => setView("list")} className="text-zinc-500 hover:text-zinc-800 transition-colors">Contacts</button>
+            <svg className="w-3.5 h-3.5 text-zinc-300" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+            <span className="text-zinc-900 font-semibold">Create contact</span>
+          </div>
+          <button
+            form="create-contact-form"
+            type="submit"
+            disabled={createBusy || !createForm.email}
+            className="inline-flex items-center gap-1.5 bg-[#003434] text-white text-sm px-4 py-2 rounded-lg hover:bg-[#004444] disabled:opacity-40 transition-colors"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+            {createBusy ? "Saving…" : "Save"}
+          </button>
         </div>
-      </div>
 
-      {/* ── Tags Management Section ── */}
-      <TagsManager
-        allTags={allTags}
-        contacts={contacts}
-        onRename={handleRenameTag}
-        onDelete={handleDeleteTag}
-        onCreateTag={handleCreateTag}
-        open={tagsOpen}
-        onToggle={() => setTagsOpen(v => !v)}
-      />
+        <form id="create-contact-form" onSubmit={handleCreate}>
+          <div className="bg-white border border-zinc-200 rounded-xl p-6 space-y-5">
+            {/* Helper to render a labeled input */}
+            {(() => {
+              const f = createForm
+              const set = (key: keyof typeof createForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+                setCreateForm(prev => ({ ...prev, [key]: e.target.value }))
+              const inp = (label: string, key: keyof typeof createForm, opts?: { type?: string; placeholder?: string; required?: boolean; colSpan?: boolean }) => (
+                <div className={opts?.colSpan ? "col-span-2" : ""}>
+                  <label className="text-sm font-medium text-zinc-700 block mb-1.5">
+                    {label}{opts?.required && <span className="text-red-400 ml-0.5">*</span>}
+                  </label>
+                  <input
+                    type={opts?.type ?? "text"}
+                    required={opts?.required}
+                    className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#003434]/20"
+                    placeholder={opts?.placeholder ?? label}
+                    value={f[key] as string}
+                    onChange={set(key)}
+                  />
+                </div>
+              )
+              return (
+                <div className="grid grid-cols-2 gap-4">
+                  {inp("Email", "email", { type: "email", placeholder: "email@example.com", required: true, colSpan: true })}
+                  {inp("First name", "firstName")}
+                  {inp("Last name", "lastName")}
+                  {inp("Street address", "streetAddress")}
+                  {inp("Street number", "streetNumber")}
+                  {inp("Neighborhood", "neighborhood")}
+                  {inp("Postal code", "postalCode")}
+                  {inp("City", "city")}
+                  {inp("State / Province", "stateProvince")}
+                  <div>
+                    <label className="text-sm font-medium text-zinc-700 block mb-1.5">Country</label>
+                    <select
+                      className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#003434]/20 bg-white"
+                      value={f.country}
+                      onChange={set("country")}
+                    >
+                      <option value="">Country</option>
+                      {["India","United States","United Kingdom","Australia","Canada","Singapore","UAE","Germany","France","Netherlands","Other"].map(c => (
+                        <option key={c} value={c}>{c}</option>
+                      ))}
+                    </select>
+                  </div>
+                  {inp("Phone number", "phone", { type: "tel", placeholder: "+91 98765 43210" })}
+                  {inp("Company name", "company")}
+                  {inp("Tax number", "taxNumber")}
+                  {inp("Alternate Mobile No", "alternatePhone", { type: "tel" })}
+                  {inp("Agent Pancard No", "agentPancardNo")}
+                  {inp("Agent GST Number", "agentGstNumber")}
+                  {inp("Agent Id", "agentId")}
+                  {inp("Agent Registered Date", "agentRegisteredDate", { type: "date" })}
+                  {inp("User Type", "userType")}
+                  {inp("Agent Name", "agentName")}
+                  {inp("User Name", "userName")}
+                  <div>
+                    <label className="text-sm font-medium text-zinc-700 block mb-1.5">Language <span className="text-red-400">*</span></label>
+                    <select
+                      className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#003434]/20 bg-white"
+                      value={f.language}
+                      onChange={set("language")}
+                    >
+                      {["English","Hindi","Marathi","Tamil","Telugu","Kannada","Bengali","Gujarati","Other"].map(l => (
+                        <option key={l} value={l}>{l}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+              )
+            })()}
 
-      {/* ── Tag filter bar ── */}
-      <div className="bg-white border border-zinc-200 rounded-xl px-4 py-3 mb-3 flex items-center gap-2 flex-wrap">
-        <span className="text-xs font-semibold text-zinc-400 uppercase tracking-wide mr-1 shrink-0">Filter</span>
-        <button onClick={() => setFilterTag(null)} className={`inline-flex items-center text-xs px-3 py-1 rounded-full border transition-colors shrink-0 ${filterTag === null ? "bg-[#003434] text-white border-[#003434]" : "bg-white text-zinc-600 border-zinc-200 hover:border-zinc-300 hover:bg-zinc-50"}`}>
-          All{filterTag === null && contacts.length > 0 && <span className="ml-1.5 opacity-60 text-[10px]">{contacts.length}</span>}
-        </button>
-        {visibleTags.map(tag => {
-          const count = contacts.filter(c => c.tags.some(t => t.id === tag.id)).length
-          return (
-            <button key={tag.id} onClick={() => setFilterTag(filterTag === tag.id ? null : tag.id)}
-              className={`inline-flex items-center gap-1.5 text-xs px-3 py-1 rounded-full border transition-colors shrink-0 ${filterTag === tag.id ? "bg-[#003434] text-white border-[#003434]" : "bg-teal-50 text-[#003434] border-teal-200 hover:bg-teal-100"}`}>
-              {tag.name}<span className={`text-[10px] ${filterTag === tag.id ? "opacity-60" : "text-teal-600/70"}`}>{count}</span>
+            {/* Dynamic custom fields */}
+            {createForm.customFields.length > 0 && (
+              <div className="border-t border-zinc-100 pt-4 grid grid-cols-2 gap-4">
+                {createForm.customFields.map((field, idx) => (
+                  <div key={field.key}>
+                    <div className="flex items-center justify-between mb-1.5">
+                      <label className="text-sm font-medium text-zinc-700">{field.label}</label>
+                      <button
+                        type="button"
+                        onClick={() => setCreateForm(f => ({ ...f, customFields: f.customFields.filter((_, i) => i !== idx) }))}
+                        className="text-zinc-300 hover:text-red-400 transition-colors"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                      </button>
+                    </div>
+                    <input
+                      className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#003434]/20"
+                      placeholder={field.label}
+                      value={field.value}
+                      onChange={e => setCreateForm(f => ({
+                        ...f,
+                        customFields: f.customFields.map((cf, i) => i === idx ? { ...cf, value: e.target.value } : cf)
+                      }))}
+                    />
+                  </div>
+                ))}
+              </div>
+            )}
+
+            <button type="button" onClick={() => setShowCustomFieldModal(true)} className="inline-flex items-center gap-2 text-sm text-[#003434] hover:underline">
+              <span className="w-5 h-5 rounded-full bg-[#003434] text-white flex items-center justify-center">
+                <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" /></svg>
+              </span>
+              Add new custom field
             </button>
-          )
-        })}
-        {overflowTags.length > 0 && (
-          <div className="relative shrink-0" ref={overflowRef}>
-            <button onClick={() => setShowOverflow(v => !v)} className={`inline-flex items-center gap-1 text-xs px-3 py-1 rounded-full border transition-colors ${showOverflow ? "bg-zinc-100 border-zinc-300 text-zinc-700" : "bg-white border-zinc-200 text-zinc-500 hover:bg-zinc-50"}`}>
-              +{overflowTags.length} more
-              <svg className={`w-3 h-3 transition-transform ${showOverflow ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-            </button>
-            {showOverflow && (
-              <div className="absolute z-50 top-full left-0 mt-1.5 bg-white border border-zinc-200 rounded-xl shadow-xl py-1.5 min-w-[160px]">
-                {overflowTags.map(tag => {
-                  const count = contacts.filter(c => c.tags.some(t => t.id === tag.id)).length
+          </div>
+
+          {/* Tags */}
+          <div className="bg-white border border-zinc-200 rounded-xl p-6 mt-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold text-zinc-700">Select tags</h3>
+              <button type="button" onClick={() => setCreateForm(f => ({ ...f, tagIds: [] }))} className="text-xs text-zinc-400 hover:text-zinc-600">Discard changes</button>
+            </div>
+            <TagMultiSelect allTags={allTags} value={createForm.tagIds} onChange={v => setCreateForm(f => ({ ...f, tagIds: v }))} placeholder="Search and select tags…" />
+            {createForm.tagIds.length > 0 && (
+              <div className="flex flex-wrap gap-2 mt-3">
+                {createForm.tagIds.map(id => {
+                  const tag = allTags.find(t => t.id === id)
+                  if (!tag) return null
                   return (
-                    <button key={tag.id} onClick={() => { setFilterTag(filterTag === tag.id ? null : tag.id); setShowOverflow(false) }} className={`w-full text-left px-3 py-1.5 text-xs flex items-center justify-between hover:bg-zinc-50 ${filterTag === tag.id ? "text-[#003434] font-medium" : "text-zinc-700"}`}>
-                      <span className="flex items-center gap-2"><span className="w-1.5 h-1.5 rounded-full bg-teal-400" />{tag.name}</span>
-                      <span className="text-[10px] text-zinc-400">{count}</span>
-                    </button>
+                    <span key={id} className="inline-flex items-center gap-1.5 bg-teal-50 text-[#003434] border border-teal-200 text-xs px-3 py-1 rounded-full">
+                      {tag.name}
+                      <button type="button" onClick={() => setCreateForm(f => ({ ...f, tagIds: f.tagIds.filter(tid => tid !== id) }))} className="text-teal-400 hover:text-teal-600">
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                      </button>
+                    </span>
                   )
                 })}
               </div>
             )}
           </div>
-        )}
-        {allTags.length > 0 && <span className="w-px h-4 bg-zinc-200 shrink-0" />}
-        <div className="relative shrink-0" ref={createTagRef}>
-          <button onClick={() => { setShowCreateTag(v => !v); setNewGlobalTag("") }} className="inline-flex items-center gap-1.5 text-xs px-3 py-1 rounded-full border border-dashed border-zinc-300 text-zinc-500 hover:border-[#003434] hover:text-[#003434] transition-colors">
-            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-            New tag
+        </form>
+      </div>
+    )
+  }
+
+  // ─── View: Import ───────────────────────────────────────────────────────────
+
+  if (view === "import") {
+    const filteredImportTags = importTagSearch.trim()
+      ? allTags.filter(t => t.name.toLowerCase().includes(importTagSearch.toLowerCase()))
+      : allTags
+
+    return (
+      <div className="max-w-4xl">
+        {/* Back button */}
+        <button onClick={() => setView("list")} className="inline-flex items-center gap-1.5 text-sm text-zinc-500 hover:text-zinc-800 mb-5 transition-colors">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+          Back to Contacts
+        </button>
+
+        <div className="grid lg:grid-cols-5 gap-5 mb-6">
+          {/* Warnings panel */}
+          <div className="lg:col-span-2">
+            <ImportWarningsPanel />
+          </div>
+
+          {/* Import form */}
+          <div className="lg:col-span-3 space-y-4">
+            {/* Contacts to import */}
+            <div className="bg-white border border-zinc-200 rounded-xl p-5">
+              <h3 className="text-sm font-semibold text-zinc-700 mb-4">Contacts to import</h3>
+              <div className="mb-4">
+                <label className="text-xs font-medium text-zinc-500 uppercase tracking-wide mb-2 block">Select CSV delimiter</label>
+                <div className="flex gap-0">
+                  {([",", ";", "|"] as const).map((d, i) => {
+                    const labels = { ",": "Comma", ";": "Semicolon", "|": "Pipe" }
+                    const active = importDelimiter === d
+                    return (
+                      <button
+                        key={d}
+                        type="button"
+                        onClick={() => setImportDelimiter(d)}
+                        className={`flex-1 py-2 text-sm border transition-colors ${
+                          i === 0 ? "rounded-l-lg" : i === 2 ? "rounded-r-lg" : ""
+                        } ${
+                          active
+                            ? "bg-[#003434] text-white border-[#003434] z-10"
+                            : "bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50"
+                        }`}
+                      >
+                        {labels[d]}
+                        {active && (
+                          <svg className="w-3 h-3 inline ml-1.5 opacity-70" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" /></svg>
+                        )}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+              <div
+                className="border-2 border-dashed border-zinc-200 rounded-xl p-8 text-center hover:border-[#003434]/40 transition-colors cursor-pointer"
+                onClick={() => fileRef.current?.click()}
+              >
+                {importFile ? (
+                  <div>
+                    <svg className="w-8 h-8 text-[#70BF4B] mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                    <p className="text-sm font-medium text-zinc-700">{importFile.name}</p>
+                    <button type="button" onClick={e => { e.stopPropagation(); setImportFile(null); if (fileRef.current) fileRef.current.value = "" }} className="text-xs text-zinc-400 hover:text-red-400 mt-1 transition-colors">Remove</button>
+                  </div>
+                ) : (
+                  <>
+                    <svg className="w-8 h-8 text-zinc-300 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+                    <p className="text-sm text-zinc-500">Click to select the CSV file that contains your contacts</p>
+                    <p className="text-xs text-zinc-400 mt-1">Ensure that the first row contains column names</p>
+                  </>
+                )}
+                <input ref={fileRef} type="file" accept=".csv,.txt" className="hidden" onChange={e => setImportFile(e.target.files?.[0] ?? null)} />
+              </div>
+            </div>
+
+            {/* Select tags */}
+            <div className="bg-white border border-zinc-200 rounded-xl p-5">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-sm font-semibold text-zinc-700">Select tags</h3>
+                <div className="flex items-center gap-2">
+                  <button type="button" onClick={() => setImportTagIds([])} className="text-xs text-zinc-400 hover:text-zinc-600 transition-colors">Discard changes</button>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      const name = prompt("Tag name:")
+                      if (name?.trim()) await handleCreateTag(name.trim())
+                    }}
+                    className="text-xs bg-[#003434] text-white px-3 py-1.5 rounded-lg hover:bg-[#004444] transition-colors"
+                  >
+                    Create a new tag
+                  </button>
+                </div>
+              </div>
+              <div className="relative mb-3">
+                <svg className="w-3.5 h-3.5 text-zinc-400 absolute left-3 top-1/2 -translate-y-1/2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                <input className="w-full border border-zinc-200 rounded-lg pl-8 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#003434]/20" placeholder="Search" value={importTagSearch} onChange={e => setImportTagSearch(e.target.value)} />
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {filteredImportTags.map(tag => {
+                  const selected = importTagIds.includes(tag.id)
+                  return (
+                    <button
+                      key={tag.id} type="button"
+                      onClick={() => setImportTagIds(prev => selected ? prev.filter(id => id !== tag.id) : [...prev, tag.id])}
+                      className={`inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-full border transition-colors ${
+                        selected ? "bg-[#003434] text-white border-[#003434]" : "bg-zinc-50 text-zinc-600 border-zinc-200 hover:border-zinc-300"
+                      }`}
+                    >
+                      {tag.name}
+                      {selected && (
+                        <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                      )}
+                    </button>
+                  )
+                })}
+                {filteredImportTags.length === 0 && <p className="text-xs text-zinc-400">No tags found</p>}
+              </div>
+            </div>
+
+            {/* Actions */}
+            <div className="flex items-center justify-between">
+              <button type="button" onClick={() => setView("list")} className="text-sm px-4 py-2 rounded-lg border border-zinc-200 text-zinc-600 hover:bg-zinc-50 transition-colors">
+                Previous
+              </button>
+              <button type="button" onClick={handleImport} disabled={importBusy || !importFile} className="inline-flex items-center gap-2 bg-[#003434] text-white text-sm px-5 py-2 rounded-lg hover:bg-[#004444] disabled:opacity-40 transition-colors">
+                {importBusy ? (
+                  <>
+                    <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                    Importing…
+                  </>
+                ) : (
+                  <>
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+                    Next
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Previous imports */}
+        <div className="bg-white border border-zinc-200 rounded-xl overflow-hidden">
+          <div className="px-5 py-4 border-b border-zinc-100 flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-zinc-700">Previous imports</h3>
+          </div>
+          {importLogs.length === 0 ? (
+            <div className="px-5 py-8 text-center text-sm text-zinc-400">No previous imports</div>
+          ) : (
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-zinc-100 bg-zinc-50/50">
+                  <th className="text-left px-5 py-3 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Date</th>
+                  <th className="text-left px-5 py-3 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">File</th>
+                  <th className="text-left px-5 py-3 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Registered</th>
+                  <th className="text-left px-5 py-3 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Invalid data</th>
+                  <th className="text-left px-5 py-3 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Status</th>
+                </tr>
+              </thead>
+              <tbody>
+                {importLogs.map(log => (
+                  <tr key={log.id} className="border-b border-zinc-50 hover:bg-zinc-50/60 transition-colors">
+                    <td className="px-5 py-3 text-xs text-zinc-600 whitespace-nowrap">
+                      {new Date(log.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" })},&nbsp;
+                      {new Date(log.created_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })}
+                    </td>
+                    <td className="px-5 py-3 text-xs text-zinc-600 max-w-[160px] truncate">{log.file_name ?? "—"}</td>
+                    <td className="px-5 py-3 text-xs text-zinc-600">{log.imported}/{log.total_rows}</td>
+                    <td className="px-5 py-3 text-xs">{log.invalid > 0 ? <span className="text-orange-500">{log.invalid} invalid rows</span> : <span className="text-zinc-400">—</span>}</td>
+                    <td className="px-5 py-3">
+                      <span className={`inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full border ${log.status === "completed" ? "bg-emerald-50 text-emerald-600 border-emerald-200" : "bg-red-50 text-red-600 border-red-200"}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full inline-block ${log.status === "completed" ? "bg-[#70BF4B]" : "bg-red-400"}`} />
+                        {log.status === "completed" ? "Approved" : "Failed"}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      </div>
+    )
+  }
+
+  // ─── View: List (default) ───────────────────────────────────────────────────
+
+  return (
+    <div className="w-full">
+      {dialog && <ConfirmDialog {...dialog} onCancel={() => setDialog(null)} />}
+
+      {/* Header */}
+      <div className="flex items-center justify-between mb-5">
+        <h1 className="text-xl font-semibold text-zinc-900">
+          {filteredContacts.length > 0 ? `${filteredContacts.length} Contacts` : "Contacts"}
+        </h1>
+        <div className="flex items-center gap-2.5">
+          <button
+            onClick={() => setView("create")}
+            className="inline-flex items-center gap-1.5 bg-[#003434] text-white text-sm px-4 py-2 rounded-lg hover:bg-[#004444] transition-colors"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" /></svg>
+            Create contact
           </button>
-          {showCreateTag && (
-            <div className="absolute z-50 top-full left-0 mt-1.5 bg-white border border-zinc-200 rounded-xl shadow-xl p-2 w-52" onClick={e => e.stopPropagation()}>
-              <div className="flex gap-1.5">
-                <input autoFocus className="flex-1 min-w-0 border border-zinc-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#003434]/20" placeholder="Tag name…" value={newGlobalTag} onChange={e => setNewGlobalTag(e.target.value)}
-                  onKeyDown={e => { if (e.key === "Enter") handleCreateGlobalTag(); if (e.key === "Escape") { setShowCreateTag(false); setNewGlobalTag("") } }} />
-                <button className="text-xs bg-[#003434] text-white px-2.5 py-1 rounded-lg hover:bg-[#004444] shrink-0" onClick={handleCreateGlobalTag}>Create</button>
+          <button
+            onClick={() => setView("import")}
+            className="inline-flex items-center gap-1.5 text-sm px-4 py-2 rounded-lg border border-zinc-200 text-zinc-700 bg-white hover:bg-zinc-50 transition-colors"
+          >
+            <svg className="w-3.5 h-3.5 text-zinc-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20H5a2 2 0 01-2-2V6a2 2 0 012-2h4l2 3h8a2 2 0 012 2v9a2 2 0 01-2 2z" /></svg>
+            Import contacts
+          </button>
+        </div>
+      </div>
+
+      <div className="flex gap-5 items-start">
+        {/* Sidebar */}
+        <div className="w-[240px] shrink-0">
+          <SidebarFilters
+            filters={sidebarFilters}
+            allTags={allTags}
+            onChange={f => setSidebarFilters(f)}
+            savedFilters={savedFilters}
+            onSave={handleSaveFilter}
+            onLoadFilter={f => { setSidebarFilters(f.filters); setPage(1) }}
+            onDeleteFilter={handleDeleteSavedFilter}
+            onReset={() => { setSidebarFilters(DEFAULT_FILTERS); setPage(1) }}
+          />
+        </div>
+
+        {/* Main content */}
+        <div className="flex-1 min-w-0">
+          {/* Bulk action bar */}
+          {someSelected && (
+            <div className="bg-[#003434] rounded-xl px-4 py-2.5 mb-3 flex items-center gap-3 flex-wrap">
+              <span className="text-xs font-semibold text-white/90 shrink-0">{selected.size} selected</span>
+              <span className="w-px h-4 bg-white/20 shrink-0" />
+              <div className="relative shrink-0" ref={bulkTagRef}>
+                <button onClick={() => setBulkTagOpen(v => !v)} disabled={bulkBusy} className="inline-flex items-center gap-1.5 text-xs text-white/80 hover:text-white border border-white/20 hover:border-white/40 rounded-lg px-2.5 py-1 transition-colors disabled:opacity-40">
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg>
+                  Add tags
+                </button>
+                {bulkTagOpen && <BulkTagPopover allTags={allTags} onApply={bulkAddTags} onClose={() => setBulkTagOpen(false)} />}
+              </div>
+              <button onClick={() => bulkSubscribe(true)} disabled={bulkBusy} className="text-xs text-white/80 hover:text-white border border-white/20 hover:border-white/40 rounded-lg px-2.5 py-1 transition-colors disabled:opacity-40 shrink-0">Subscribe</button>
+              <button onClick={() => bulkSubscribe(false)} disabled={bulkBusy} className="text-xs text-white/80 hover:text-white border border-white/20 hover:border-white/40 rounded-lg px-2.5 py-1 transition-colors disabled:opacity-40 shrink-0">Unsubscribe</button>
+              <button onClick={bulkDelete} disabled={bulkBusy} className="text-xs text-red-300 hover:text-red-200 border border-red-400/30 hover:border-red-400/60 rounded-lg px-2.5 py-1 transition-colors disabled:opacity-40 shrink-0">Delete</button>
+              <button onClick={() => setSelected(new Set())} className="ml-auto text-xs text-white/50 hover:text-white/80 transition-colors shrink-0">Clear</button>
+            </div>
+          )}
+
+          {/* Table */}
+          <div className="bg-white border border-zinc-200 rounded-xl overflow-hidden">
+            {loading ? (
+              <div className="px-4 py-12 text-center">
+                <div className="inline-block w-5 h-5 border-2 border-zinc-200 border-t-[#003434] rounded-full animate-spin" />
+              </div>
+            ) : filteredContacts.length === 0 ? (
+              <div className="px-4 py-12 text-center">
+                <svg className="w-10 h-10 text-zinc-200 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M17 20H5a2 2 0 01-2-2V6a2 2 0 012-2h4l2 3h8a2 2 0 012 2v9a2 2 0 01-2 2z" /></svg>
+                <p className="text-sm text-zinc-400">No contacts found</p>
+                <button onClick={() => setSidebarFilters(DEFAULT_FILTERS)} className="text-xs text-[#003434] hover:underline mt-1">Clear filters</button>
+              </div>
+            ) : (
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="border-b border-zinc-100 bg-zinc-50/60">
+                    <th className="px-4 py-3 w-8">
+                      <input type="checkbox" checked={allSelected} onChange={toggleAll} className="w-3.5 h-3.5 rounded border-zinc-300 cursor-pointer accent-[#003434]" />
+                    </th>
+                    <th className="text-left px-4 py-3 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Date registered</th>
+                    <th className="text-left px-4 py-3 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Email address</th>
+                    <th className="text-left px-4 py-3 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Tags</th>
+                    <th className="px-4 py-3 w-8" />
+                  </tr>
+                </thead>
+                <tbody>
+                  {paginatedContacts.map(c => {
+                    const isChecked = selected.has(c.id)
+                    return (
+                      <tr key={c.id} className={`border-b border-zinc-50 transition-colors ${isChecked ? "bg-teal-50/40" : "hover:bg-zinc-50/50"}`}>
+                        <td className="px-4 py-3.5 w-8">
+                          <input type="checkbox" checked={isChecked} onChange={() => toggleSelect(c.id)} className="w-3.5 h-3.5 rounded border-zinc-300 cursor-pointer accent-[#003434]" />
+                        </td>
+                        <td className="px-4 py-3.5 text-xs text-zinc-500 whitespace-nowrap">
+                          {new Date(c.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "2-digit", year: "numeric" })},&nbsp;
+                          {new Date(c.created_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })}
+                        </td>
+                        <td className="px-4 py-3.5">
+                          <div className="flex items-center gap-2">
+                            <div className="w-7 h-7 rounded-full bg-zinc-100 flex items-center justify-center text-zinc-400 shrink-0">
+                              <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                            </div>
+                            <div>
+                              <p className="text-xs font-medium text-[#003434]">{c.email}</p>
+                              {c.name && <p className="text-[11px] text-zinc-400">{c.name}</p>}
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3.5">
+                          <div className="flex flex-wrap items-center gap-1">
+                            {c.tags.map(tag => (
+                              <span key={tag.id} className="relative inline-flex">
+                                <button
+                                  className="inline-flex items-center text-[11px] bg-teal-50 text-[#003434] border border-teal-200 px-2 py-0.5 rounded-full hover:bg-teal-100 transition-colors gap-1"
+                                  onClick={() => setOpenPillDropdown(
+                                    openPillDropdown?.contactId === c.id && openPillDropdown.tag.id === tag.id ? null : { contactId: c.id, tag }
+                                  )}
+                                >
+                                  {tag.name}
+                                  <svg className="w-2 h-2 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                                </button>
+                                {openPillDropdown?.contactId === c.id && openPillDropdown.tag.id === tag.id && (
+                                  <TagPillDropdown
+                                    tag={tag}
+                                    onRename={handleRenameTag}
+                                    onRemove={() => handleRemoveTag(c.id, tag.id)}
+                                    onClose={() => setOpenPillDropdown(null)}
+                                  />
+                                )}
+                              </span>
+                            ))}
+                            <span className="relative">
+                              <button
+                                className="w-5 h-5 flex items-center justify-center text-zinc-300 hover:text-[#003434] border border-dashed border-zinc-200 hover:border-teal-300 rounded-full transition-colors"
+                                title="Add/remove tags"
+                                onClick={() => setOpenAddTag(openAddTag === c.id ? null : c.id)}
+                              >
+                                <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" /></svg>
+                              </button>
+                              {openAddTag === c.id && (
+                                <AddTagPopover
+                                  contactId={c.id}
+                                  clientId={clientId}
+                                  allTags={allTags}
+                                  contactTags={c.tags}
+                                  onApply={handleApplyTags}
+                                  onNewTag={tag => setAllTags(prev => [...prev, tag].sort((a, b) => a.name.localeCompare(b.name)))}
+                                  onClose={() => setOpenAddTag(null)}
+                                />
+                              )}
+                            </span>
+                            {/* Status badge alongside tags */}
+                            {statusBadge(c)}
+                          </div>
+                        </td>
+                        <td className="px-4 py-3.5">
+                          <RowActions
+                            contact={c}
+                            onToggleSubscribe={() => handleToggleSubscribe(c.id, c.subscribed)}
+                            onDelete={() => handleDelete(c.id, c.email)}
+                          />
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            )}
+          </div>
+
+          {/* Pagination */}
+          {filteredContacts.length > 0 && (
+            <div className="flex items-center justify-between mt-3 px-1">
+              <div className="flex items-center gap-1">
+                <span className="text-xs text-zinc-400 mr-2">Rows per page:</span>
+                {([10, 25, 50] as const).map(n => (
+                  <button key={n} onClick={() => { setPageSize(n); setPage(1) }}
+                    className={`w-8 h-8 text-xs rounded-lg transition-colors ${pageSize === n ? "bg-[#003434] text-white" : "text-zinc-500 hover:bg-zinc-100"}`}>
+                    {n}
+                  </button>
+                ))}
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-zinc-400">{(page - 1) * pageSize + 1}–{Math.min(page * pageSize, filteredContacts.length)} of {filteredContacts.length}</span>
+                <button
+                  onClick={() => setPage(p => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  className="text-sm px-3 py-1.5 rounded-lg border border-zinc-200 text-zinc-600 hover:bg-zinc-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  Previous
+                </button>
+                <button
+                  onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+                  disabled={page >= totalPages}
+                  className="text-sm px-3 py-1.5 rounded-lg border border-zinc-200 text-zinc-600 hover:bg-zinc-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  Next
+                </button>
               </div>
             </div>
           )}
         </div>
-        {filterTag && <span className="ml-auto text-xs text-zinc-400 shrink-0">{visibleContacts.length} contact{visibleContacts.length !== 1 ? "s" : ""}</span>}
-      </div>
-
-      {/* ── Bulk action bar ── */}
-      {someSelected && (
-        <div className="bg-[#003434] rounded-xl px-4 py-2.5 mb-3 flex items-center gap-3 flex-wrap">
-          <span className="text-xs font-semibold text-white/90 shrink-0">{selected.size} selected</span>
-          <span className="w-px h-4 bg-white/20 shrink-0" />
-          <div className="relative shrink-0" ref={bulkTagRef}>
-            <button onClick={() => setBulkTagOpen(v => !v)} disabled={bulkBusy} className="inline-flex items-center gap-1.5 text-xs text-white/80 hover:text-white border border-white/20 hover:border-white/40 rounded-lg px-2.5 py-1 transition-colors disabled:opacity-40">
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg>
-              Add tags
-            </button>
-            {bulkTagOpen && <BulkTagPopover allTags={allTags} onApply={bulkAddTags} onClose={() => setBulkTagOpen(false)} />}
-          </div>
-          <button onClick={() => bulkSubscribe(true)} disabled={bulkBusy} className="text-xs text-white/80 hover:text-white border border-white/20 hover:border-white/40 rounded-lg px-2.5 py-1 transition-colors disabled:opacity-40 shrink-0">Subscribe</button>
-          <button onClick={() => bulkSubscribe(false)} disabled={bulkBusy} className="text-xs text-white/80 hover:text-white border border-white/20 hover:border-white/40 rounded-lg px-2.5 py-1 transition-colors disabled:opacity-40 shrink-0">Unsubscribe</button>
-          <button onClick={bulkDelete} disabled={bulkBusy} className="text-xs text-red-300 hover:text-red-200 border border-red-400/30 hover:border-red-400/60 rounded-lg px-2.5 py-1 transition-colors disabled:opacity-40 shrink-0">Delete</button>
-          <button onClick={() => setSelected(new Set())} className="ml-auto text-xs text-white/50 hover:text-white/80 transition-colors shrink-0">Clear</button>
-        </div>
-      )}
-
-      {/* Contact table */}
-      <div className="bg-white border border-zinc-200 rounded-xl">
-        <div className="px-4 py-3 border-b border-zinc-100 flex items-center gap-3 rounded-t-xl overflow-hidden">
-          <svg className="w-3.5 h-3.5 text-zinc-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-          <input className="flex-1 text-sm focus:outline-none placeholder:text-zinc-400" placeholder="Search by email…" value={search} onChange={e => setSearch(e.target.value)} />
-          {search && <button className="text-xs text-zinc-400 hover:text-zinc-600" onClick={() => setSearch("")}>Clear</button>}
-        </div>
-        {loading ? (
-          <div className="px-4 py-10 text-center"><div className="inline-block w-5 h-5 border-2 border-zinc-200 border-t-[#003434] rounded-full animate-spin" /></div>
-        ) : visibleContacts.length === 0 ? (
-          <div className="px-4 py-10 text-center"><p className="text-sm text-zinc-400">{filterTag ? `No contacts with tag "${allTags.find(t => t.id === filterTag)?.name}".` : "No contacts found."}</p></div>
-        ) : (
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="border-b border-zinc-100 bg-zinc-50/50">
-                <th className="px-4 py-2.5 w-8">
-                  <input type="checkbox" checked={allSelected} onChange={toggleAll} className="w-3.5 h-3.5 rounded border-zinc-300 cursor-pointer accent-[#003434]" />
-                </th>
-                <th className="text-left px-4 py-2.5 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Email</th>
-                <th className="text-left px-4 py-2.5 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Name</th>
-                <th className="text-left px-4 py-2.5 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Tags</th>
-                <th className="text-left px-4 py-2.5 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Status</th>
-                <th className="text-left px-4 py-2.5 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">Added</th>
-                <th className="text-left px-4 py-2.5 text-[11px] font-semibold text-zinc-400 uppercase tracking-wider">List</th>
-                <th className="px-4 py-2.5" />
-              </tr>
-            </thead>
-            <tbody>
-              {visibleContacts.map(c => {
-                const isChecked = selected.has(c.id)
-                return (
-                  <tr key={c.id} className={`border-b border-zinc-50 transition-colors ${isChecked ? "bg-teal-50/40" : "hover:bg-zinc-50/60"}`}>
-                    <td className="px-4 py-3 w-8">
-                      <input type="checkbox" checked={isChecked} onChange={() => toggleSelect(c.id)} className="w-3.5 h-3.5 rounded border-zinc-300 cursor-pointer accent-[#003434]" />
-                    </td>
-                    <td className="px-4 py-3 text-zinc-800 font-medium text-xs">{c.email}</td>
-                    <td className="px-4 py-3 text-zinc-500 text-xs">{c.name ?? <span className="text-zinc-300">—</span>}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-wrap items-center gap-1 min-w-[80px]">
-                        {c.tags.map(tag => (
-                          <span key={tag.id} className="relative inline-flex">
-                            <button
-                              className="inline-flex items-center text-[11px] bg-teal-50 text-[#003434] border border-teal-200 px-2 py-0.5 rounded-full hover:bg-teal-100 transition-colors gap-1"
-                              onClick={() => setOpenPillDropdown(
-                                openPillDropdown?.contactId === c.id && openPillDropdown.tag.id === tag.id ? null : { contactId: c.id, tag }
-                              )}
-                            >
-                              {tag.name}
-                              <svg className="w-2 h-2 opacity-40" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-                            </button>
-                            {openPillDropdown?.contactId === c.id && openPillDropdown.tag.id === tag.id && (
-                              <TagPillDropdown
-                                tag={tag}
-                                onRename={handleRenameTag}
-                                onRemove={() => handleRemoveTag(c.id, tag.id)}
-                                onClose={() => setOpenPillDropdown(null)}
-                              />
-                            )}
-                          </span>
-                        ))}
-                        <span className="relative">
-                          <button
-                            className="w-5 h-5 flex items-center justify-center text-zinc-300 hover:text-[#003434] border border-dashed border-zinc-200 hover:border-teal-300 rounded-full transition-colors"
-                            title="Add/remove tags"
-                            onClick={() => setOpenAddTag(openAddTag === c.id ? null : c.id)}
-                          >
-                            <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" /></svg>
-                          </button>
-                          {openAddTag === c.id && (
-                            <AddTagPopover
-                              contactId={c.id}
-                              clientId={clientId}
-                              allTags={allTags}
-                              contactTags={c.tags}
-                              onApply={handleApplyTags}
-                              onNewTag={tag => setAllTags(prev => [...prev, tag].sort((a, b) => a.name.localeCompare(b.name)))}
-                              onClose={() => setOpenAddTag(null)}
-                            />
-                          )}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">{statusBadge(c)}</td>
-                    <td className="px-4 py-3 text-zinc-400 text-xs whitespace-nowrap">{new Date(c.created_at).toLocaleDateString("en-IN", { day: "2-digit", month: "short", year: "numeric" })}</td>
-                    <td className="px-4 py-3"><AddToListDropdown contactEmail={c.email} lists={lists} /></td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center justify-end gap-3">
-                        {!c.bounced && !c.complained && (
-                          <button onClick={() => handleToggleSubscribe(c.id, c.subscribed)} className={`text-xs underline underline-offset-2 ${c.subscribed ? "text-zinc-400 hover:text-zinc-600" : "text-emerald-500 hover:text-emerald-700"}`}>
-                            {c.subscribed ? "Unsubscribe" : "Re-subscribe"}
-                          </button>
-                        )}
-                        <button onClick={() => handleDelete(c.id, c.email)} className="text-xs text-red-400 hover:text-red-600 underline underline-offset-2">Delete</button>
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })}
-            </tbody>
-          </table>
-        )}
       </div>
     </div>
   )

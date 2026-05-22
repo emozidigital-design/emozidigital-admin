@@ -10,6 +10,7 @@ export async function POST(req: NextRequest) {
   const clientId = formData.get("client_id") as string
   const file = formData.get("file") as File | null
   const tagIds = formData.getAll("tag_id") as string[]
+  const delimiter = (formData.get("delimiter") as string) || ","
 
   if (!clientId || !file) {
     return NextResponse.json({ error: "client_id and file required" }, { status: 400 })
@@ -22,7 +23,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "CSV must have header row + at least one data row" }, { status: 400 })
   }
 
-  const headers = lines[0].split(",").map(h => h.replace(/^"|"$/g, "").trim().toLowerCase())
+  const headers = lines[0].split(delimiter).map(h => h.replace(/^"|"$/g, "").trim().toLowerCase())
   const emailIdx = headers.indexOf("email")
   const nameIdx = headers.indexOf("name")
 
@@ -30,12 +31,18 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "CSV must have an 'email' column" }, { status: 400 })
   }
 
+  let invalid = 0
   const contacts = lines.slice(1).flatMap(line => {
-    const cols = line.split(",").map(c => c.replace(/^"|"$/g, "").trim())
+    const cols = line.split(delimiter).map(c => c.replace(/^"|"$/g, "").trim())
     const email = cols[emailIdx]
-    if (!email || !email.includes("@")) return []
+    if (!email || !email.includes("@")) {
+      invalid++
+      return []
+    }
     return [{ client_id: clientId, email, name: nameIdx !== -1 ? cols[nameIdx] : null, metadata: {} }]
   })
+
+  const totalRows = lines.length - 1
 
   if (contacts.length === 0) {
     return NextResponse.json({ error: "no valid email addresses found" }, { status: 400 })
@@ -64,5 +71,17 @@ export async function POST(req: NextRequest) {
     }
   }
 
-  return NextResponse.json({ imported: contacts.length })
+  // Write import log
+  await supabaseAdmin.from("email_import_logs").insert({
+    client_id: clientId,
+    file_name: file.name,
+    delimiter,
+    total_rows: totalRows,
+    imported: contacts.length,
+    invalid,
+    tag_ids: tagIds,
+    status: "completed",
+  })
+
+  return NextResponse.json({ imported: contacts.length, invalid })
 }
