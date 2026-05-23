@@ -21,20 +21,29 @@ export async function GET(req: NextRequest) {
   const { count, error: countError } = await countQuery
   if (countError) return NextResponse.json({ error: countError.message }, { status: 500 })
 
-  let query = supabaseAdmin
-    .from("email_contacts")
-    .select("*, email_contact_tags(tag_id, email_tags(id, name))")
-    .order("created_at", { ascending: false })
-    .limit(count ?? 10000)
+  // Supabase PostgREST caps at 1000 rows per request — fetch in batches
+  const total = count ?? 0
+  const BATCH = 1000
+  const batches = Math.ceil(total / BATCH) || 1
+  const allData: Record<string, unknown>[] = []
 
-  if (clientId) query = query.eq("client_id", clientId)
-  if (search) query = query.ilike("email", `%${search}%`)
+  for (let i = 0; i < batches; i++) {
+    let q = supabaseAdmin
+      .from("email_contacts")
+      .select("*, email_contact_tags(tag_id, email_tags(id, name))")
+      .order("created_at", { ascending: false })
+      .range(i * BATCH, (i + 1) * BATCH - 1)
 
-  const { data, error } = await query
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    if (clientId) q = q.eq("client_id", clientId)
+    if (search) q = q.ilike("email", `%${search}%`)
+
+    const { data, error } = await q
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    allData.push(...(data ?? []))
+  }
 
   // Flatten nested tag structure to contacts[].tags = [{ id, name }]
-  const contacts = (data ?? []).map((c: Record<string, unknown>) => {
+  const contacts = allData.map((c: Record<string, unknown>) => {
     const tagJunctions = (c.email_contact_tags as { email_tags: { id: string; name: string } | null }[] | null) ?? []
     const tags = tagJunctions
       .map(j => j.email_tags)
