@@ -121,14 +121,6 @@ function buildAgentBazarNewsletterHtml(opts: {
           </td>
         </tr>
 
-        <!-- Greeting -->
-        <tr>
-          <td style="padding:20px 24px 12px;border-bottom:2px solid #F47920;">
-            <p style="margin:0 0 2px;font-style:italic;font-size:16px;color:#1a2332;">Hello ${opts.firstName},</p>
-            <p style="margin:0;font-size:14px;font-weight:bold;color:#1a2332;">Today&#39;s Highlight</p>
-          </td>
-        </tr>
-
         <!-- Hero cover image -->
         ${heroCoverHtml}
 
