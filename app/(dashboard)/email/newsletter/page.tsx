@@ -9,7 +9,7 @@ const TEST_EMAIL = "emozidigital@gmail.com"
 
 // ─── Interfaces ────────────────────────────────────────────────────────────────
 
-interface EmailTag { id: string; name: string }
+interface EmailTag { id: string; name: string; contact_count?: number }
 
 interface BlogPost {
   id: string
@@ -108,11 +108,14 @@ function TagMultiSelect({ allTags, value, onChange, placeholder = "Filter by tag
         <svg className={`w-4 h-4 text-zinc-400 transition-transform ${open ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
       </button>
       {open && (
-        <div className="absolute z-50 top-full mt-1 left-0 right-0 bg-white border border-zinc-200 rounded-xl shadow-xl py-1 max-h-44 overflow-y-auto">
+        <div className="absolute z-[100] top-full mt-1 left-0 right-0 bg-white border border-zinc-200 rounded-xl shadow-xl py-1 max-h-44 overflow-y-auto">
           {allTags.map(tag => (
             <label key={tag.id} className="flex items-center gap-2.5 px-3 py-1.5 hover:bg-zinc-50 cursor-pointer">
               <input type="checkbox" checked={value.includes(tag.id)} onChange={() => toggle(tag.id)} className="w-3.5 h-3.5 rounded border-zinc-300 accent-[#003434] cursor-pointer" />
-              <span className="text-xs text-zinc-700">{tag.name}</span>
+              <span className="text-xs text-zinc-700 flex-1">{tag.name}</span>
+              {tag.contact_count !== undefined && (
+                <span className="text-[10px] text-zinc-400 font-medium tabular-nums">{tag.contact_count.toLocaleString()}</span>
+              )}
             </label>
           ))}
         </div>
@@ -397,7 +400,9 @@ export default function NewsletterPage() {
 
   const validateStep3 = () => {
     if (!selectedPost || !senderId || !subject) { toast.error("Fill all required fields"); return false }
-    if ((isAgentBazar || recipientType === "list") && !listId) { toast.error("Select a recipient list"); return false }
+    if ((isAgentBazar || recipientType === "list") && !listId && filterTagIds.length === 0) {
+      toast.error("Select a recipient list or at least one tag"); return false
+    }
     return true
   }
 
@@ -1000,7 +1005,9 @@ export default function NewsletterPage() {
 
           {isAgentBazar ? (
             <div>
-              <label className="text-xs font-medium text-zinc-500 block mb-1">Recipient list</label>
+              <label className="text-xs font-medium text-zinc-500 block mb-1">
+                Recipient list <span className="font-normal text-zinc-400">(optional — select a list, tags, or both)</span>
+              </label>
               <select value={listId} onChange={e => setListId(e.target.value)} className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#003434]/20 bg-white">
                 <option value="">Choose a contact list…</option>
                 {lists.map(l => <option key={l.id} value={l.id}>{l.name} ({l.contact_count} contacts)</option>)}
@@ -1008,7 +1015,9 @@ export default function NewsletterPage() {
               {lists.length === 0 && <p className="text-xs text-amber-600 mt-1">No lists found. Create a list and add contacts first.</p>}
               {allTags.length > 0 && (
                 <div className="mt-2">
-                  <label className="text-xs font-medium text-zinc-500 block mb-1">Filter by tag <span className="font-normal text-zinc-400">(optional — sends to all if none selected)</span></label>
+                  <label className="text-xs font-medium text-zinc-500 block mb-1">
+                    Filter by tag <span className="font-normal text-zinc-400">(optional — sends to all in list if none selected)</span>
+                  </label>
                   <TagMultiSelect allTags={allTags} value={filterTagIds} onChange={setFilterTagIds} placeholder="All contacts in list" />
                 </div>
               )}
@@ -1045,8 +1054,16 @@ export default function NewsletterPage() {
           )}
 
           <button
-            onClick={() => { if (senderId && subject && (isAgentBazar ? listId : (recipientType === "leads" || listId))) setStep(3) }}
-            disabled={!senderId || !subject || (isAgentBazar ? !listId : (recipientType === "list" && !listId))}
+            onClick={() => {
+              const recipientOk = isAgentBazar
+                ? (!!listId || filterTagIds.length > 0)
+                : (recipientType === "leads" || !!listId || filterTagIds.length > 0)
+              if (senderId && subject && recipientOk) setStep(3)
+            }}
+            disabled={!senderId || !subject || (isAgentBazar
+              ? (!listId && filterTagIds.length === 0)
+              : (recipientType === "list" && !listId && filterTagIds.length === 0)
+            )}
             className="w-full bg-[#003434] text-white text-sm py-2.5 rounded-xl hover:bg-[#004848] disabled:opacity-40 active:scale-[0.98] transition-all font-semibold shadow-sm"
           >
             Preview newsletter →

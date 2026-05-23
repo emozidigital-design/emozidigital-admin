@@ -12,12 +12,20 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await supabaseAdmin
     .from("email_tags")
-    .select("*")
+    .select("*, email_contact_tags(count)")
     .eq("client_id", clientId)
     .order("name", { ascending: true })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json(data)
+
+  const tags = (data ?? []).map((t: Record<string, unknown>) => {
+    const countArr = t.email_contact_tags as { count: number }[] | null
+    const contact_count = countArr?.[0]?.count ?? 0
+    const { email_contact_tags: _, ...rest } = t
+    return { ...rest, contact_count }
+  })
+
+  return NextResponse.json(tags)
 }
 
 export async function POST(req: NextRequest) {
