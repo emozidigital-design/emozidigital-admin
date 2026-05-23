@@ -7,11 +7,14 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (unauth) return unauth
 
   const body = await req.json()
-  const { name, subject, html_body, variables } = body
+  const { name, subject, html_body, variables, template_type } = body
+
+  const updates: Record<string, unknown> = { name, subject, html_body, variables, updated_at: new Date().toISOString() }
+  if (template_type) updates.template_type = template_type
 
   const { data, error } = await supabaseAdmin
     .from("email_templates")
-    .update({ name, subject, html_body, variables, updated_at: new Date().toISOString() })
+    .update(updates)
     .eq("id", params.id)
     .select()
     .single()

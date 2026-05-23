@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import toast from "react-hot-toast"
 import { useClient } from "../client-context"
+import EmailEditorModal from "@/components/email/EmailEditorModal"
 
 const AGENTBAZAR_CLIENT_ID = "d5104fcd-defe-4e3d-a4cf-1893dba7b931"
 const TEST_EMAIL = "emozidigital@gmail.com"
@@ -181,6 +182,13 @@ export default function NewsletterPage() {
   const [savingTemplate, setSavingTemplate] = useState(false)
   const [deletingTemplateId, setDeletingTemplateId] = useState("")
 
+  // Email editor modal (for newsletter templates)
+  const [editorOpen, setEditorOpen] = useState(false)
+  const [editorTemplate, setEditorTemplate] = useState<NewsletterTemplate | null>(null)
+  // Three-dot menu for newsletter template in wizard
+  const [tmplMenuId, setTmplMenuId] = useState<string | null>(null)
+  const tmplMenuRef = useRef<HTMLDivElement>(null)
+
   // ── Wizard state ────────────────────────────────────────────────────────────
   const [step, setStep] = useState<1 | 2 | 3>(1)
   const [selectedPost, setSelectedPost] = useState<BlogPost | null>(null)
@@ -219,6 +227,15 @@ export default function NewsletterPage() {
   useEffect(() => {
     const h = (e: MouseEvent) => {
       if (sendDropdownRef.current && !sendDropdownRef.current.contains(e.target as Node)) setSendDropdownOpen(false)
+    }
+    document.addEventListener("mousedown", h)
+    return () => document.removeEventListener("mousedown", h)
+  }, [])
+
+  // Close template menu on outside click
+  useEffect(() => {
+    const h = (e: MouseEvent) => {
+      if (tmplMenuRef.current && !tmplMenuRef.current.contains(e.target as Node)) setTmplMenuId(null)
     }
     document.addEventListener("mousedown", h)
     return () => document.removeEventListener("mousedown", h)
@@ -759,7 +776,12 @@ export default function NewsletterPage() {
                         ) : (
                           <button onClick={() => setSelectedTemplateId(t.id)} className="text-xs text-zinc-500 hover:text-[#003434] font-medium">Use</button>
                         )}
-                        <button onClick={() => openEdit(t)} className="text-xs text-zinc-400 hover:text-zinc-700 px-2 py-1 rounded hover:bg-zinc-100">Edit</button>
+                        <button
+                          onClick={() => { setEditorTemplate(t); setEditorOpen(true) }}
+                          className="text-xs text-zinc-400 hover:text-zinc-700 px-2 py-1 rounded hover:bg-zinc-100"
+                        >
+                          Edit
+                        </button>
                         <button onClick={() => deleteTemplate(t.id)} disabled={deletingTemplateId === t.id} className="text-xs text-red-400 hover:text-red-600 px-2 py-1 rounded hover:bg-red-50 disabled:opacity-40">
                           {deletingTemplateId === t.id ? "…" : "Delete"}
                         </button>
@@ -806,7 +828,10 @@ export default function NewsletterPage() {
                 </div>
               ) : (
                 clientId && (
-                  <button onClick={openCreate} className="w-full border border-dashed border-zinc-200 rounded-xl py-3 text-sm text-zinc-400 hover:border-[#003434] hover:text-[#003434] transition-colors">
+                  <button
+                    onClick={() => { setEditorTemplate(null); setEditorOpen(true) }}
+                    className="w-full border border-dashed border-zinc-200 rounded-xl py-3 text-sm text-zinc-400 hover:border-[#003434] hover:text-[#003434] transition-colors"
+                  >
                     + New newsletter template
                   </button>
                 )
@@ -814,6 +839,26 @@ export default function NewsletterPage() {
             </div>
           )}
         </div>
+
+        {/* Newsletter template editor modal (dashboard view) */}
+        <EmailEditorModal
+          open={editorOpen}
+          onClose={() => {
+            setEditorOpen(false)
+            setEditorTemplate(null)
+            refreshTemplates()
+          }}
+          clientId={clientId}
+          initialTemplate={editorTemplate ? {
+            id: editorTemplate.id,
+            name: editorTemplate.name,
+            subject: editorTemplate.subject,
+            html_body: editorTemplate.html_body,
+            template_type: "newsletter",
+          } : undefined}
+          onSaved={() => refreshTemplates()}
+          defaultTemplateType="newsletter"
+        />
       </div>
     )
   }
@@ -968,18 +1013,78 @@ export default function NewsletterPage() {
           {/* Newsletter template */}
           {!loadingTemplates && (
             <div>
-              <label className="text-xs font-medium text-zinc-500 block mb-1">Newsletter template</label>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-medium text-zinc-500">Newsletter template</label>
+                {newsletterTemplates.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={() => { setEditorTemplate(null); setEditorOpen(true) }}
+                    className="text-xs font-medium text-[#003434] hover:underline"
+                  >
+                    + New template
+                  </button>
+                )}
+              </div>
               {newsletterTemplates.length === 0 ? (
                 <div className="flex items-center gap-2 p-3 rounded-lg border border-zinc-100 bg-zinc-50">
                   <span className="text-xs text-zinc-400 flex-1">No newsletter templates yet — using default system layout.</span>
-                  <button type="button" onClick={() => { setShowTemplatePanel(true); openCreate(); setView("dashboard") }} className="text-xs font-medium text-[#003434] hover:underline shrink-0">+ Create one</button>
+                  <button
+                    type="button"
+                    onClick={() => { setEditorTemplate(null); setEditorOpen(true) }}
+                    className="text-xs font-medium text-[#003434] hover:underline shrink-0"
+                  >
+                    + Create one
+                  </button>
                 </div>
               ) : (
                 <>
-                  <select value={selectedTemplateId} onChange={e => setSelectedTemplateId(e.target.value)} className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#003434]/20 bg-white">
-                    <option value="">Default system layout</option>
-                    {newsletterTemplates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                  </select>
+                  <div className="flex items-center gap-2">
+                    <select
+                      value={selectedTemplateId}
+                      onChange={e => setSelectedTemplateId(e.target.value)}
+                      className="flex-1 border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#003434]/20 bg-white"
+                    >
+                      <option value="">Default system layout</option>
+                      {newsletterTemplates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    </select>
+                    {/* Three-dot menu for selected template */}
+                    {selectedTemplateId && (() => {
+                      const selTmpl = newsletterTemplates.find(t => t.id === selectedTemplateId)
+                      if (!selTmpl) return null
+                      return (
+                        <div className="relative shrink-0" ref={tmplMenuId === selTmpl.id ? tmplMenuRef : undefined}>
+                          <button
+                            type="button"
+                            onClick={() => setTmplMenuId(tmplMenuId === selTmpl.id ? null : selTmpl.id)}
+                            className="w-8 h-8 flex items-center justify-center rounded-lg border border-zinc-200 hover:bg-zinc-100 text-zinc-400 hover:text-zinc-700 transition-colors"
+                          >
+                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
+                              <circle cx="10" cy="4" r="1.5" /><circle cx="10" cy="10" r="1.5" /><circle cx="10" cy="16" r="1.5" />
+                            </svg>
+                          </button>
+                          {tmplMenuId === selTmpl.id && (
+                            <div className="absolute right-0 top-9 z-50 bg-white border border-zinc-200 rounded-xl shadow-xl py-1.5 w-28 ring-1 ring-black/5">
+                              <button
+                                type="button"
+                                onClick={() => { setEditorTemplate(selTmpl); setEditorOpen(true); setTmplMenuId(null) }}
+                                className="w-full text-left px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-50 font-medium"
+                              >
+                                Edit
+                              </button>
+                              <div className="border-t border-zinc-100 my-1" />
+                              <button
+                                type="button"
+                                onClick={() => { deleteTemplate(selTmpl.id); setTmplMenuId(null) }}
+                                className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 font-medium"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })()}
+                  </div>
                   {selectedTemplateId
                     ? <p className="text-xs text-emerald-600 mt-1">✓ Custom template selected — your HTML design will be used</p>
                     : <p className="text-xs text-zinc-400 mt-1">Using the default branded layout</p>
@@ -1219,6 +1324,29 @@ export default function NewsletterPage() {
           </div>
         </div>
       )}
+
+      {/* ── Newsletter template editor modal ── */}
+      <EmailEditorModal
+        open={editorOpen}
+        onClose={() => {
+          setEditorOpen(false)
+          setEditorTemplate(null)
+          refreshTemplates()
+        }}
+        clientId={clientId}
+        initialTemplate={editorTemplate ? {
+          id: editorTemplate.id,
+          name: editorTemplate.name,
+          subject: editorTemplate.subject,
+          html_body: editorTemplate.html_body,
+          template_type: "newsletter",
+        } : undefined}
+        onSaved={(id) => {
+          refreshTemplates()
+          setSelectedTemplateId(id)
+        }}
+        defaultTemplateType="newsletter"
+      />
 
       {/* ── Schedule modal ── */}
       {showScheduleModal && (

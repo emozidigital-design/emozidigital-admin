@@ -54,9 +54,11 @@ interface EmailEditorModalProps {
     name?: string
     subject?: string
     html_body?: string
+    template_type?: string
   }
   clientId: string
   onSaved?: (templateId: string) => void
+  defaultTemplateType?: "campaign" | "newsletter"
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -766,6 +768,7 @@ export default function EmailEditorModal({
   initialTemplate,
   clientId,
   onSaved,
+  defaultTemplateType = "campaign",
 }: EmailEditorModalProps) {
   const router = useRouter()
   const [blocks, setBlocks] = useState<EmailBlock[]>([])
@@ -776,6 +779,7 @@ export default function EmailEditorModal({
   const [savedTemplateId, setSavedTemplateId] = useState<string | null>(null)
   const [name, setName] = useState("")
   const [subject, setSubject] = useState("")
+  const [templateType, setTemplateType] = useState<"campaign" | "newsletter">(defaultTemplateType)
   const [saving, setSaving] = useState(false)
   const [dragOverCanvas, setDragOverCanvas] = useState(false)
 
@@ -785,6 +789,7 @@ export default function EmailEditorModal({
     if (initialTemplate) {
       setName(initialTemplate.name || "")
       setSubject(initialTemplate.subject || "")
+      setTemplateType((initialTemplate.template_type as "campaign" | "newsletter") || defaultTemplateType)
       const parsed = parseBlocksFromHtml(initialTemplate.html_body || "")
       if (parsed) {
         setBlocks(parsed)
@@ -797,13 +802,14 @@ export default function EmailEditorModal({
     } else {
       setName("")
       setSubject("")
+      setTemplateType(defaultTemplateType)
       setBlocks([])
       setHtmlSource("")
       setMode("visual")
     }
     setSelectedId(null)
     setSavedTemplateId(null)
-  }, [open, initialTemplate])
+  }, [open, initialTemplate, defaultTemplateType])
 
   function addBlock(block: EmailBlock) {
     setBlocks(prev => [...prev, block])
@@ -901,6 +907,7 @@ export default function EmailEditorModal({
         subject: subject.trim(),
         html_body: html,
         variables: [],
+        template_type: templateType,
       }
       const url = initialTemplate?.id
         ? `/api/email/templates/${initialTemplate.id}`
@@ -943,6 +950,16 @@ export default function EmailEditorModal({
           placeholder="Subject line…"
           className="flex-1 min-w-0 border border-zinc-200 rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#003434]/20"
         />
+        {/* Template type selector */}
+        <select
+          value={templateType}
+          onChange={e => setTemplateType(e.target.value as "campaign" | "newsletter")}
+          className="border border-zinc-200 rounded-lg px-3 py-1.5 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-[#003434]/20 bg-white shrink-0 text-zinc-700"
+        >
+          <option value="campaign">Campaign</option>
+          <option value="newsletter">Newsletter</option>
+        </select>
+
         {/* Mode toggle */}
         <div className="flex rounded-lg border border-zinc-200 overflow-hidden text-xs shrink-0">
           <button
@@ -1060,23 +1077,30 @@ export default function EmailEditorModal({
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <button
-              onClick={() => {
-                onClose()
-              }}
+              onClick={() => { onClose() }}
               className="px-4 py-2 text-sm font-medium text-zinc-600 border border-zinc-200 rounded-xl hover:bg-zinc-50 transition-colors"
             >
               Exit
             </button>
-            <button
-              onClick={() => {
-                localStorage.setItem("email_draft_template_id", savedTemplateId)
-                onClose()
-                router.push("/email/campaigns")
-              }}
-              className="px-5 py-2 text-sm font-semibold bg-[#003434] text-white rounded-xl hover:bg-[#004444] transition-colors"
-            >
-              Create Campaign →
-            </button>
+            {templateType === "newsletter" ? (
+              <button
+                onClick={() => { onClose() }}
+                className="px-5 py-2 text-sm font-semibold bg-[#003434] text-white rounded-xl hover:bg-[#004444] transition-colors"
+              >
+                Done — back to Newsletters →
+              </button>
+            ) : (
+              <button
+                onClick={() => {
+                  localStorage.setItem("email_draft_template_id", savedTemplateId)
+                  onClose()
+                  router.push("/email/campaigns")
+                }}
+                className="px-5 py-2 text-sm font-semibold bg-[#003434] text-white rounded-xl hover:bg-[#004444] transition-colors"
+              >
+                Create Campaign →
+              </button>
+            )}
           </div>
         </div>
       )}

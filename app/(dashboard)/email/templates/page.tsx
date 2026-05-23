@@ -13,6 +13,7 @@ interface Template {
   subject: string
   html_body: string
   variables: string[]
+  template_type: string
   created_at: string
   updated_at: string
 }
@@ -31,7 +32,7 @@ export default function TemplatesPage() {
 
   async function fetchTemplates() {
     setLoading(true)
-    const params = new URLSearchParams()
+    const params = new URLSearchParams({ template_type: "campaign" })
     if (clientId) params.set("client_id", clientId)
     const res = await fetch(`/api/email/templates?${params}`)
     const data = await res.json()
@@ -98,8 +99,7 @@ export default function TemplatesPage() {
         <div>
           <h1 className="text-xl font-semibold text-zinc-900">Templates</h1>
           <p className="text-sm text-zinc-500 mt-1">
-            HTML email templates with{" "}
-            <code className="bg-zinc-100 px-1 rounded">{"{{variable}}"}</code> placeholders
+            Campaign templates — use in bulk email campaigns
           </p>
         </div>
         <button
@@ -206,6 +206,7 @@ export default function TemplatesPage() {
         clientId={clientId}
         initialTemplate={editorTemplate ?? undefined}
         onSaved={handleEditorSaved}
+        defaultTemplateType="campaign"
       />
     </div>
   )
