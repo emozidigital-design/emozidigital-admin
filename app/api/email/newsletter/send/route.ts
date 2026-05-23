@@ -4,6 +4,7 @@ import { getAgentBazarSupabase } from "@/lib/supabase-agentbazar"
 import { sesClient, SES_CONFIGURATION_SET } from "@/lib/ses"
 import { SendEmailCommand } from "@aws-sdk/client-ses"
 import { requireAuth } from "@/lib/require-auth"
+import { filterEligibleContacts } from "@/lib/email-contacts"
 
 const AGENTBAZAR_CLIENT_ID = "d5104fcd-defe-4e3d-a4cf-1893dba7b931"
 const AGENTBAZAR_BLOG_URL = "https://blog.agentbazar.in"
@@ -284,16 +285,13 @@ export async function POST(req: NextRequest) {
   if (unauth) return unauth
 
   const body = await req.json()
-  const { blog_post_id, sender_id, subject, client_id, recipient_type, list_id, newsletter_template_id } = body
+  const { blog_post_id, sender_id, subject, client_id, recipient_type, newsletter_template_id } = body
   const trending_post_ids: string[] = Array.isArray(body.trending_post_ids) ? body.trending_post_ids.slice(0, 2) : []
   const tag_ids: string[] = Array.isArray(body.tag_ids) ? body.tag_ids : []
   const test_email: string | null = typeof body.test_email === "string" && body.test_email ? body.test_email : null
 
   if (!blog_post_id || !sender_id || !subject || !recipient_type) {
     return NextResponse.json({ error: "Missing required fields" }, { status: 400 })
-  }
-  if (recipient_type === "list" && !list_id) {
-    return NextResponse.json({ error: "list_id required when recipient_type is list" }, { status: 400 })
   }
 
   const isAgentBazar = client_id === AGENTBAZAR_CLIENT_ID
@@ -368,28 +366,16 @@ export async function POST(req: NextRequest) {
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     recipients = (data ?? []).filter(r => r.email)
   } else {
-    const { data, error } = await supabaseAdmin
-      .from("email_list_contacts")
-      .select("email_contacts(id, email, name, subscribed, bounced, complained)")
-      .eq("list_id", list_id)
-
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-
-    type RawContact = { id: string; email: string; name: string | null; subscribed: boolean; bounced: boolean; complained: boolean }
-    let filtered = (data ?? [])
-      .map(r => r.email_contacts as unknown as RawContact)
-      .filter(c => c && c.subscribed && !c.bounced && !c.complained)
-
     if (tag_ids.length > 0) {
-      const { data: taggedContacts } = await supabaseAdmin
+      const { data, error } = await supabaseAdmin
         .from("email_contact_tags")
-        .select("contact_id")
+        .select("email_contacts(id, email, name, subscribed, bounced, complained)")
         .in("tag_id", tag_ids)
-      const taggedIds = new Set((taggedContacts ?? []).map(r => r.contact_id))
-      filtered = filtered.filter(c => taggedIds.has(c.id))
-    }
 
-    recipients = filtered.map(({ email, name }) => ({ email, name }))
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+      recipients = filterEligibleContacts(data ?? []).map(({ email, name }) => ({ email, name }))
+    }
   }
 
   // Test mode: override recipients with a single test address
@@ -408,7 +394,6 @@ export async function POST(req: NextRequest) {
       sender_id,
       subject,
       recipient_type,
-      list_id: list_id || null,
       tag_ids,
       trending_post_ids,
       newsletter_template_id: newsletter_template_id || null,

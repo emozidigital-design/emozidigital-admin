@@ -3,6 +3,7 @@ import { supabaseAdmin } from "@/lib/supabase-server"
 import { sesClient, SES_CONFIGURATION_SET } from "@/lib/ses"
 import { SendEmailCommand } from "@aws-sdk/client-ses"
 import { requireAuth } from "@/lib/require-auth"
+import { filterEligibleContacts, type EligibleContact } from "@/lib/email-contacts"
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const unauth = await requireAuth()
@@ -13,7 +14,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   // Fetch campaign with related data
   const { data: campaign, error: cErr } = await supabaseAdmin
     .from("email_campaigns")
-    .select("*, email_senders(*), email_templates(*), email_lists(*)")
+    .select("*, email_senders(*), email_templates(*)")
     .eq("id", campaignId)
     .single()
 
@@ -22,51 +23,17 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     return NextResponse.json({ error: "campaign already sent" }, { status: 409 })
   }
 
-  type ContactRow = { id: string; email: string; name: string | null; subscribed: boolean; bounced: boolean; complained: boolean }
+  let contacts: EligibleContact[] = []
 
-  let contacts: ContactRow[] = []
-
-  if (campaign.list_id) {
-    // List-based audience
-    const { data: listContacts, error: lcErr } = await supabaseAdmin
-      .from("email_list_contacts")
+  if (Array.isArray(campaign.tag_ids) && campaign.tag_ids.length > 0) {
+    const { data: taggedContacts, error: tcErr } = await supabaseAdmin
+      .from("email_contact_tags")
       .select("email_contacts(id, email, name, subscribed, bounced, complained)")
-      .eq("list_id", campaign.list_id)
-
-    if (lcErr) return NextResponse.json({ error: lcErr.message }, { status: 500 })
-
-    contacts = listContacts
-      ?.map(r => r.email_contacts as unknown as ContactRow)
-      .filter(c => c && c.subscribed && !c.bounced && !c.complained) ?? []
-  } else if (Array.isArray(campaign.tag_ids) && campaign.tag_ids.length > 0) {
-    // Tag-based audience — find lists tagged with any of the tag_ids, then get their contacts
-    const { data: taggedLists, error: tlErr } = await supabaseAdmin
-      .from("email_list_tags")
-      .select("list_id")
       .in("tag_id", campaign.tag_ids)
 
-    if (tlErr) return NextResponse.json({ error: tlErr.message }, { status: 500 })
+    if (tcErr) return NextResponse.json({ error: tcErr.message }, { status: 500 })
 
-    const listIdSet = new Set((taggedLists ?? []).map((r: { list_id: string }) => r.list_id))
-    const listIds = Array.from(listIdSet)
-    if (listIds.length > 0) {
-      const { data: listContacts, error: lcErr } = await supabaseAdmin
-        .from("email_list_contacts")
-        .select("email_contacts(id, email, name, subscribed, bounced, complained)")
-        .in("list_id", listIds)
-
-      if (lcErr) return NextResponse.json({ error: lcErr.message }, { status: 500 })
-
-      const seen = new Set<string>()
-      contacts = (listContacts ?? [])
-        .map(r => r.email_contacts as unknown as ContactRow)
-        .filter(c => {
-          if (!c || !c.subscribed || c.bounced || c.complained) return false
-          if (seen.has(c.id)) return false
-          seen.add(c.id)
-          return true
-        })
-    }
+    contacts = filterEligibleContacts(taggedContacts ?? [])
   }
 
   if (contacts.length === 0) {

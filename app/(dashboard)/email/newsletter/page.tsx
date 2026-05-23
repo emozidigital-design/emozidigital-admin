@@ -32,11 +32,6 @@ interface Sender {
   dkim_status: string
 }
 
-interface EmailList {
-  id: string
-  name: string
-  contact_count: number
-}
 
 interface NewsletterSend {
   id: string
@@ -194,9 +189,7 @@ export default function NewsletterPage() {
   const [selectedPost, setSelectedPost] = useState<BlogPost | null>(null)
   const [trendingPosts, setTrendingPosts] = useState<BlogPost[]>([])
   const [postSearch, setPostSearch] = useState("")
-  const [recipientType, setRecipientType] = useState<"leads" | "list">("leads")
   const [senderId, setSenderId] = useState("")
-  const [listId, setListId] = useState("")
   const [filterTagIds, setFilterTagIds] = useState<string[]>([])
   const [subject, setSubject] = useState("")
   const [selectedTemplateId, setSelectedTemplateId] = useState("")
@@ -204,7 +197,6 @@ export default function NewsletterPage() {
   // ── Data ────────────────────────────────────────────────────────────────────
   const [posts, setPosts] = useState<BlogPost[]>([])
   const [senders, setSenders] = useState<Sender[]>([])
-  const [lists, setLists] = useState<EmailList[]>([])
   const [allTags, setAllTags] = useState<EmailTag[]>([])
   const [history, setHistory] = useState<NewsletterSend[]>([])
   const [newsletterTemplates, setNewsletterTemplates] = useState<NewsletterTemplate[]>([])
@@ -241,9 +233,6 @@ export default function NewsletterPage() {
     return () => document.removeEventListener("mousedown", h)
   }, [])
 
-  useEffect(() => {
-    if (isAgentBazar) setRecipientType("list")
-  }, [isAgentBazar])
 
   useEffect(() => {
     setLoadingPosts(true)
@@ -278,15 +267,13 @@ export default function NewsletterPage() {
   useEffect(() => {
     const params = new URLSearchParams()
     if (clientId) params.set("client_id", clientId)
-    fetch(`/api/email/senders?${params}`)
-      .then(r => r.json())
-      .then(d => setSenders(Array.isArray(d) ? d.filter((s: Sender) => s.dkim_status === "verified") : []))
-    fetch(`/api/email/lists?${params}`)
-      .then(r => r.json())
-      .then(d => setLists(Array.isArray(d) ? d : []))
-    fetch(`/api/email/tags?${params}`)
-      .then(r => r.json())
-      .then(d => setAllTags(Array.isArray(d) ? d : []))
+    Promise.all([
+      fetch(`/api/email/senders?${params}`).then(r => r.json()),
+      fetch(`/api/email/tags?${params}`).then(r => r.json()),
+    ]).then(([s, tg]) => {
+      setSenders(Array.isArray(s) ? s.filter((v: Sender) => v.dkim_status === "verified") : [])
+      setAllTags(Array.isArray(tg) ? tg : [])
+    })
   }, [clientId])
 
   const refreshHistory = useCallback(() => {
@@ -326,9 +313,7 @@ export default function NewsletterPage() {
     setPostSearch("")
     setSubject("")
     setSenderId("")
-    setListId("")
     setFilterTagIds([])
-    setRecipientType(isAgentBazar ? "list" : "leads")
     setSelectedTemplateId(newsletterTemplates.length === 1 ? newsletterTemplates[0].id : "")
     setEditingRecordId(null)
     setEditingRecordStatus("draft")
@@ -346,10 +331,8 @@ export default function NewsletterPage() {
     setEditingRecordStatus(ns.status)
     setSubject(ns.subject)
     setSenderId(ns.sender_id ?? "")
-    setListId(ns.list_id ?? "")
     setFilterTagIds(ns.tag_ids ?? [])
     setSelectedTemplateId(ns.newsletter_template_id ?? "")
-    setRecipientType((ns.recipient_type as "leads" | "list") ?? "list")
     const post = posts.find(p => p.id === ns.blog_post_id)
     if (post) {
       setSelectedPost(post)
@@ -408,8 +391,7 @@ export default function NewsletterPage() {
     sender_id: senderId,
     subject,
     client_id: clientId || null,
-    recipient_type: recipientType,
-    list_id: recipientType === "list" ? listId : null,
+    recipient_type: isAgentBazar ? "list" : (filterTagIds.length > 0 ? "tags" : "leads"),
     tag_ids: filterTagIds,
     newsletter_template_id: selectedTemplateId || null,
     trending_post_ids: isAgentBazar ? trendingPosts.map(p => p.id) : [],
@@ -417,8 +399,8 @@ export default function NewsletterPage() {
 
   const validateStep3 = () => {
     if (!selectedPost || !senderId || !subject) { toast.error("Fill all required fields"); return false }
-    if ((isAgentBazar || recipientType === "list") && !listId && filterTagIds.length === 0) {
-      toast.error("Select a recipient list or at least one tag"); return false
+    if (!isAgentBazar && filterTagIds.length === 0) {
+      toast.error("Select at least one tag to target"); return false
     }
     return true
   }
@@ -614,7 +596,7 @@ export default function NewsletterPage() {
             history.map((ns, idx) => {
               const recipientLabel = ns.recipient_type === "leads"
                 ? "Leads"
-                : lists.find(l => l.id === ns.list_id)?.name ?? ns.list_id?.slice(0, 8) ?? "–"
+                : (ns.tag_ids?.length ?? 0) > 0 ? `${ns.tag_ids!.length} tag${ns.tag_ids!.length === 1 ? "" : "s"}` : "Tags"
               const tagNames = (ns.tag_ids ?? []).map(id => allTags.find(t => t.id === id)?.name).filter(Boolean)
               const openPct = ns.sent_count > 0 ? Math.round(((ns.opens_count ?? 0) / ns.sent_count) * 100) : 0
               const rowBg = idx % 2 === 0 ? "bg-white" : "bg-[#003434]/[0.022]"
@@ -1108,67 +1090,32 @@ export default function NewsletterPage() {
             {senders.length === 0 && <p className="text-xs text-amber-600 mt-1">No verified senders found. Add & verify a sender first.</p>}
           </div>
 
-          {isAgentBazar ? (
+          {!isAgentBazar && (
             <div>
               <label className="text-xs font-medium text-zinc-500 block mb-1">
-                Recipient list <span className="font-normal text-zinc-400">(optional — select a list, tags, or both)</span>
+                Target tags <span className="font-normal text-zinc-400">(required — contacts with these tags will receive the newsletter)</span>
               </label>
-              <select value={listId} onChange={e => setListId(e.target.value)} className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#003434]/20 bg-white">
-                <option value="">Choose a contact list…</option>
-                {lists.map(l => <option key={l.id} value={l.id}>{l.name} ({l.contact_count} contacts)</option>)}
-              </select>
-              {lists.length === 0 && <p className="text-xs text-amber-600 mt-1">No lists found. Create a list and add contacts first.</p>}
-              {allTags.length > 0 && (
-                <div className="mt-2">
-                  <label className="text-xs font-medium text-zinc-500 block mb-1">
-                    Filter by tag <span className="font-normal text-zinc-400">(optional — sends to all in list if none selected)</span>
-                  </label>
-                  <TagMultiSelect allTags={allTags} value={filterTagIds} onChange={setFilterTagIds} placeholder="All contacts in list" />
-                </div>
+              {allTags.length === 0 ? (
+                <p className="text-xs text-amber-600">No tags found. Create tags in the Tags section first.</p>
+              ) : (
+                <TagMultiSelect allTags={allTags} value={filterTagIds} onChange={setFilterTagIds} placeholder="Select tags…" />
               )}
-              <p className="text-xs text-zinc-400 mt-1.5">Sends only to subscribed, non-bounced contacts. Greeting is personalised using each contact&apos;s name.</p>
+              <p className="text-xs text-zinc-400 mt-1.5">Sends only to subscribed, non-bounced contacts with the selected tags.</p>
             </div>
-          ) : (
-            <>
-              <div>
-                <label className="text-xs font-medium text-zinc-500 block mb-1">Recipients</label>
-                <div className="flex gap-2">
-                  <button onClick={() => setRecipientType("leads")} className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium border transition-colors ${recipientType === "leads" ? "bg-[#003434] text-white border-[#003434]" : "bg-white text-zinc-600 border-zinc-200 hover:border-zinc-300"}`}>Leads</button>
-                  <button onClick={() => setRecipientType("list")} className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium border transition-colors ${recipientType === "list" ? "bg-[#003434] text-white border-[#003434]" : "bg-white text-zinc-600 border-zinc-200 hover:border-zinc-300"}`}>Email list</button>
-                </div>
-              </div>
-              {recipientType === "list" && (
-                <div className="space-y-2">
-                  <div>
-                    <label className="text-xs font-medium text-zinc-500 block mb-1">Select list</label>
-                    <select value={listId} onChange={e => setListId(e.target.value)} className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#003434]/20 bg-white">
-                      <option value="">Choose a list…</option>
-                      {lists.map(l => <option key={l.id} value={l.id}>{l.name} ({l.contact_count} contacts)</option>)}
-                    </select>
-                  </div>
-                  {allTags.length > 0 && (
-                    <div>
-                      <label className="text-xs font-medium text-zinc-500 block mb-1">Filter by tag <span className="font-normal text-zinc-400">(optional)</span></label>
-                      <TagMultiSelect allTags={allTags} value={filterTagIds} onChange={setFilterTagIds} placeholder="All contacts in list" />
-                    </div>
-                  )}
-                </div>
-              )}
-              {recipientType === "leads" && <p className="text-xs text-zinc-400">Sends to {clientId ? "leads for the selected client" : "all leads"} in the lead list.</p>}
-            </>
+          )}
+
+          {isAgentBazar && allTags.length > 0 && (
+            <div>
+              <label className="text-xs font-medium text-zinc-500 block mb-1">
+                Filter by tag <span className="font-normal text-zinc-400">(optional — sends to all contacts if none selected)</span>
+              </label>
+              <TagMultiSelect allTags={allTags} value={filterTagIds} onChange={setFilterTagIds} placeholder="All contacts" />
+            </div>
           )}
 
           <button
-            onClick={() => {
-              const recipientOk = isAgentBazar
-                ? (!!listId || filterTagIds.length > 0)
-                : (recipientType === "leads" || !!listId || filterTagIds.length > 0)
-              if (senderId && subject && recipientOk) setStep(3)
-            }}
-            disabled={!senderId || !subject || (isAgentBazar
-              ? (!listId && filterTagIds.length === 0)
-              : (recipientType === "list" && !listId && filterTagIds.length === 0)
-            )}
+            onClick={() => { if (senderId && subject && (isAgentBazar || filterTagIds.length > 0)) setStep(3) }}
+            disabled={!senderId || !subject || (!isAgentBazar && filterTagIds.length === 0)}
             className="w-full bg-[#003434] text-white text-sm py-2.5 rounded-xl hover:bg-[#004848] disabled:opacity-40 active:scale-[0.98] transition-all font-semibold shadow-sm"
           >
             Preview newsletter →
@@ -1258,7 +1205,7 @@ export default function NewsletterPage() {
               <div className="bg-zinc-50 border border-zinc-100 rounded-xl p-3">
                 <p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wide mb-1">Recipients</p>
                 <p className="text-xs font-semibold text-zinc-700 capitalize">
-                  {(isAgentBazar || recipientType === "list") ? lists.find(l => l.id === listId)?.name ?? "List" : "Leads"}
+                  {isAgentBazar ? "All contacts" : filterTagIds.length > 0 ? `${filterTagIds.length} ${filterTagIds.length === 1 ? "tag" : "tags"}` : "Leads"}
                 </p>
               </div>
               <div className="bg-zinc-50 border border-zinc-100 rounded-xl p-3">

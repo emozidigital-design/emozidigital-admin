@@ -11,7 +11,6 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (body.subject !== undefined) updates.subject = body.subject
   if (body.sender_id !== undefined) updates.sender_id = body.sender_id
   if (body.template_id !== undefined) updates.template_id = body.template_id
-  if (body.list_id !== undefined) updates.list_id = body.list_id || null
   if (body.tag_ids !== undefined) updates.tag_ids = body.tag_ids ?? []
   if (body.scheduled_at !== undefined) updates.scheduled_at = body.scheduled_at
 
@@ -19,7 +18,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     .from("email_campaigns")
     .update(updates)
     .eq("id", params.id)
-    .select("*, email_senders(from_email, from_name), email_templates(name, html_body), email_lists(name, contact_count)")
+    .select("*, email_senders(from_email, from_name), email_templates(name, html_body)")
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

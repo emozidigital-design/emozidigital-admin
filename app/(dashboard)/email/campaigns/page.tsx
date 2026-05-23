@@ -19,12 +19,6 @@ interface TemplateOption {
   subject: string
 }
 
-interface EmailList {
-  id: string
-  name: string
-  contact_count: number
-}
-
 interface EmailTag {
   id: string
   name: string
@@ -41,7 +35,6 @@ interface Campaign {
   tag_ids: string[]
   email_senders: { from_email: string; from_name: string } | null
   email_templates: { name: string; html_body?: string } | null
-  email_lists: { name: string; contact_count: number } | null
 }
 
 const STATUS_STYLE: Record<string, string> = {
@@ -53,6 +46,7 @@ const STATUS_STYLE: Record<string, string> = {
 }
 
 const INPUT_CLS = "border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#003434]/20 bg-white w-full"
+const tagLabel = (n: number) => `${n} ${n === 1 ? "tag" : "tags"}`
 
 export default function CampaignsPage() {
   const { clientId } = useClient()
@@ -69,7 +63,7 @@ export default function CampaignsPage() {
   const [creating, setCreating] = useState(false)
   const [editingCampaign, setEditingCampaign] = useState<Campaign | null>(null)
   const [form, setForm] = useState({
-    client_id: "", sender_id: "", template_id: "", list_id: "", subject: "", scheduled_at: "",
+    client_id: "", sender_id: "", template_id: "", subject: "", scheduled_at: "",
   })
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([])
   const [saving, setSaving] = useState(false)
@@ -77,7 +71,6 @@ export default function CampaignsPage() {
   // Dropdown selects data
   const [senders, setSenders] = useState<Sender[]>([])
   const [templatesList, setTemplatesList] = useState<TemplateOption[]>([])
-  const [lists, setLists] = useState<EmailList[]>([])
   const [tags, setTags] = useState<EmailTag[]>([])
   const [loadingRelated, setLoadingRelated] = useState(false)
 
@@ -130,13 +123,11 @@ export default function CampaignsPage() {
     Promise.all([
       fetch(`/api/email/senders?${params}`).then(r => r.json()),
       fetch(`/api/email/templates?${params}`).then(r => r.json()),
-      fetch(`/api/email/lists?${params}`).then(r => r.json()),
       fetch(`/api/email/tags?${params}`).then(r => r.json()),
     ])
-      .then(([s, t, l, tg]) => {
+      .then(([s, t, tg]) => {
         setSenders(Array.isArray(s) ? s : [])
         setTemplatesList(Array.isArray(t) ? t : [])
-        setLists(Array.isArray(l) ? l : [])
         setTags(Array.isArray(tg) ? tg : [])
       })
       .finally(() => setLoadingRelated(false))
@@ -157,7 +148,7 @@ export default function CampaignsPage() {
   // ── Helpers ───────────────────────────────────────────────────────────────
 
   function resetForm() {
-    setForm({ client_id: clientId, sender_id: "", template_id: "", list_id: "", subject: "", scheduled_at: "" })
+    setForm({ client_id: clientId, sender_id: "", template_id: "", subject: "", scheduled_at: "" })
     setSelectedTagIds([])
     setEditingCampaign(null)
     setCreating(false)
@@ -171,8 +162,8 @@ export default function CampaignsPage() {
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!form.list_id && selectedTagIds.length === 0) {
-      toast.error("Select a contact list or at least one tag")
+    if (selectedTagIds.length === 0) {
+      toast.error("Select at least one tag to target")
       return
     }
     setSaving(true)
@@ -199,8 +190,8 @@ export default function CampaignsPage() {
   const handleEdit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!editingCampaign) return
-    if (!form.list_id && selectedTagIds.length === 0) {
-      toast.error("Select a contact list or at least one tag")
+    if (selectedTagIds.length === 0) {
+      toast.error("Select at least one tag to target")
       return
     }
     setSaving(true)
@@ -228,9 +219,8 @@ export default function CampaignsPage() {
     setEditingCampaign(c)
     setForm({
       client_id: c.client_id,
-      sender_id: "",   // UUIDs not in Campaign type; selects will show empty, user re-selects
+      sender_id: "",
       template_id: "",
-      list_id: "",
       subject: c.subject,
       scheduled_at: c.scheduled_at ? c.scheduled_at.slice(0, 16) : "",
     })
@@ -393,25 +383,6 @@ export default function CampaignsPage() {
                 </select>
               </div>
 
-              {/* List select */}
-              <div>
-                <label className="text-xs text-zinc-500 mb-1 block">
-                  Contact list <span className="text-zinc-400">(or use tags below)</span>
-                </label>
-                <select
-                  value={form.list_id}
-                  onChange={e => setForm(f => ({ ...f, list_id: e.target.value }))}
-                  className={INPUT_CLS}
-                >
-                  <option value="">Select list…</option>
-                  {lists.map(l => (
-                    <option key={l.id} value={l.id}>
-                      {l.name} ({l.contact_count} contacts)
-                    </option>
-                  ))}
-                </select>
-              </div>
-
               {/* Subject */}
               <div>
                 <label className="text-xs text-zinc-500 mb-1 block">Subject</label>
@@ -430,7 +401,7 @@ export default function CampaignsPage() {
           {tags.length > 0 && (
             <div>
               <label className="text-xs text-zinc-500 mb-2 block">
-                Target tags <span className="text-zinc-400">(optional — contacts in lists with these tags)</span>
+                Target tags <span className="text-zinc-400 font-normal">(required — contacts with these tags will receive the campaign)</span>
               </label>
               <div className="flex flex-wrap gap-2">
                 {tags.map(tag => {
@@ -546,10 +517,8 @@ export default function CampaignsPage() {
                   <p className="text-sm font-medium text-zinc-800 truncate">{c.subject}</p>
                   <p className="text-xs text-zinc-400 mt-0.5">
                     {c.email_senders?.from_name} · {c.email_templates?.name}
-                    {c.email_lists ? (
-                      <> · {c.email_lists.name}{c.email_lists.contact_count != null && ` (${c.email_lists.contact_count})`}</>
-                    ) : Array.isArray(c.tag_ids) && c.tag_ids.length > 0 ? (
-                      <> · <span className="text-[#003434]">{c.tag_ids.length} tag{c.tag_ids.length > 1 ? "s" : ""}</span></>
+                    {Array.isArray(c.tag_ids) && c.tag_ids.length > 0 ? (
+                      <> · <span className="text-[#003434]">{tagLabel(c.tag_ids.length)}</span></>
                     ) : null}
                   </p>
                   {c.sent_at && (
@@ -650,16 +619,9 @@ export default function CampaignsPage() {
               </div>
               <div>
                 <p className="text-[11px] text-zinc-400 font-semibold uppercase tracking-wider">Audience</p>
-                {previewCampaign.email_lists ? (
-                  <p className="text-xs text-zinc-700 font-semibold mt-0.5">
-                    {previewCampaign.email_lists.name}
-                    {previewCampaign.email_lists.contact_count != null && (
-                      <span className="text-zinc-400 font-normal"> ({previewCampaign.email_lists.contact_count})</span>
-                    )}
-                  </p>
-                ) : Array.isArray(previewCampaign.tag_ids) && previewCampaign.tag_ids.length > 0 ? (
+                {Array.isArray(previewCampaign.tag_ids) && previewCampaign.tag_ids.length > 0 ? (
                   <p className="text-xs text-[#003434] font-semibold mt-0.5">
-                    {previewCampaign.tag_ids.length} tag{previewCampaign.tag_ids.length > 1 ? "s" : ""}
+                    {tagLabel(previewCampaign.tag_ids.length)}
                   </p>
                 ) : (
                   <p className="text-xs text-zinc-400 mt-0.5">—</p>

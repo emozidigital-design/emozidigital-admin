@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
 
   let query = supabaseAdmin
     .from("email_campaigns")
-    .select("*, email_senders(from_email, from_name), email_templates(name, html_body), email_lists(name, contact_count)")
+    .select("*, email_senders(from_email, from_name), email_templates(name, html_body)")
     .order("created_at", { ascending: false })
 
   if (clientId) query = query.eq("client_id", clientId)
@@ -27,17 +27,16 @@ export async function POST(req: NextRequest) {
   if (unauth) return unauth
 
   const body = await req.json()
-  const { client_id, sender_id, template_id, list_id, subject, scheduled_at, tag_ids } = body
+  const { client_id, sender_id, template_id, subject, scheduled_at, tag_ids } = body
 
-  const hasAudience = list_id || (Array.isArray(tag_ids) && tag_ids.length > 0)
-  if (!client_id || !sender_id || !template_id || !subject || !hasAudience) {
-    return NextResponse.json({ error: "client_id, sender_id, template_id, subject required; and at least one of list_id or tag_ids" }, { status: 400 })
+  if (!client_id || !sender_id || !template_id || !subject || !Array.isArray(tag_ids) || tag_ids.length === 0) {
+    return NextResponse.json({ error: "client_id, sender_id, template_id, subject, and at least one tag_id are required" }, { status: 400 })
   }
 
   const { data, error } = await supabaseAdmin
     .from("email_campaigns")
-    .insert({ client_id, sender_id, template_id, list_id: list_id || null, subject, scheduled_at: scheduled_at ?? null, tag_ids: tag_ids ?? [] })
-    .select("*, email_senders(from_email, from_name), email_templates(name, html_body), email_lists(name, contact_count)")
+    .insert({ client_id, sender_id, template_id, subject, scheduled_at: scheduled_at ?? null, tag_ids })
+    .select("*, email_senders(from_email, from_name), email_templates(name, html_body)")
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
