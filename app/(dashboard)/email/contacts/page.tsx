@@ -839,6 +839,7 @@ export default function ContactsPage() {
 
   // ── Shared data ──
   const [contacts, setContacts] = useState<Contact[]>([])
+  const [totalContacts, setTotalContacts] = useState(0)
   const [allTags, setAllTags] = useState<EmailTag[]>([])
   const [lists, setLists] = useState<EmailList[]>([])
   const [importLogs, setImportLogs] = useState<ImportLog[]>([])
@@ -901,7 +902,10 @@ export default function ContactsPage() {
     setLoading(true)
     fetch(`/api/email/contacts?client_id=${clientId}`)
       .then(r => r.json())
-      .then(d => setContacts(Array.isArray(d) ? d : []))
+      .then(d => {
+        setContacts(Array.isArray(d) ? d : (Array.isArray(d?.contacts) ? d.contacts : []))
+        setTotalContacts(typeof d?.total === "number" ? d.total : (Array.isArray(d) ? d.length : 0))
+      })
       .finally(() => setLoading(false))
   }, [clientId])
 
@@ -1621,7 +1625,7 @@ export default function ContactsPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-5">
         <h1 className="text-xl font-semibold text-zinc-900">
-          {filteredContacts.length > 0 ? `${filteredContacts.length} Contacts` : "Contacts"}
+          {totalContacts > 0 ? `${totalContacts.toLocaleString()} Contacts` : "Contacts"}
         </h1>
         <div className="flex items-center gap-2.5">
           <button

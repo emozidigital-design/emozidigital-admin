@@ -43,7 +43,7 @@ export async function GET(req: NextRequest) {
     return { ...rest, tags }
   })
 
-  return NextResponse.json(contacts)
+  return NextResponse.json({ contacts, total: count ?? contacts.length })
 }
 
 export async function POST(req: NextRequest) {
