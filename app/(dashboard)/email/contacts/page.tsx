@@ -832,6 +832,190 @@ function RowActions({ contact, onToggleSubscribe, onDelete }: {
   )
 }
 
+// ─── Contact drawer ───────────────────────────────────────────────────────────
+
+function ContactDrawer({ contact, allTags, onClose, onSave, onDelete }: {
+  contact: Contact
+  allTags: EmailTag[]
+  onClose: () => void
+  onSave: (id: string, fields: Record<string, unknown>, tagIds: string[]) => Promise<void>
+  onDelete: (id: string, email: string) => void
+}) {
+  const [form, setForm] = useState({
+    first_name: contact.first_name ?? "",
+    last_name: contact.last_name ?? "",
+    phone: contact.phone ?? "",
+    alternate_phone: contact.alternate_phone ?? "",
+    company: contact.company ?? "",
+    street_address: contact.street_address ?? "",
+    street_number: contact.street_number ?? "",
+    neighborhood: contact.neighborhood ?? "",
+    postal_code: contact.postal_code ?? "",
+    city: contact.city ?? "",
+    state_province: contact.state_province ?? "",
+    country: contact.country ?? "",
+    tax_number: contact.tax_number ?? "",
+    language: contact.language ?? "English",
+    user_name: contact.user_name ?? "",
+    user_type: contact.user_type ?? "",
+    agent_name: contact.agent_name ?? "",
+    agent_id: contact.agent_id ?? "",
+    agent_registered_date: contact.agent_registered_date ?? "",
+    agent_pancard_no: contact.agent_pancard_no ?? "",
+    agent_gst_number: contact.agent_gst_number ?? "",
+  })
+  const [tagIds, setTagIds] = useState<string[]>(contact.tags.map(t => t.id))
+  const [busy, setBusy] = useState(false)
+
+  const set = (key: keyof typeof form) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+    setForm(f => ({ ...f, [key]: e.target.value }))
+
+  const handleSave = async () => {
+    setBusy(true)
+    await onSave(contact.id, form, tagIds)
+    setBusy(false)
+  }
+
+  const inp = (label: string, key: keyof typeof form, type = "text") => (
+    <div>
+      <label className="text-xs font-medium text-zinc-500 block mb-1">{label}</label>
+      <input
+        type={type}
+        className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#003434]/20"
+        value={form[key]}
+        onChange={set(key)}
+      />
+    </div>
+  )
+
+  return (
+    <>
+      {/* Backdrop */}
+      <div className="fixed inset-0 bg-black/20 z-40" onClick={onClose} />
+      {/* Drawer */}
+      <div className="fixed right-0 top-0 h-full w-[480px] max-w-full bg-white shadow-2xl z-50 flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-100 shrink-0">
+          <div className="min-w-0">
+            <p className="text-sm font-semibold text-zinc-900 truncate">{contact.email}</p>
+            <p className="text-xs text-zinc-400 mt-0.5">{[contact.first_name, contact.last_name].filter(Boolean).join(" ") || "No name"}</p>
+          </div>
+          <button onClick={onClose} className="ml-3 shrink-0 text-zinc-400 hover:text-zinc-600 transition-colors">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+          </button>
+        </div>
+
+        {/* Scrollable body */}
+        <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
+          {/* Personal info */}
+          <section>
+            <p className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider mb-3">Personal information</p>
+            <div className="grid grid-cols-2 gap-3">
+              {inp("First name", "first_name")}
+              {inp("Last name", "last_name")}
+              {inp("Phone number", "phone", "tel")}
+              {inp("Alternate phone", "alternate_phone", "tel")}
+              {inp("Company", "company")}
+              {inp("Tax number", "tax_number")}
+            </div>
+          </section>
+
+          {/* Address */}
+          <section>
+            <p className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider mb-3">Address</p>
+            <div className="grid grid-cols-2 gap-3">
+              {inp("Street address", "street_address")}
+              {inp("Street number", "street_number")}
+              {inp("Neighborhood", "neighborhood")}
+              {inp("Postal code", "postal_code")}
+              {inp("City", "city")}
+              {inp("State / Province", "state_province")}
+              <div className="col-span-2">
+                <label className="text-xs font-medium text-zinc-500 block mb-1">Country</label>
+                <select className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#003434]/20 bg-white" value={form.country} onChange={set("country")}>
+                  <option value="">Select country</option>
+                  {["India","United States","United Kingdom","Australia","Canada","Singapore","UAE","Germany","France","Netherlands","Other"].map(c => <option key={c} value={c}>{c}</option>)}
+                </select>
+              </div>
+            </div>
+          </section>
+
+          {/* Account */}
+          <section>
+            <p className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider mb-3">Account</p>
+            <div className="grid grid-cols-2 gap-3">
+              {inp("User name", "user_name")}
+              {inp("User type", "user_type")}
+              <div className="col-span-2">
+                <label className="text-xs font-medium text-zinc-500 block mb-1">Language</label>
+                <select className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#003434]/20 bg-white" value={form.language} onChange={set("language")}>
+                  {["English","Hindi","Marathi","Tamil","Telugu","Kannada","Bengali","Gujarati","Other"].map(l => <option key={l} value={l}>{l}</option>)}
+                </select>
+              </div>
+            </div>
+          </section>
+
+          {/* Agent info */}
+          <section>
+            <p className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider mb-3">Agent information</p>
+            <div className="grid grid-cols-2 gap-3">
+              {inp("Agent name", "agent_name")}
+              {inp("Agent ID", "agent_id")}
+              {inp("Agent registered date", "agent_registered_date", "date")}
+              {inp("Agent PAN card no.", "agent_pancard_no")}
+              <div className="col-span-2">{inp("Agent GST number", "agent_gst_number")}</div>
+            </div>
+          </section>
+
+          {/* Tags */}
+          <section>
+            <p className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider mb-3">Tags</p>
+            <TagMultiSelect allTags={allTags} value={tagIds} onChange={setTagIds} placeholder="Select tags…" />
+            {tagIds.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mt-2">
+                {tagIds.map(id => {
+                  const tag = allTags.find(t => t.id === id)
+                  if (!tag) return null
+                  return (
+                    <span key={id} className="inline-flex items-center gap-1 bg-teal-50 text-[#003434] border border-teal-200 text-xs px-2.5 py-0.5 rounded-full">
+                      {tag.name}
+                      <button type="button" onClick={() => setTagIds(prev => prev.filter(tid => tid !== id))} className="text-teal-400 hover:text-teal-600">
+                        <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                      </button>
+                    </span>
+                  )
+                })}
+              </div>
+            )}
+          </section>
+        </div>
+
+        {/* Footer */}
+        <div className="shrink-0 border-t border-zinc-100 px-5 py-3 flex items-center justify-between gap-3">
+          <button
+            onClick={() => { onClose(); onDelete(contact.id, contact.email) }}
+            className="text-xs text-red-400 hover:text-red-600 transition-colors flex items-center gap-1.5"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+            Delete contact
+          </button>
+          <div className="flex gap-2">
+            <button onClick={onClose} className="text-sm px-4 py-2 rounded-lg border border-zinc-200 text-zinc-600 hover:bg-zinc-50 transition-colors">Cancel</button>
+            <button
+              onClick={handleSave}
+              disabled={busy}
+              className="inline-flex items-center gap-1.5 bg-[#003434] text-white text-sm px-5 py-2 rounded-lg hover:bg-[#004444] disabled:opacity-40 transition-colors"
+            >
+              {busy && <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />}
+              {busy ? "Saving…" : "Save changes"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  )
+}
+
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function ContactsPage() {
@@ -860,6 +1044,7 @@ export default function ContactsPage() {
   const [openAddTag, setOpenAddTag] = useState<string | null>(null)
   const bulkTagRef = useRef<HTMLDivElement>(null)
   const [dialog, setDialog] = useState<DialogState>(null)
+  const [drawerContact, setDrawerContact] = useState<Contact | null>(null)
 
   // ── Create view state ──
   const [createForm, setCreateForm] = useState({
@@ -1216,6 +1401,32 @@ export default function ContactsPage() {
       setView("list")
     } catch (err: unknown) { toast.error(err instanceof Error ? err.message : "Import error") }
     finally { setImportBusy(false) }
+  }
+
+  // ── Drawer save handler ──
+  const handleDrawerSave = async (id: string, fields: Record<string, unknown>, newTagIds: string[]) => {
+    const res = await fetch(`/api/email/contacts/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ fields }),
+    })
+    if (!res.ok) { toast.error("Failed to save"); return }
+
+    // Sync tags: add new, remove dropped
+    const contact = contacts.find(c => c.id === id)
+    if (contact) {
+      const currentTagIds = contact.tags.map(t => t.id)
+      const toAdd = newTagIds.filter(tid => !currentTagIds.includes(tid))
+      const toRemove = currentTagIds.filter(tid => !newTagIds.includes(tid))
+      await Promise.all([
+        ...toAdd.map(tid => fetch(`/api/email/contacts/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ add_tag_id: tid }) })),
+        ...toRemove.map(tid => fetch(`/api/email/contacts/${id}`, { method: "PATCH", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ remove_tag_id: tid }) })),
+      ])
+      const updatedTags = allTags.filter(t => newTagIds.includes(t.id))
+      setContacts(prev => prev.map(c => c.id === id ? { ...c, ...fields, tags: updatedTags } : c))
+    }
+    setDrawerContact(prev => prev ? { ...prev, ...fields, tags: allTags.filter(t => newTagIds.includes(t.id)) } : null)
+    toast.success("Contact updated")
   }
 
   // ── Status badge helper ──
@@ -1621,6 +1832,15 @@ export default function ContactsPage() {
   return (
     <div className="w-full">
       {dialog && <ConfirmDialog {...dialog} onCancel={() => setDialog(null)} />}
+      {drawerContact && (
+        <ContactDrawer
+          contact={drawerContact}
+          allTags={allTags}
+          onClose={() => setDrawerContact(null)}
+          onSave={handleDrawerSave}
+          onDelete={(id, email) => { setDrawerContact(null); handleDelete(id, email) }}
+        />
+      )}
 
       {/* Header */}
       <div className="flex items-center justify-between mb-5">
@@ -1720,17 +1940,20 @@ export default function ContactsPage() {
                           {new Date(c.created_at).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", hour12: true })}
                         </td>
                         <td className="px-4 py-3.5">
-                          <div className="flex items-center gap-2">
-                            <div className="w-7 h-7 rounded-full bg-zinc-100 flex items-center justify-center text-zinc-400 shrink-0">
+                          <button
+                            className="flex items-center gap-2 text-left group"
+                            onClick={() => setDrawerContact(c)}
+                          >
+                            <div className="w-7 h-7 rounded-full bg-zinc-100 flex items-center justify-center text-zinc-400 shrink-0 group-hover:bg-teal-50 transition-colors">
                               <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
                             </div>
                             <div>
-                              <p className="text-xs font-medium text-[#003434]">{c.email}</p>
+                              <p className="text-xs font-medium text-[#003434] group-hover:underline">{c.email}</p>
                               {(c.first_name || c.last_name) && (
                                 <p className="text-[11px] text-zinc-400">{[c.first_name, c.last_name].filter(Boolean).join(" ")}</p>
                               )}
                             </div>
-                          </div>
+                          </button>
                         </td>
                         <td className="px-4 py-3.5 text-xs text-zinc-500 whitespace-nowrap">
                           {c.phone ?? <span className="text-zinc-300">—</span>}
