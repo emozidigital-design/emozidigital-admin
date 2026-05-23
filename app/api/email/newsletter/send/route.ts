@@ -159,7 +159,9 @@ function buildAgentBazarNewsletterHtml(opts: {
                 <td style="background:#1a6b3a;padding:28px 24px;text-align:center;">
                   <p style="margin:0 0 4px;font-size:13px;color:#ffffff;letter-spacing:0.02em;">For the latest Travel Blog &amp; Updates</p>
                   <p style="margin:0 0 18px;font-size:20px;font-weight:bold;color:#ffffff;line-height:1.3;">Join Our WhatsApp Community Now</p>
-                  <a href="https://wa.me/919435009519" style="display:inline-block;background:#ffffff;color:#1a6b3a;text-decoration:none;padding:10px 36px;border-radius:24px;font-size:14px;font-weight:bold;">&#9654;&nbsp; JOIN NOW</a>
+                  <a href="https://wa.me/919435009519" style="display:inline-block;background:#ffffff;color:#1a6b3a;text-decoration:none;padding:10px 28px;border-radius:24px;font-size:14px;font-weight:bold;">
+                    <img src="https://img.icons8.com/color/20/whatsapp--v1.png" alt="" width="20" height="20" style="display:inline-block;vertical-align:middle;margin-right:8px;width:20px;height:20px;" /><span style="vertical-align:middle;">JOIN NOW</span>
+                  </a>
                 </td>
               </tr>
             </table>
@@ -171,23 +173,6 @@ function buildAgentBazarNewsletterHtml(opts: {
           <td style="background:#ffffff;padding:28px 24px 20px;border-top:1px solid #e8ecf2;">
             <table width="100%" cellpadding="0" cellspacing="0">
 
-              <!-- WhatsApp invite row -->
-              <tr>
-                <td style="padding-bottom:22px;border-bottom:1px solid #eeeeee;">
-                  <table width="100%" cellpadding="0" cellspacing="0">
-                    <tr>
-                      <td width="40" valign="middle" style="padding-right:10px;">
-                        <img src="https://img.icons8.com/material-rounded/40/25D366/whatsapp--v1.png" alt="WhatsApp" width="36" height="36" style="display:block;width:36px;height:36px;" />
-                      </td>
-                      <td valign="middle">
-                        <p style="margin:0 0 1px;font-size:13px;color:#333333;font-family:Arial,Helvetica,sans-serif;">Travel Updates, Delivered Instantly.</p>
-                        <a href="https://www.whatsapp.com/channel/0029VaCTkLJBFLgcbBhFnM1C" style="color:#25D366;font-size:13px;font-weight:bold;text-decoration:none;font-family:Arial,Helvetica,sans-serif;">Join AgentBazar&rsquo;s WhatsApp Channel Now</a>
-                      </td>
-                    </tr>
-                  </table>
-                </td>
-              </tr>
-
               <!-- Two-column: enquiry left | follow us right -->
               <tr>
                 <td style="padding:20px 0 18px;">
@@ -195,7 +180,6 @@ function buildAgentBazarNewsletterHtml(opts: {
                     <tr>
                       <!-- LEFT: contact -->
                       <td width="55%" valign="top">
-                        <p style="margin:0 0 6px;font-size:12px;font-weight:bold;color:#333333;font-family:Arial,Helvetica,sans-serif;text-transform:uppercase;letter-spacing:0.04em;">For Enquiries, please contact:</p>
                         <a href="tel:+919435009519" style="display:block;color:#111111;text-decoration:none;font-size:13px;font-family:Arial,Helvetica,sans-serif;margin-bottom:3px;">+91-9435009519</a>
                         <a href="mailto:support@agentbazar.in" style="display:block;color:#111111;text-decoration:none;font-size:13px;font-family:Arial,Helvetica,sans-serif;margin-bottom:5px;">support@agentbazar.in</a>
                         <p style="margin:0 0 2px;font-size:12px;color:#555555;font-family:Arial,Helvetica,sans-serif;">Tripforu Holidays Pvt. Ltd. (Guwahati)</p>
