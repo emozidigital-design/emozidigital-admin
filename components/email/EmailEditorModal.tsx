@@ -850,9 +850,9 @@ function HtmlPreviewPane({ html }: { html: string }) {
     <iframe
       ref={iframeRef}
       title="HTML Preview"
-      className="w-full border-0 min-h-[600px] flex-1"
+      className="w-full border-0"
       sandbox="allow-same-origin"
-      style={{ height: "100%" }}
+      style={{ height: "calc(100vh - 100px)", display: "block" }}
     />
   )
 }
@@ -1133,10 +1133,8 @@ export default function EmailEditorModal({
                     Hide
                   </button>
                 </div>
-                <div className="flex-1 overflow-y-auto p-4">
-                  <div className="bg-white shadow-sm rounded-lg overflow-hidden" style={{ width: 600, margin: "0 auto" }}>
-                    <HtmlPreviewPane html={htmlPreviewContent} />
-                  </div>
+                <div className="flex-1 overflow-y-auto">
+                  <HtmlPreviewPane html={htmlPreviewContent} />
                 </div>
               </div>
             )}
