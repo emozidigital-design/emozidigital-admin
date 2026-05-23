@@ -165,47 +165,58 @@ function buildAgentBazarNewsletterHtml(opts: {
           </td>
         </tr>
 
-        <!-- Footer: white background, BW Travel-style centered layout -->
+        <!-- Footer -->
         <tr>
           <td style="background:#ffffff;padding:32px 24px 24px;border-top:1px solid #e8ecf2;">
-
-            <!-- Logo -->
             <table width="100%" cellpadding="0" cellspacing="0">
+
+              <!-- Logo -->
               <tr>
                 <td style="text-align:center;padding-bottom:20px;">
                   <img src="https://blog.agentbazar.in/new-logo.jpg" alt="AgentBazar" height="48" style="height:48px;max-height:48px;border:0;display:inline-block;" />
-                  <p style="margin:4px 0 0;font-size:11px;color:#999999;letter-spacing:0.05em;text-transform:uppercase;"><span style="color:#999999;text-decoration:none;">AGENTBAZAR&#8203;.IN</span></p>
+                  <p style="margin:4px 0 0;font-size:11px;color:#999999;letter-spacing:0.12em;text-transform:uppercase;font-family:Arial,Helvetica,sans-serif;">blog.agentbazar.in</p>
                 </td>
               </tr>
 
-              <!-- Social icons: PNG images from icons8 (email-client compatible, white icons on black circles) -->
+              <!-- Social icons: inline SVG circles (email-client safe) -->
               <tr>
                 <td style="text-align:center;padding-bottom:20px;">
-                  <table cellpadding="0" cellspacing="0" style="display:inline-table;">
+                  <table cellpadding="0" cellspacing="0" border="0" style="display:inline-table;margin:0 auto;">
                     <tr>
-                      <td style="padding:0 5px;">
-                        <a href="https://www.facebook.com/people/Agentbazarblogs/" title="Facebook" style="display:block;text-decoration:none;">
-                          <img src="https://img.icons8.com/ios-filled/40/ffffff/facebook-new.png" alt="Facebook" width="40" height="40" style="display:block;width:40px;height:40px;background:#111111;border-radius:50%;" />
+                      <!-- Facebook -->
+                      <td style="padding:0 6px;">
+                        <a href="https://www.facebook.com/people/Agentbazarblogs/" style="display:block;text-decoration:none;">
+                          <img src="https://img.icons8.com/material-rounded/44/ffffff/facebook-new.png" alt="Facebook" width="44" height="44" style="display:block;width:44px;height:44px;border-radius:50%;background:#000000;" />
                         </a>
                       </td>
-                      <td style="padding:0 5px;">
-                        <a href="https://x.com/AgentBazar" title="X (Twitter)" style="display:block;text-decoration:none;">
-                          <img src="https://img.icons8.com/ios-filled/40/ffffff/twitterx.png" alt="X" width="40" height="40" style="display:block;width:40px;height:40px;background:#111111;border-radius:50%;" />
+                      <!-- X / Twitter -->
+                      <td style="padding:0 6px;">
+                        <a href="https://x.com/AgentBazar" style="display:block;text-decoration:none;">
+                          <img src="https://img.icons8.com/material-rounded/44/ffffff/twitterx--v2.png" alt="X" width="44" height="44" style="display:block;width:44px;height:44px;border-radius:50%;background:#000000;" />
                         </a>
                       </td>
-                      <td style="padding:0 5px;">
-                        <a href="https://www.instagram.com/agentbazarblogs/" title="Instagram" style="display:block;text-decoration:none;">
-                          <img src="https://img.icons8.com/ios-filled/40/ffffff/instagram-new.png" alt="Instagram" width="40" height="40" style="display:block;width:40px;height:40px;background:#111111;border-radius:50%;" />
+                      <!-- Instagram -->
+                      <td style="padding:0 6px;">
+                        <a href="https://www.instagram.com/agentbazarblogs/" style="display:block;text-decoration:none;">
+                          <img src="https://img.icons8.com/material-rounded/44/ffffff/instagram-new--v1.png" alt="Instagram" width="44" height="44" style="display:block;width:44px;height:44px;border-radius:50%;background:#000000;" />
                         </a>
                       </td>
-                      <td style="padding:0 5px;">
-                        <a href="https://www.youtube.com/@agentbazar6074" title="YouTube" style="display:block;text-decoration:none;">
-                          <img src="https://img.icons8.com/ios-filled/40/ffffff/youtube-play.png" alt="YouTube" width="40" height="40" style="display:block;width:40px;height:40px;background:#111111;border-radius:50%;" />
+                      <!-- YouTube -->
+                      <td style="padding:0 6px;">
+                        <a href="https://www.youtube.com/@agentbazar6074" style="display:block;text-decoration:none;">
+                          <img src="https://img.icons8.com/material-rounded/44/ffffff/youtube-play.png" alt="YouTube" width="44" height="44" style="display:block;width:44px;height:44px;border-radius:50%;background:#000000;" />
                         </a>
                       </td>
-                      <td style="padding:0 5px;">
-                        <a href="https://www.whatsapp.com/channel/0029VaCTkLJBFLgcbBhFnM1C" title="WhatsApp" style="display:block;text-decoration:none;">
-                          <img src="https://img.icons8.com/ios-filled/40/ffffff/whatsapp.png" alt="WhatsApp" width="40" height="40" style="display:block;width:40px;height:40px;background:#111111;border-radius:50%;" />
+                      <!-- WhatsApp -->
+                      <td style="padding:0 6px;">
+                        <a href="https://www.whatsapp.com/channel/0029VaCTkLJBFLgcbBhFnM1C" style="display:block;text-decoration:none;">
+                          <img src="https://img.icons8.com/material-rounded/44/ffffff/whatsapp--v1.png" alt="WhatsApp" width="44" height="44" style="display:block;width:44px;height:44px;border-radius:50%;background:#000000;" />
+                        </a>
+                      </td>
+                      <!-- Phone -->
+                      <td style="padding:0 6px;">
+                        <a href="tel:+919435009519" style="display:block;text-decoration:none;">
+                          <img src="https://img.icons8.com/material-rounded/44/ffffff/phone.png" alt="Phone" width="44" height="44" style="display:block;width:44px;height:44px;border-radius:50%;background:#000000;" />
                         </a>
                       </td>
                     </tr>
@@ -213,47 +224,47 @@ function buildAgentBazarNewsletterHtml(opts: {
                 </td>
               </tr>
 
-              <!-- Nav links: centered horizontal -->
+              <!-- Nav links -->
               <tr>
                 <td style="text-align:center;padding-bottom:18px;">
-                  <a href="https://www.agentbazar.in" style="color:#111111;text-decoration:none;font-size:12px;font-weight:700;letter-spacing:0.05em;margin:0 10px;">HOME</a>
-                  <a href="https://www.agentbazar.in/about-us" style="color:#111111;text-decoration:none;font-size:12px;font-weight:700;letter-spacing:0.05em;margin:0 10px;">ABOUT US</a>
-                  <a href="https://blog.agentbazar.in" style="color:#111111;text-decoration:none;font-size:12px;font-weight:700;letter-spacing:0.05em;margin:0 10px;">BLOG</a>
-                  <a href="https://www.agentbazar.in/help" style="color:#111111;text-decoration:none;font-size:12px;font-weight:700;letter-spacing:0.05em;margin:0 10px;">HELP</a>
+                  <a href="https://www.agentbazar.in" style="color:#111111;text-decoration:none;font-size:12px;font-weight:700;letter-spacing:0.05em;margin:0 10px;font-family:Arial,Helvetica,sans-serif;">HOME</a>
+                  <a href="https://www.agentbazar.in/about-us" style="color:#111111;text-decoration:none;font-size:12px;font-weight:700;letter-spacing:0.05em;margin:0 10px;font-family:Arial,Helvetica,sans-serif;">ABOUT US</a>
+                  <a href="https://blog.agentbazar.in" style="color:#111111;text-decoration:none;font-size:12px;font-weight:700;letter-spacing:0.05em;margin:0 10px;font-family:Arial,Helvetica,sans-serif;">BLOG</a>
+                  <a href="https://www.agentbazar.in/help" style="color:#111111;text-decoration:none;font-size:12px;font-weight:700;letter-spacing:0.05em;margin:0 10px;font-family:Arial,Helvetica,sans-serif;">HELP</a>
                 </td>
               </tr>
 
               <!-- Contact info -->
               <tr>
                 <td style="text-align:center;padding-bottom:6px;">
-                  <p style="margin:0 0 4px;font-size:13px;font-weight:bold;color:#111111;">For Enquiries, please contact:</p>
-                  <p style="margin:0 0 3px;font-size:13px;color:#333333;">
-                    <a href="tel:+919435009519" style="color:#333333;text-decoration:none;">+91-9435009519</a>
-                    &nbsp;&nbsp;
-                    <a href="mailto:support@agentbazar.in" style="color:#333333;text-decoration:none;">support@agentbazar.in</a>
+                  <p style="margin:0 0 6px;font-size:13px;font-weight:bold;color:#111111;font-family:Arial,Helvetica,sans-serif;">For Enquiries, please contact:</p>
+                  <p style="margin:0 0 3px;font-size:13px;color:#1155cc;font-family:Arial,Helvetica,sans-serif;">
+                    <a href="tel:+919435009519" style="color:#1155cc;text-decoration:none;">+91-9435009519</a>
+                    &nbsp;&nbsp;&nbsp;
+                    <a href="mailto:support@agentbazar.in" style="color:#1155cc;text-decoration:none;">support@agentbazar.in</a>
                   </p>
-                  <p style="margin:0;font-size:12px;color:#666666;">Tripforu Holidays Pvt. Ltd. (Guwahati)</p>
+                  <p style="margin:4px 0 0;font-size:12px;color:#1155cc;font-family:Arial,Helvetica,sans-serif;">Tripforu Holidays Pvt. Ltd. (Guwahati)</p>
                 </td>
               </tr>
 
               <!-- Divider -->
               <tr>
                 <td style="padding:18px 0 14px;">
-                  <hr style="border:none;border-top:1px solid #e8ecf2;margin:0;" />
+                  <hr style="border:none;border-top:1px solid #e0e0e0;margin:0;" />
                 </td>
               </tr>
 
-              <!-- Unsubscribe: prominent like BW Travel -->
+              <!-- Unsubscribe -->
               <tr>
                 <td style="text-align:center;padding-bottom:10px;">
-                  <a href="${opts.unsubscribeUrl}" style="color:#111111;text-decoration:underline;font-size:13px;font-weight:bold;">Unsubscribe from AgentBazar</a>
+                  <a href="${opts.unsubscribeUrl}" style="color:#111111;text-decoration:underline;font-size:13px;font-weight:bold;font-family:Arial,Helvetica,sans-serif;">Unsubscribe from AgentBazar</a>
                 </td>
               </tr>
 
               <!-- Copyright -->
               <tr>
                 <td style="text-align:center;">
-                  <p style="margin:0;font-size:12px;font-weight:bold;color:#111111;">AgentBazar &copy;2025</p>
+                  <p style="margin:0;font-size:12px;font-weight:bold;color:#111111;font-family:Arial,Helvetica,sans-serif;">AgentBazar &copy;2025</p>
                 </td>
               </tr>
 
