@@ -1341,6 +1341,9 @@ export default function ContactsPage() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
       toast.success("Contact created")
+      // Optimistically prepend the new contact (with tags) so it shows immediately
+      const newContact: Contact = { ...data, tags: data.tags ?? [] }
+      setContacts(prev => [newContact, ...prev])
       setCreateForm({
         email: "", firstName: "", lastName: "", phone: "", alternatePhone: "",
         company: "", streetAddress: "", streetNumber: "", neighborhood: "",
@@ -1350,7 +1353,6 @@ export default function ContactsPage() {
         tagIds: [], customFields: [],
       })
       setView("list")
-      load()
     } catch (err: unknown) { toast.error(err instanceof Error ? err.message : "Error") }
     finally { setCreateBusy(false) }
   }

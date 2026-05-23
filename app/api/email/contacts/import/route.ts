@@ -80,37 +80,22 @@ export async function POST(req: NextRequest) {
   }
   const dedupedContacts = Array.from(dedupedMap.values())
 
-  const { error } = await supabaseAdmin
+  // Upsert and get back all IDs in one shot — avoids email case-mismatch on lookup
+  const { data: upserted, error } = await supabaseAdmin
     .from("email_contacts")
     .upsert(dedupedContacts, { onConflict: "client_id,email" })
+    .select("id")
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
   // If tags were provided, assign all of them to all imported contacts
-  if (tagIds.length) {
-    // Fetch contact IDs by client — more reliable than matching by email string
-    const { data: rows } = await supabaseAdmin
-      .from("email_contacts")
-      .select("id")
-      .eq("client_id", clientId)
-      .in("email", dedupedContacts.map(c => (c.email as string).toLowerCase()))
-
-    // Also try case-insensitive fallback via ilike for any that didn't match
-    const { data: rowsUpper } = await supabaseAdmin
-      .from("email_contacts")
-      .select("id")
-      .eq("client_id", clientId)
-      .in("email", dedupedContacts.map(c => c.email as string))
-
-    const allRows = [...(rows ?? []), ...(rowsUpper ?? [])]
-    const uniqueIds = Array.from(new Set(allRows.map(r => r.id)))
-
-    if (uniqueIds.length) {
-      const tagRows = uniqueIds.flatMap(contactId => tagIds.map(tid => ({ contact_id: contactId, tag_id: tid })))
-      await supabaseAdmin
-        .from("email_contact_tags")
-        .upsert(tagRows, { onConflict: "contact_id,tag_id" })
-    }
+  if (tagIds.length && upserted?.length) {
+    const tagRows = upserted.flatMap((r: { id: string }) =>
+      tagIds.map(tid => ({ contact_id: r.id, tag_id: tid }))
+    )
+    await supabaseAdmin
+      .from("email_contact_tags")
+      .upsert(tagRows, { onConflict: "contact_id,tag_id" })
   }
 
   // Write import log
