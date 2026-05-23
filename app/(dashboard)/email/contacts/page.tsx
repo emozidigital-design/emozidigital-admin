@@ -1845,7 +1845,7 @@ export default function ContactsPage() {
       {/* Header */}
       <div className="flex items-center justify-between mb-5">
         <h1 className="text-xl font-semibold text-zinc-900">
-          {totalContacts > 0 ? `${totalContacts.toLocaleString()} Contacts` : "Contacts"}
+          {contacts.length > 0 ? `${contacts.length.toLocaleString()} Contacts` : (totalContacts > 0 ? `${totalContacts.toLocaleString()} Contacts` : "Contacts")}
         </h1>
         <div className="flex items-center gap-2.5">
           <button
