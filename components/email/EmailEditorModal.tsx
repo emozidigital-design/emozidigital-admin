@@ -725,7 +725,7 @@ function CanvasBlock({
 
   return (
     <div
-      className={`relative group cursor-pointer transition-all ${isSelected ? "ring-2 ring-inset ring-[#003434]" : "hover:ring-1 hover:ring-inset hover:ring-[#003434]/40"}`}
+      className={`relative group cursor-pointer transition-all border-b border-zinc-200 ${isSelected ? "outline outline-2 outline-[#003434] outline-offset-[-2px] z-10" : "hover:outline hover:outline-1 hover:outline-[#003434]/50 hover:outline-offset-[-1px]"}`}
       onClick={onSelect}
     >
       {/* Top-level block controls */}
@@ -742,11 +742,9 @@ function CanvasBlock({
         </button>
       </div>
 
-      {isSelected && (
-        <div className="absolute top-0 left-0 z-20 bg-[#003434] text-white text-[10px] font-medium px-2 py-0.5 rounded-br-md leading-tight">
-          {block.type.replace(/_/g, " ")}
-        </div>
-      )}
+      <div className={`absolute top-0 left-0 z-20 text-[10px] font-medium px-2 py-0.5 rounded-br-md leading-tight transition-all ${isSelected ? "bg-[#003434] text-white opacity-100" : "bg-zinc-600 text-white opacity-0 group-hover:opacity-100"}`}>
+        {block.type.replace(/_/g, " ")}
+      </div>
 
       {isLayout ? (
         <div style={{ padding: `${py}px ${px}px`, background: bg, display: "flex", gap: 8 }}>
@@ -761,7 +759,7 @@ function CanvasBlock({
                 {children.map((child, childIdx) => (
                   <div
                     key={child.id}
-                    className={`relative group/child cursor-pointer transition-all ${selectedId === child.id ? "ring-2 ring-inset ring-[#003434]" : "hover:ring-1 hover:ring-inset hover:ring-[#003434]/40"}`}
+                    className={`relative group/child cursor-pointer transition-all border-b border-zinc-100 last:border-b-0 ${selectedId === child.id ? "outline outline-2 outline-[#003434] outline-offset-[-2px]" : "hover:outline hover:outline-1 hover:outline-[#003434]/50 hover:outline-offset-[-1px]"}`}
                     onClick={e => { e.stopPropagation(); onSelectChild(child.id) }}
                   >
                     <div className="absolute top-1 right-1 z-30 hidden group-hover/child:flex gap-1 bg-white rounded-lg shadow border border-zinc-200 p-0.5">
@@ -776,11 +774,9 @@ function CanvasBlock({
                         <Trash2 className="w-3 h-3" />
                       </button>
                     </div>
-                    {selectedId === child.id && (
-                      <div className="absolute top-0 left-0 z-20 bg-[#003434] text-white text-[10px] font-medium px-2 py-0.5 rounded-br-md leading-tight">
-                        {child.type}
-                      </div>
-                    )}
+                    <div className={`absolute top-0 left-0 z-20 text-[10px] font-medium px-2 py-0.5 rounded-br-md leading-tight transition-all ${selectedId === child.id ? "bg-[#003434] text-white opacity-100" : "bg-zinc-600 text-white opacity-0 group-hover/child:opacity-100"}`}>
+                      {child.type}
+                    </div>
                     <BlockVisual block={child} />
                   </div>
                 ))}
