@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
   let invalid = 0
   const contacts = lines.slice(1).flatMap(line => {
     const cols = line.split(delimiter).map(c => c.replace(/^"|"$/g, "").trim())
-    const email = cols[emailIdx]
+    const email = cols[emailIdx]?.toLowerCase().trim()
     if (!email || !email.includes("@")) {
       invalid++
       return []

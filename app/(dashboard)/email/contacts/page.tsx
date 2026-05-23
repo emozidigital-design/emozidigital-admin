@@ -796,19 +796,48 @@ function RowActions({ contact, onToggleSubscribe, onDelete }: {
   contact: Contact; onToggleSubscribe: () => void; onDelete: () => void
 }) {
   const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
+  const [menuStyle, setMenuStyle] = useState<React.CSSProperties>({})
+  const btnRef = useRef<HTMLButtonElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
+
   useEffect(() => {
-    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false) }
+    const h = (e: MouseEvent) => {
+      if (
+        btnRef.current && !btnRef.current.contains(e.target as Node) &&
+        menuRef.current && !menuRef.current.contains(e.target as Node)
+      ) setOpen(false)
+    }
     document.addEventListener("mousedown", h)
     return () => document.removeEventListener("mousedown", h)
   }, [])
+
+  function handleOpen() {
+    if (!btnRef.current) return
+    const rect = btnRef.current.getBoundingClientRect()
+    const menuH = 90 // approx height of menu
+    const spaceBelow = window.innerHeight - rect.bottom
+    const style: React.CSSProperties = {
+      position: "fixed",
+      right: window.innerWidth - rect.right,
+      zIndex: 9999,
+      minWidth: 160,
+    }
+    if (spaceBelow < menuH + 8) {
+      style.bottom = window.innerHeight - rect.top + 4
+    } else {
+      style.top = rect.bottom + 4
+    }
+    setMenuStyle(style)
+    setOpen(v => !v)
+  }
+
   return (
-    <div className="relative" ref={ref}>
-      <button onClick={() => setOpen(v => !v)} className="w-7 h-7 rounded-lg flex items-center justify-center text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 transition-colors">
+    <div className="relative">
+      <button ref={btnRef} onClick={handleOpen} className="w-7 h-7 rounded-lg flex items-center justify-center text-zinc-400 hover:text-zinc-600 hover:bg-zinc-100 transition-colors">
         <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="5" r="1.5" /><circle cx="12" cy="12" r="1.5" /><circle cx="12" cy="19" r="1.5" /></svg>
       </button>
       {open && (
-        <div className="absolute z-50 right-0 top-full mt-1 bg-white border border-zinc-200 rounded-xl shadow-xl py-1.5 min-w-[160px]">
+        <div ref={menuRef} style={menuStyle} className="bg-white border border-zinc-200 rounded-xl shadow-xl py-1.5">
           {!contact.bounced && !contact.complained && (
             <button
               className="w-full text-left px-3 py-1.5 text-xs text-zinc-700 hover:bg-zinc-50 flex items-center gap-2"
