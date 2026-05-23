@@ -171,13 +171,6 @@ function buildAgentBazarNewsletterHtml(opts: {
           <td style="background:#ffffff;padding:28px 24px 20px;border-top:1px solid #e8ecf2;">
             <table width="100%" cellpadding="0" cellspacing="0">
 
-              <!-- Logo -->
-              <tr>
-                <td style="text-align:center;padding-bottom:22px;">
-                  <img src="https://blog.agentbazar.in/new-logo.jpg" alt="AgentBazar" height="48" style="height:48px;max-height:48px;border:0;display:inline-block;" />
-                </td>
-              </tr>
-
               <!-- WhatsApp invite row -->
               <tr>
                 <td style="padding-bottom:22px;border-bottom:1px solid #eeeeee;">
