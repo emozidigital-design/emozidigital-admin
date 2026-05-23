@@ -7,7 +7,8 @@
       "mcp__claude_ai_Supabase__list_projects",
       "mcp__claude_ai_Supabase__execute_sql",
       "Bash(npx tsc *)",
-      "Bash(gh pr *)"
+      "Bash(gh pr *)",
+      "PowerShell(cd \"c:\\\\northeastforu\\\\emozidigital\"; git diff app/\\(marketing\\)/blog/page.tsx; git diff \"app/\\(marketing\\)/blog/[slug]/page.tsx\"; git diff app/api/blog/views/route.ts; git diff app/sitemap.ts)"
     ]
   }
 }

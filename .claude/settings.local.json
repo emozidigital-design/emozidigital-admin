@@ -3,7 +3,27 @@
     "allow": [
       "Bash(git commit -m ' *)",
       "Bash(git push *)",
-      "Bash(git add *)"
+      "Bash(git add *)",
+      "Bash(xargs grep -l \"Contact|List\")",
+      "Bash(xargs grep -l \"email_contacts\\\\|email_lists\")",
+      "Bash(findstr /S \"tag\" supabase\\\\migrations\\\\*.sql)",
+      "Bash(powershell -Command \"Select-String -Path 'supabase\\\\migrations\\\\*.sql' -Pattern 'tag' -SimpleMatch\")",
+      "Bash(powershell -Command \"Select-String -Path 'app\\\\api\\\\email\\\\*.ts' -Pattern 'tag' -SimpleMatch\")",
+      "Bash(mkdir -p \"c:\\\\northeastforu\\\\emozidigital-admin\\\\app\\\\api\\\\email\\\\tags\\\\[id]\")",
+      "mcp__claude_ai_Supabase__list_tables",
+      "mcp__claude_ai_Supabase__get_logs",
+      "Bash(git -C \"c:\\\\northeastforu\\\\emozidigital-admin\" status)",
+      "Bash(git -C \"c:\\\\northeastforu\\\\emozidigital-admin\" diff)",
+      "Bash(git -C \"c:\\\\northeastforu\\\\emozidigital-admin\" add app/api/email/newsletter/send/route.ts)",
+      "Bash(git -C 'c:\\\\northeastforu\\\\emozidigital-admin' commit -m ' *)",
+      "Bash(git -C \"c:\\\\northeastforu\\\\emozidigital-admin\" push origin main)",
+      "Read(//c/northeastforu/**)",
+      "Bash(dir \"C:\\\\northeastforu\")",
+      "Bash(Get-ChildItem -Path \"c:\\\\northeastforu\\\\emozidigital-admin\\\\app\\\\\\(dashboard\\)\\\\email\\\\contacts\" -File)",
+      "mcp__claude_ai_Supabase__apply_migration"
+    ],
+    "additionalDirectories": [
+      "c:\\northeastforu\\emozidigital-admin\\app\\api\\email\\tags"
     ]
   }
 }
