@@ -1045,6 +1045,59 @@ function ContactDrawer({ contact, allTags, onClose, onSave, onDelete }: {
   )
 }
 
+// ─── Duplicate contact dialog ─────────────────────────────────────────────────
+
+function DuplicateDialog({ type, existingCount, newCount, onSkip, onCancel }: {
+  type: "create" | "import"
+  existingCount: number
+  newCount: number
+  onSkip: () => void
+  onCancel: () => void
+}) {
+  const isCreate = type === "create"
+  return (
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={onCancel} />
+      <div className="relative bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 border border-zinc-100">
+        <div className="flex items-start gap-3 mb-5">
+          <div className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 bg-amber-100">
+            <svg className="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          </div>
+          <div className="flex-1 min-w-0 pt-0.5">
+            <h3 className="text-sm font-semibold text-zinc-900">
+              {isCreate ? "Contact already exists" : `${existingCount} duplicate${existingCount !== 1 ? "s" : ""} found`}
+            </h3>
+            <p className="text-xs text-zinc-500 mt-1 leading-relaxed">
+              {isCreate
+                ? "This email address is already in your contacts list."
+                : `${existingCount} contact${existingCount !== 1 ? "s" : ""} in this file already exist${existingCount === 1 ? "s" : ""} in your list.${newCount > 0 ? ` ${newCount} new contact${newCount !== 1 ? "s" : ""} will be added.` : " There are no new contacts to add."}`
+              }
+            </p>
+          </div>
+        </div>
+        <div className="flex justify-end gap-2">
+          <button
+            className="text-sm px-4 py-2 rounded-lg border border-zinc-200 text-zinc-700 hover:bg-zinc-50 transition-colors"
+            onClick={onCancel}
+          >
+            Cancel
+          </button>
+          {(!isCreate && newCount > 0) && (
+            <button
+              className="text-sm px-4 py-2 rounded-lg bg-[#003434] text-white hover:bg-[#004848] transition-colors"
+              onClick={onSkip}
+            >
+              Skip existing · add {newCount} new
+            </button>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function ContactsPage() {
@@ -1074,6 +1127,12 @@ export default function ContactsPage() {
   const bulkTagRef = useRef<HTMLDivElement>(null)
   const [dialog, setDialog] = useState<DialogState>(null)
   const [drawerContact, setDrawerContact] = useState<Contact | null>(null)
+  const [dupDialog, setDupDialog] = useState<{
+    type: "create" | "import"
+    existingCount: number
+    newCount: number
+    onSkip: () => void
+  } | null>(null)
 
   // ── Create view state ──
   const [createForm, setCreateForm] = useState({
@@ -1326,6 +1385,24 @@ export default function ContactsPage() {
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!createForm.email || !clientId) return
+
+    // Check for duplicate before submitting
+    const dupRes = await fetch("/api/email/contacts/check-duplicates", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ client_id: clientId, emails: [createForm.email] }),
+    })
+    const dupData = await dupRes.json()
+    if (dupData.existing?.length > 0) {
+      setDupDialog({
+        type: "create",
+        existingCount: 1,
+        newCount: 0,
+        onSkip: () => { setDupDialog(null) },
+      })
+      return
+    }
+
     setCreateBusy(true)
     try {
       const name = [createForm.firstName, createForm.lastName].filter(Boolean).join(" ") || null
@@ -1403,11 +1480,9 @@ export default function ContactsPage() {
     setImportStep("map")
   }
 
-  // ── Mapped import handler (map step → actual API call) ──
-  const handleMappedImport = async () => {
+  // ── Actual import call (called after duplicate check is resolved) ──
+  const doImport = async (skipExisting: boolean) => {
     if (!importFile || !clientId) return
-    const hasEmail = Object.values(columnMap).includes("email")
-    if (!hasEmail) { toast.error("Please map a column to Email before importing"); return }
     setImportBusy(true)
     try {
       const fd = new FormData()
@@ -1415,11 +1490,15 @@ export default function ContactsPage() {
       fd.append("file", importFile)
       fd.append("delimiter", importDelimiter)
       fd.append("column_map", JSON.stringify(columnMap))
+      fd.append("skip_existing", skipExisting ? "true" : "false")
       importTagIds.forEach(id => fd.append("tag_id", id))
       const res = await fetch("/api/email/contacts/import", { method: "POST", body: fd })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
-      toast.success(`Imported ${data.imported} contacts${data.invalid ? ` (${data.invalid} invalid skipped)` : ""}`)
+      const parts = [`Imported ${data.imported} contact${data.imported !== 1 ? "s" : ""}`]
+      if (data.skipped) parts.push(`${data.skipped} existing skipped`)
+      if (data.invalid) parts.push(`${data.invalid} invalid skipped`)
+      toast.success(parts.join(" · "))
       setImportFile(null)
       if (fileRef.current) fileRef.current.value = ""
       setImportTagIds([])
@@ -1432,6 +1511,50 @@ export default function ContactsPage() {
       setView("list")
     } catch (err: unknown) { toast.error(err instanceof Error ? err.message : "Import error") }
     finally { setImportBusy(false) }
+  }
+
+  // ── Mapped import handler (map step → duplicate check → actual import) ──
+  const handleMappedImport = async () => {
+    if (!importFile || !clientId) return
+    const hasEmail = Object.values(columnMap).includes("email")
+    if (!hasEmail) { toast.error("Please map a column to Email before importing"); return }
+
+    // Parse all emails from the full CSV to check for duplicates
+    const text = await importFile.text()
+    const lines = text.split("\n").map(l => l.trim()).filter(Boolean)
+    const headers = lines[0].split(importDelimiter).map(h => h.replace(/^"|"$/g, "").trim())
+    const emailColIdx = Object.entries(columnMap).find(([, v]) => v === "email")?.[0]
+    const emailIdx = emailColIdx !== undefined ? Number(emailColIdx) : headers.findIndex(h => h.toLowerCase() === "email")
+    const allEmails = lines.slice(1)
+      .map(l => l.split(importDelimiter).map(c => c.replace(/^"|"$/g, "").trim())[emailIdx]?.toLowerCase().trim())
+      .filter(e => e && e.includes("@"))
+    const uniqueEmails = Array.from(new Set(allEmails))
+
+    // Check for existing contacts in batches of 500
+    let existingCount = 0
+    const CHUNK = 500
+    for (let i = 0; i < uniqueEmails.length; i += CHUNK) {
+      const chunk = uniqueEmails.slice(i, i + CHUNK)
+      const res = await fetch("/api/email/contacts/check-duplicates", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ client_id: clientId, emails: chunk }),
+      })
+      const data = await res.json()
+      existingCount += (data.existing ?? []).length
+    }
+
+    if (existingCount > 0) {
+      setDupDialog({
+        type: "import",
+        existingCount,
+        newCount: uniqueEmails.length - existingCount,
+        onSkip: () => { setDupDialog(null); doImport(true) },
+      })
+      return
+    }
+
+    doImport(false)
   }
 
   // ── Drawer save handler ──
@@ -1474,6 +1597,7 @@ export default function ContactsPage() {
     return (
       <div className="w-full">
         {dialog && <ConfirmDialog {...dialog} onCancel={() => setDialog(null)} />}
+        {dupDialog && <DuplicateDialog {...dupDialog} onCancel={() => setDupDialog(null)} />}
         {showCustomFieldModal && (
           <CustomFieldModal
             onClose={() => setShowCustomFieldModal(false)}
@@ -1657,6 +1781,7 @@ export default function ContactsPage() {
 
     return (
       <div className="w-full">
+        {dupDialog && <DuplicateDialog {...dupDialog} onCancel={() => setDupDialog(null)} />}
         {/* Back button */}
         <button onClick={() => { resetImportState(); setView("list") }} className="inline-flex items-center gap-1.5 text-sm text-zinc-500 hover:text-zinc-800 mb-5 transition-colors">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
@@ -1863,6 +1988,7 @@ export default function ContactsPage() {
   return (
     <div className="w-full">
       {dialog && <ConfirmDialog {...dialog} onCancel={() => setDialog(null)} />}
+      {dupDialog && <DuplicateDialog {...dupDialog} onCancel={() => setDupDialog(null)} />}
       {drawerContact && (
         <ContactDrawer
           contact={drawerContact}

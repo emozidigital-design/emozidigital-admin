@@ -16,6 +16,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "client_id and file required" }, { status: 400 })
   }
 
+  const skipExisting = formData.get("skip_existing") === "true"
   const columnMapRaw = formData.get("column_map") as string | null
   const columnMap: Record<number, string> = columnMapRaw ? JSON.parse(columnMapRaw) : {}
   const hasColumnMap = Object.keys(columnMap).length > 0
@@ -80,10 +81,43 @@ export async function POST(req: NextRequest) {
   }
   const dedupedContacts = Array.from(dedupedMap.values())
 
+  // If skip_existing is set, filter out emails that already exist in the DB
+  let finalContacts = dedupedContacts
+  let skipped = 0
+  if (skipExisting) {
+    const existingEmails = new Set<string>()
+    const CHUNK = 500
+    for (let i = 0; i < dedupedContacts.length; i += CHUNK) {
+      const chunk = dedupedContacts.slice(i, i + CHUNK).map(c => (c.email as string).toLowerCase())
+      const { data: existing } = await supabaseAdmin
+        .from("email_contacts")
+        .select("email")
+        .eq("client_id", clientId)
+        .in("email", chunk)
+      ;(existing ?? []).forEach(r => existingEmails.add(r.email.toLowerCase()))
+    }
+    finalContacts = dedupedContacts.filter(c => !existingEmails.has((c.email as string).toLowerCase()))
+    skipped = dedupedContacts.length - finalContacts.length
+  }
+
+  if (finalContacts.length === 0) {
+    await supabaseAdmin.from("email_import_logs").insert({
+      client_id: clientId,
+      file_name: file.name,
+      delimiter,
+      total_rows: totalRows,
+      imported: 0,
+      invalid,
+      tag_ids: tagIds,
+      status: "completed",
+    })
+    return NextResponse.json({ imported: 0, invalid, skipped })
+  }
+
   // Upsert and get back all IDs in one shot — avoids email case-mismatch on lookup
   const { data: upserted, error } = await supabaseAdmin
     .from("email_contacts")
-    .upsert(dedupedContacts, { onConflict: "client_id,email" })
+    .upsert(finalContacts, { onConflict: "client_id,email" })
     .select("id")
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -104,11 +138,11 @@ export async function POST(req: NextRequest) {
     file_name: file.name,
     delimiter,
     total_rows: totalRows,
-    imported: dedupedContacts.length,
+    imported: finalContacts.length,
     invalid,
     tag_ids: tagIds,
     status: "completed",
   })
 
-  return NextResponse.json({ imported: dedupedContacts.length, invalid })
+  return NextResponse.json({ imported: finalContacts.length, invalid, skipped })
 }
