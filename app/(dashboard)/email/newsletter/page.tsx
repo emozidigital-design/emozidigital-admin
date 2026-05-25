@@ -39,6 +39,7 @@ interface NewsletterSend {
   recipient_type: string
   status: string
   sent_count: number
+  recipient_count: number
   failed_count: number
   opens_count: number
   clicks_count: number
@@ -633,8 +634,22 @@ export default function NewsletterPage() {
                   </div>
 
                   {/* Sent */}
-                  <div className="text-sm font-semibold text-zinc-700 text-right pr-3">
-                    {ns.sent_count > 0 ? ns.sent_count.toLocaleString() : <span className="text-zinc-300 font-normal text-xs">–</span>}
+                  <div className="text-right pr-3">
+                    {ns.sent_count > 0 ? (
+                      <>
+                        <p className="text-sm font-semibold text-zinc-700">{ns.sent_count.toLocaleString()}</p>
+                        {ns.recipient_count > 0 && ns.recipient_count !== ns.sent_count && (
+                          <p className="text-[10px] text-zinc-400">of {ns.recipient_count.toLocaleString()}</p>
+                        )}
+                        {ns.recipient_count > 0 && ns.recipient_count === ns.sent_count && (
+                          <p className="text-[10px] text-[#70BF4B]">all sent</p>
+                        )}
+                      </>
+                    ) : ns.recipient_count > 0 ? (
+                      <p className="text-xs text-zinc-400">{ns.recipient_count.toLocaleString()} queued</p>
+                    ) : (
+                      <span className="text-zinc-300 font-normal text-xs">–</span>
+                    )}
                   </div>
 
                   {/* Opens */}

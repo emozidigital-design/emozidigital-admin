@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
   let query = supabaseAdmin
     .from("newsletter_sends")
     .select(
-      "id, subject, recipient_type, status, sent_count, failed_count, opens_count, clicks_count, sent_at, created_at, blog_post_id, sender_id, list_id, tag_ids, trending_post_ids, newsletter_template_id, scheduled_at"
+      "id, subject, recipient_type, status, sent_count, recipient_count, failed_count, opens_count, clicks_count, sent_at, created_at, blog_post_id, sender_id, list_id, tag_ids, trending_post_ids, newsletter_template_id, scheduled_at"
     )
     .order("created_at", { ascending: false })
     .limit(100)

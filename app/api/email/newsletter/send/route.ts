@@ -376,6 +376,7 @@ export async function POST(req: NextRequest) {
       trending_post_ids,
       newsletter_template_id: newsletter_template_id || null,
       status: test_email ? "test" : "sending",
+      recipient_count: test_email ? 1 : recipients.length,
     })
     .select("id")
     .single()
