@@ -426,7 +426,7 @@ export default function NewsletterPage() {
         if (mode === "test") {
           toast.success(`Test email sent to ${TEST_EMAIL}`)
         } else {
-          toast.success(`Sent to ${data.sent} recipient${data.sent !== 1 ? "s" : ""}${data.failed ? ` · ${data.failed} failed` : ""}`)
+          toast.success(`Queued for ${data.total.toLocaleString()} recipient${data.total !== 1 ? "s" : ""} — sending in background`)
           setView("dashboard")
           refreshHistory()
         }
