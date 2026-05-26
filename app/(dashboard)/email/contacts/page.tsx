@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef, useCallback, useMemo } from "react"
+import { createPortal } from "react-dom"
 import toast from "react-hot-toast"
 import { useClient } from "../client-context"
 
@@ -178,22 +179,47 @@ function TagPillDropdown({ tag, onRename, onRemove, onClose }: {
   )
 }
 
-function AddTagPopover({ contactId, clientId, allTags, contactTags, onApply, onNewTag, onClose }: {
+function AddTagPopover({ contactId, clientId, allTags, contactTags, anchorRef, onApply, onNewTag, onClose }: {
   contactId: string; clientId: string; allTags: EmailTag[]; contactTags: EmailTag[]
+  anchorRef: React.RefObject<HTMLButtonElement>
   onApply: (contactId: string, toAdd: string[], toRemove: string[]) => Promise<void>
   onNewTag: (tag: EmailTag) => void; onClose: () => void
 }) {
   const [checked, setChecked] = useState<Set<string>>(new Set(contactTags.map(t => t.id)))
   const [input, setInput] = useState("")
   const [busy, setBusy] = useState(false)
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null)
   const ref = useRef<HTMLDivElement>(null)
-  const flipUp = useFlipUp(ref)
   const filtered = input.trim() ? allTags.filter(t => t.name.toLowerCase().includes(input.toLowerCase())) : allTags
+
+  // Compute position from the anchor button on mount
   useEffect(() => {
-    const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) onClose() }
+    if (!anchorRef.current) return
+    const r = anchorRef.current.getBoundingClientRect()
+    const popoverWidth = 208 // w-52
+    const left = Math.min(r.right - popoverWidth, window.innerWidth - popoverWidth - 8)
+    setPos({ top: r.bottom + window.scrollY + 6, left: Math.max(left, 8) })
+  }, [anchorRef])
+
+  // Flip above if it would overflow viewport bottom
+  useEffect(() => {
+    if (!ref.current || !anchorRef.current) return
+    const r = anchorRef.current.getBoundingClientRect()
+    const popH = ref.current.offsetHeight
+    if (r.bottom + popH + 6 > window.innerHeight) {
+      setPos(prev => prev ? { ...prev, top: r.top + window.scrollY - popH - 6 } : prev)
+    }
+  })
+
+  useEffect(() => {
+    const h = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node) &&
+          anchorRef.current && !anchorRef.current.contains(e.target as Node)) onClose()
+    }
     document.addEventListener("mousedown", h)
     return () => document.removeEventListener("mousedown", h)
-  }, [onClose])
+  }, [onClose, anchorRef])
+
   const toggle = (id: string) => setChecked(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n })
   const apply = async () => {
     const toAdd = Array.from(checked).filter(id => !contactTags.find(t => t.id === id))
@@ -210,8 +236,16 @@ function AddTagPopover({ contactId, clientId, allTags, contactTags, onApply, onN
     setChecked(prev => new Set(Array.from(prev).concat(data.id)))
     setInput(""); setBusy(false)
   }
-  return (
-    <div ref={ref} className={`absolute z-50 ${flipUp ? "bottom-full mb-1.5" : "top-full mt-1.5"} right-0 bg-white border border-zinc-200 rounded-xl shadow-xl w-52`} onClick={e => e.stopPropagation()}>
+
+  if (!pos) return null
+
+  return createPortal(
+    <div
+      ref={ref}
+      style={{ position: "absolute", top: pos.top, left: pos.left, zIndex: 9999 }}
+      className="bg-white border border-zinc-200 rounded-xl shadow-xl w-52"
+      onClick={e => e.stopPropagation()}
+    >
       <div className="p-2 border-b border-zinc-100">
         <input autoFocus className="w-full border border-zinc-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#003434]/20" placeholder="Search tags…" value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === "Escape" && onClose()} />
       </div>
@@ -237,7 +271,8 @@ function AddTagPopover({ contactId, clientId, allTags, contactTags, onApply, onN
           {busy ? "Saving…" : "Apply"}
         </button>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 
@@ -1136,6 +1171,7 @@ export default function ContactsPage() {
   const [bulkBusy, setBulkBusy] = useState(false)
   const [openPillDropdown, setOpenPillDropdown] = useState<{ contactId: string; tag: EmailTag } | null>(null)
   const [openAddTag, setOpenAddTag] = useState<string | null>(null)
+  const addTagBtnRefs = useRef<Map<string, HTMLButtonElement>>(new Map())
   const bulkTagRef = useRef<HTMLDivElement>(null)
   const [dialog, setDialog] = useState<DialogState>(null)
   const [drawerContact, setDrawerContact] = useState<Contact | null>(null)
@@ -2183,26 +2219,26 @@ export default function ContactsPage() {
                                 )}
                               </span>
                             ))}
-                            <span className="relative">
-                              <button
-                                className="w-5 h-5 flex items-center justify-center text-zinc-300 hover:text-[#003434] border border-dashed border-zinc-200 hover:border-teal-300 rounded-full transition-colors"
-                                title="Add/remove tags"
-                                onClick={() => setOpenAddTag(openAddTag === c.id ? null : c.id)}
-                              >
-                                <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" /></svg>
-                              </button>
-                              {openAddTag === c.id && (
-                                <AddTagPopover
-                                  contactId={c.id}
-                                  clientId={clientId}
-                                  allTags={allTags}
-                                  contactTags={c.tags}
-                                  onApply={handleApplyTags}
-                                  onNewTag={tag => setAllTags(prev => [...prev, tag].sort((a, b) => a.name.localeCompare(b.name)))}
-                                  onClose={() => setOpenAddTag(null)}
-                                />
-                              )}
-                            </span>
+                            <button
+                              ref={el => { if (el) addTagBtnRefs.current.set(c.id, el); else addTagBtnRefs.current.delete(c.id) }}
+                              className="w-5 h-5 flex items-center justify-center text-zinc-300 hover:text-[#003434] border border-dashed border-zinc-200 hover:border-teal-300 rounded-full transition-colors"
+                              title="Add/remove tags"
+                              onClick={() => setOpenAddTag(openAddTag === c.id ? null : c.id)}
+                            >
+                              <svg className="w-2.5 h-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" /></svg>
+                            </button>
+                            {openAddTag === c.id && addTagBtnRefs.current.get(c.id) && (
+                              <AddTagPopover
+                                contactId={c.id}
+                                clientId={clientId}
+                                allTags={allTags}
+                                contactTags={c.tags}
+                                anchorRef={{ current: addTagBtnRefs.current.get(c.id)! }}
+                                onApply={handleApplyTags}
+                                onNewTag={tag => setAllTags(prev => [...prev, tag].sort((a, b) => a.name.localeCompare(b.name)))}
+                                onClose={() => setOpenAddTag(null)}
+                              />
+                            )}
                             {/* Status badge alongside tags */}
                             {statusBadge(c)}
                           </div>
