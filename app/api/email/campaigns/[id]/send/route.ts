@@ -26,14 +26,23 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   let contacts: EligibleContact[] = []
 
   if (Array.isArray(campaign.tag_ids) && campaign.tag_ids.length > 0) {
-    const { data: taggedContacts, error: tcErr } = await supabaseAdmin
-      .from("email_contact_tags")
-      .select("email_contacts(id, email, name, subscribed, bounced, complained)")
-      .in("tag_id", campaign.tag_ids)
-
-    if (tcErr) return NextResponse.json({ error: tcErr.message }, { status: 500 })
-
-    contacts = filterEligibleContacts(taggedContacts ?? [])
+    // Paginate in chunks of 1000 — Supabase PostgREST caps responses at 1000 rows by default
+    const PAGE = 1000
+    let page = 0
+    let allRows: Array<{ email_contacts: unknown }> = []
+    while (true) {
+      const { data, error: tcErr } = await supabaseAdmin
+        .from("email_contact_tags")
+        .select("email_contacts(id, email, name, subscribed, bounced, complained)")
+        .in("tag_id", campaign.tag_ids)
+        .range(page * PAGE, (page + 1) * PAGE - 1)
+      if (tcErr) return NextResponse.json({ error: tcErr.message }, { status: 500 })
+      if (!data || data.length === 0) break
+      allRows = allRows.concat(data)
+      if (data.length < PAGE) break
+      page++
+    }
+    contacts = filterEligibleContacts(allRows)
   }
 
   if (contacts.length === 0) {

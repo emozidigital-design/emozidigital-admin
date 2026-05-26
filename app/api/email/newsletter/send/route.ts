@@ -94,12 +94,23 @@ export async function POST(req: NextRequest) {
     recipients = (data ?? []).filter(r => r.email)
   } else {
     if (tag_ids.length > 0) {
-      const { data, error } = await supabaseAdmin
-        .from("email_contact_tags")
-        .select("email_contacts(id, email, name, subscribed, bounced, complained)")
-        .in("tag_id", tag_ids)
-      if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-      recipients = filterEligibleContacts(data ?? []).map(({ email, name }) => ({ email, name }))
+      // Paginate in chunks of 1000 — Supabase PostgREST caps responses at 1000 rows by default
+      const PAGE = 1000
+      let page = 0
+      let allRows: Array<{ email_contacts: unknown }> = []
+      while (true) {
+        const { data, error } = await supabaseAdmin
+          .from("email_contact_tags")
+          .select("email_contacts(id, email, name, subscribed, bounced, complained)")
+          .in("tag_id", tag_ids)
+          .range(page * PAGE, (page + 1) * PAGE - 1)
+        if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+        if (!data || data.length === 0) break
+        allRows = allRows.concat(data)
+        if (data.length < PAGE) break
+        page++
+      }
+      recipients = filterEligibleContacts(allRows).map(({ email, name }) => ({ email, name }))
     }
   }
 
