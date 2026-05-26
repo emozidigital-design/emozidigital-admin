@@ -211,7 +211,7 @@ function AddTagPopover({ contactId, clientId, allTags, contactTags, onApply, onN
     setInput(""); setBusy(false)
   }
   return (
-    <div ref={ref} className={`absolute z-50 ${flipUp ? "bottom-full mb-1.5" : "top-full mt-1.5"} left-0 bg-white border border-zinc-200 rounded-xl shadow-xl w-52`} onClick={e => e.stopPropagation()}>
+    <div ref={ref} className={`absolute z-50 ${flipUp ? "bottom-full mb-1.5" : "top-full mt-1.5"} right-0 bg-white border border-zinc-200 rounded-xl shadow-xl w-52`} onClick={e => e.stopPropagation()}>
       <div className="p-2 border-b border-zinc-100">
         <input autoFocus className="w-full border border-zinc-200 rounded-lg px-2.5 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#003434]/20" placeholder="Search tags…" value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === "Escape" && onClose()} />
       </div>
