@@ -21,6 +21,7 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
       sender_id: orig.sender_id,
       template_id: orig.template_id,
       list_id: orig.list_id,
+      tag_ids: orig.tag_ids ?? [],
       subject: `Copy of ${orig.subject}`,
       status: "draft",
       scheduled_at: null,

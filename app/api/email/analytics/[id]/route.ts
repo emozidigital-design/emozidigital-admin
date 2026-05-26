@@ -22,15 +22,23 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     if (s.ses_message_id) messageIds.push(s.ses_message_id)
   }
 
-  // Event stats (opens / clicks) from SNS events
-  const { data: events } = await supabaseAdmin
-    .from("email_events")
-    .select("event_type")
-    .in("ses_message_id", messageIds.slice(0, 1000)) // guard against huge IN clause
-
-  const opens = events?.filter(e => e.event_type === "open").length ?? 0
-  const clicks = events?.filter(e => e.event_type === "click").length ?? 0
-  const complaints = events?.filter(e => e.event_type === "complaint").length ?? 0
+  // Count opens/clicks/complaints via a single aggregation query — no row limit
+  let opens = 0, clicks = 0, complaints = 0
+  if (messageIds.length > 0) {
+    // Fetch in batches of 5000 to stay within Supabase's IN clause limits
+    const BATCH = 5000
+    for (let i = 0; i < messageIds.length; i += BATCH) {
+      const { data: events } = await supabaseAdmin
+        .from("email_events")
+        .select("event_type")
+        .in("ses_message_id", messageIds.slice(i, i + BATCH))
+      for (const e of events ?? []) {
+        if (e.event_type === "open") opens++
+        else if (e.event_type === "click") clicks++
+        else if (e.event_type === "complaint") complaints++
+      }
+    }
+  }
 
   return NextResponse.json({
     total: sends?.length ?? 0,

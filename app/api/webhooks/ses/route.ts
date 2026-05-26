@@ -80,27 +80,16 @@ export async function POST(req: NextRequest) {
       .eq("ses_message_id", sesMessageId)
   }
 
-  // Increment opens_count on the parent newsletter batch
-  if (eventType === "Open" && sesMessageId) {
+  // Increment opens_count / clicks_count on the parent newsletter batch (if this is a newsletter send)
+  if ((eventType === "Open" || eventType === "Click") && sesMessageId) {
     const { data: sendRow } = await supabase
       .from("email_sends")
       .select("newsletter_send_id")
       .eq("ses_message_id", sesMessageId)
       .single()
     if (sendRow?.newsletter_send_id) {
-      await supabase.rpc("increment_newsletter_opens", { p_id: sendRow.newsletter_send_id })
-    }
-  }
-
-  // Increment clicks_count on the parent newsletter batch
-  if (eventType === "Click" && sesMessageId) {
-    const { data: sendRow } = await supabase
-      .from("email_sends")
-      .select("newsletter_send_id")
-      .eq("ses_message_id", sesMessageId)
-      .single()
-    if (sendRow?.newsletter_send_id) {
-      await supabase.rpc("increment_newsletter_clicks", { p_id: sendRow.newsletter_send_id })
+      const rpc = eventType === "Open" ? "increment_newsletter_opens" : "increment_newsletter_clicks"
+      await supabase.rpc(rpc, { p_id: sendRow.newsletter_send_id })
     }
   }
 
