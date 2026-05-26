@@ -1047,12 +1047,15 @@ function ContactDrawer({ contact, allTags, onClose, onSave, onDelete }: {
 
 // ─── Duplicate contact dialog ─────────────────────────────────────────────────
 
-function DuplicateDialog({ type, existingCount, newCount, onSkip, onCancel }: {
+function DuplicateDialog({ type, existingCount, newCount, onSkip, onCancel, onAddToTag, addToTagBusy, hasImportTags }: {
   type: "create" | "import"
   existingCount: number
   newCount: number
   onSkip: () => void
   onCancel: () => void
+  onAddToTag?: () => void
+  addToTagBusy?: boolean
+  hasImportTags?: boolean
 }) {
   const isCreate = type === "create"
   return (
@@ -1077,13 +1080,22 @@ function DuplicateDialog({ type, existingCount, newCount, onSkip, onCancel }: {
             </p>
           </div>
         </div>
-        <div className="flex justify-end gap-2">
+        <div className="flex justify-end gap-2 flex-wrap">
           <button
             className="text-sm px-4 py-2 rounded-lg border border-zinc-200 text-zinc-700 hover:bg-zinc-50 transition-colors"
             onClick={onCancel}
           >
             Cancel
           </button>
+          {!isCreate && hasImportTags && onAddToTag && (
+            <button
+              className="text-sm px-4 py-2 rounded-lg border border-[#003434] text-[#003434] hover:bg-[#003434]/5 transition-colors disabled:opacity-50"
+              onClick={onAddToTag}
+              disabled={addToTagBusy}
+            >
+              {addToTagBusy ? "Adding…" : `Add tag to ${existingCount} existing`}
+            </button>
+          )}
           {(!isCreate && newCount > 0) && (
             <button
               className="text-sm px-4 py-2 rounded-lg bg-[#003434] text-white hover:bg-[#004848] transition-colors"
@@ -1131,8 +1143,10 @@ export default function ContactsPage() {
     type: "create" | "import"
     existingCount: number
     newCount: number
+    existingEmails: string[]
     onSkip: () => void
   } | null>(null)
+  const [addToTagBusy, setAddToTagBusy] = useState(false)
 
   // ── Create view state ──
   const [createForm, setCreateForm] = useState({
@@ -1398,6 +1412,7 @@ export default function ContactsPage() {
         type: "create",
         existingCount: 1,
         newCount: 0,
+        existingEmails: [createForm.email],
         onSkip: () => { setDupDialog(null) },
       })
       return
@@ -1531,7 +1546,7 @@ export default function ContactsPage() {
     const uniqueEmails = Array.from(new Set(allEmails))
 
     // Check for existing contacts in batches of 500
-    let existingCount = 0
+    const existingEmails: string[] = []
     const CHUNK = 500
     for (let i = 0; i < uniqueEmails.length; i += CHUNK) {
       const chunk = uniqueEmails.slice(i, i + CHUNK)
@@ -1541,20 +1556,50 @@ export default function ContactsPage() {
         body: JSON.stringify({ client_id: clientId, emails: chunk }),
       })
       const data = await res.json()
-      existingCount += (data.existing ?? []).length
+      existingEmails.push(...(data.existing ?? []))
     }
 
-    if (existingCount > 0) {
+    if (existingEmails.length > 0) {
       setDupDialog({
         type: "import",
-        existingCount,
-        newCount: uniqueEmails.length - existingCount,
+        existingCount: existingEmails.length,
+        newCount: uniqueEmails.length - existingEmails.length,
+        existingEmails,
         onSkip: () => { setDupDialog(null); doImport(true) },
       })
       return
     }
 
     doImport(false)
+  }
+
+  // ── Add tag to existing duplicates ──
+  const handleAddToTag = async () => {
+    if (!dupDialog || !clientId || !importTagIds.length) return
+    setAddToTagBusy(true)
+    try {
+      const res = await fetch("/api/email/contacts/bulk-tag", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ client_id: clientId, emails: dupDialog.existingEmails, tag_ids: importTagIds }),
+      })
+      const json = await res.json()
+      if (!res.ok) { toast.error(json.error); return }
+      // Update local state: add tags to affected contacts
+      const tagsToAdd = allTags.filter(t => importTagIds.includes(t.id))
+      setContacts(prev => prev.map(c => {
+        if (!dupDialog.existingEmails.includes(c.email)) return c
+        const existing = new Set(c.tags.map(t => t.id))
+        const merged = [...c.tags, ...tagsToAdd.filter(t => !existing.has(t.id))]
+        return { ...c, tags: merged }
+      }))
+      toast.success(`Tag${importTagIds.length > 1 ? "s" : ""} added to ${json.tagged} contact${json.tagged !== 1 ? "s" : ""}`)
+      setDupDialog(null)
+      // If there are new contacts to add too, proceed with import
+      if (dupDialog.newCount > 0) doImport(true)
+    } finally {
+      setAddToTagBusy(false)
+    }
   }
 
   // ── Drawer save handler ──
@@ -1597,7 +1642,7 @@ export default function ContactsPage() {
     return (
       <div className="w-full">
         {dialog && <ConfirmDialog {...dialog} onCancel={() => setDialog(null)} />}
-        {dupDialog && <DuplicateDialog {...dupDialog} onCancel={() => setDupDialog(null)} />}
+        {dupDialog && <DuplicateDialog {...dupDialog} onCancel={() => setDupDialog(null)} onAddToTag={handleAddToTag} addToTagBusy={addToTagBusy} hasImportTags={importTagIds.length > 0} />}
         {showCustomFieldModal && (
           <CustomFieldModal
             onClose={() => setShowCustomFieldModal(false)}
@@ -1781,7 +1826,7 @@ export default function ContactsPage() {
 
     return (
       <div className="w-full">
-        {dupDialog && <DuplicateDialog {...dupDialog} onCancel={() => setDupDialog(null)} />}
+        {dupDialog && <DuplicateDialog {...dupDialog} onCancel={() => setDupDialog(null)} onAddToTag={handleAddToTag} addToTagBusy={addToTagBusy} hasImportTags={importTagIds.length > 0} />}
         {/* Back button */}
         <button onClick={() => { resetImportState(); setView("list") }} className="inline-flex items-center gap-1.5 text-sm text-zinc-500 hover:text-zinc-800 mb-5 transition-colors">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
@@ -1988,7 +2033,7 @@ export default function ContactsPage() {
   return (
     <div className="w-full">
       {dialog && <ConfirmDialog {...dialog} onCancel={() => setDialog(null)} />}
-      {dupDialog && <DuplicateDialog {...dupDialog} onCancel={() => setDupDialog(null)} />}
+      {dupDialog && <DuplicateDialog {...dupDialog} onCancel={() => setDupDialog(null)} onAddToTag={handleAddToTag} addToTagBusy={addToTagBusy} hasImportTags={importTagIds.length > 0} />}
       {drawerContact && (
         <ContactDrawer
           contact={drawerContact}
