@@ -187,6 +187,7 @@ export default function NewsletterPage() {
 
   // ── Wizard state ────────────────────────────────────────────────────────────
   const [step, setStep] = useState<1 | 2 | 3>(1)
+  const [isDuplicating, setIsDuplicating] = useState(false)
   const [selectedPost, setSelectedPost] = useState<BlogPost | null>(null)
   const [trendingPosts, setTrendingPosts] = useState<BlogPost[]>([])
   const [postSearch, setPostSearch] = useState("")
@@ -309,6 +310,7 @@ export default function NewsletterPage() {
 
   const resetWizard = () => {
     setStep(1)
+    setIsDuplicating(false)
     setSelectedPost(null)
     setTrendingPosts([])
     setPostSearch("")
@@ -351,10 +353,16 @@ export default function NewsletterPage() {
     setSubject(ns.subject)
     setSelectedTemplateId(ns.newsletter_template_id ?? "")
     const post = posts.find(p => p.id === ns.blog_post_id)
-    if (post) setSelectedPost(post)
+    if (post) {
+      setSelectedPost(post)
+      if (ns.trending_post_ids?.length) {
+        setTrendingPosts(ns.trending_post_ids.map(id => posts.find(p => p.id === id)).filter(Boolean) as BlogPost[])
+      }
+    }
     // Pre-fill same post/subject but clear recipients so user picks new ones
     setStep(2)
     setView("wizard")
+    setIsDuplicating(true)
     setOpenMenuId(null)
   }
 
@@ -874,8 +882,13 @@ export default function NewsletterPage() {
           Newsletters
         </button>
         <span className="text-zinc-300">/</span>
-        <span className="text-sm font-medium text-zinc-700">
+        <span className="text-sm font-medium text-zinc-700 flex items-center gap-2">
           {editingRecordId && editingRecordStatus === "draft" ? "Edit draft" : "New newsletter"}
+          {isDuplicating && (
+            <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-[#D0F255]/30 text-[#003434] border border-[#D0F255]/60 tracking-wide uppercase">
+              Duplicate
+            </span>
+          )}
         </span>
       </div>
 
