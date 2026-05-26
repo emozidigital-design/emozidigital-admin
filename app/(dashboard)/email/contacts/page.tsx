@@ -898,12 +898,13 @@ function RowActions({ contact, onToggleSubscribe, onDelete }: {
 
 // ─── Contact drawer ───────────────────────────────────────────────────────────
 
-function ContactDrawer({ contact, allTags, onClose, onSave, onDelete }: {
+function ContactDrawer({ contact, allTags, onClose, onSave, onDelete, onResetBounce }: {
   contact: Contact
   allTags: EmailTag[]
   onClose: () => void
   onSave: (id: string, fields: Record<string, unknown>, tagIds: string[]) => Promise<void>
   onDelete: (id: string, email: string) => void
+  onResetBounce: (id: string) => Promise<void>
 }) {
   const [form, setForm] = useState({
     first_name: contact.first_name ?? "",
@@ -971,6 +972,25 @@ function ContactDrawer({ contact, allTags, onClose, onSave, onDelete }: {
 
         {/* Scrollable body */}
         <div className="flex-1 overflow-y-auto px-5 py-4 space-y-5">
+
+          {/* Bounce warning banner */}
+          {contact.bounced && (
+            <div className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 flex items-start gap-3">
+              <svg className="w-4 h-4 text-red-500 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" /></svg>
+              <div className="flex-1 min-w-0">
+                <p className="text-xs font-semibold text-red-700 mb-0.5">Email bounced</p>
+                <p className="text-xs text-red-600 leading-relaxed">This address was marked as bounced by AWS SES and is currently suppressed. Only reset if you are certain the address is valid.</p>
+                <button
+                  onClick={() => onResetBounce(contact.id)}
+                  className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold text-red-700 border border-red-300 bg-white hover:bg-red-50 px-3 py-1.5 rounded-lg transition-colors"
+                >
+                  <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                  Mark as valid &amp; re-subscribe
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Personal info */}
           <section>
             <p className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider mb-3">Personal information</p>
@@ -1639,6 +1659,18 @@ export default function ContactsPage() {
   }
 
   // ── Drawer save handler ──
+  const handleResetBounce = async (id: string) => {
+    const res = await fetch(`/api/email/contacts/${id}`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ reset_bounce: true }),
+    })
+    if (!res.ok) { toast.error("Failed to reset bounce"); return }
+    setContacts(prev => prev.map(c => c.id === id ? { ...c, bounced: false, subscribed: true } : c))
+    setDrawerContact(prev => prev ? { ...prev, bounced: false, subscribed: true } : null)
+    toast.success("Bounce cleared — contact re-subscribed")
+  }
+
   const handleDrawerSave = async (id: string, fields: Record<string, unknown>, newTagIds: string[]) => {
     const res = await fetch(`/api/email/contacts/${id}`, {
       method: "PATCH",
@@ -2077,6 +2109,7 @@ export default function ContactsPage() {
           onClose={() => setDrawerContact(null)}
           onSave={handleDrawerSave}
           onDelete={(id, email) => { setDrawerContact(null); handleDelete(id, email) }}
+          onResetBounce={handleResetBounce}
         />
       )}
 

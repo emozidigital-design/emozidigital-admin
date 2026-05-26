@@ -49,6 +49,18 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     return NextResponse.json(data)
   }
 
+  // Handle bounce reset — clears bounced flag and re-subscribes
+  if (body.reset_bounce === true) {
+    const { data, error } = await supabaseAdmin
+      .from("email_contacts")
+      .update({ bounced: false, subscribed: true })
+      .eq("id", params.id)
+      .select()
+      .single()
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+    return NextResponse.json(data)
+  }
+
   // Handle direct field updates (standard + dynamic custom columns)
   if (fields && typeof fields === "object") {
     const update: Record<string, unknown> = {}
