@@ -50,10 +50,15 @@ export async function POST(request: Request) {
   try {
     const body = await request.json();
 
+    const htmlContent = await markdownToHtml(body.content);
+    const wordCount = htmlContent.replace(/<[^>]+>/g, '').split(/\s+/).filter(Boolean).length;
+    const computedReadTime = Math.max(1, Math.round(wordCount / 200));
+
     const blogPost: Record<string, unknown> = {
       slug: body.slug,
       title: body.title,
-      content: await markdownToHtml(body.content),
+      content: htmlContent,
+      read_time: computedReadTime,
       excerpt: body.excerpt || '',
       seo_title: body.seo_title || body.title,
       seo_description: body.seo_description || body.excerpt || '',
