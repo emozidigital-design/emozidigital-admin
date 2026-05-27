@@ -7,6 +7,15 @@ import rehypeRaw from 'rehype-raw';
 import rehypeStringify from 'rehype-stringify';
 import { getAgentBazarSupabase } from '@/lib/supabase-agentbazar';
 
+const BLOG_URL = 'https://blog.agentbazar.in';
+const REVALIDATE_SECRET = process.env.AGENTBAZAR_REVALIDATE_SECRET;
+
+async function revalidateBlog(slug?: string) {
+  if (!REVALIDATE_SECRET) return;
+  const url = `${BLOG_URL}/api/revalidate?secret=${REVALIDATE_SECRET}${slug ? `&slug=${slug}` : ''}`;
+  await fetch(url, { method: 'POST' }).catch(() => {});
+}
+
 async function markdownToHtml(markdown: string): Promise<string> {
   const result = await unified()
     .use(remarkParse)
@@ -87,6 +96,9 @@ export async function POST(request: Request) {
 
     if (error) throw error;
 
+    // Clear ISR cache so the new/updated post is visible immediately
+    await revalidateBlog(body.slug);
+
     return NextResponse.json({ post: data });
   } catch (err: any) {
     console.error('Agent Bazar publish error:', err);
@@ -107,6 +119,9 @@ export async function DELETE(request: Request) {
     .eq('slug', slug);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // Clear ISR cache for the deleted post and homepage
+  await revalidateBlog(slug);
 
   return NextResponse.json({ success: true });
 }
