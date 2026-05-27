@@ -80,7 +80,7 @@ export async function GET(req: NextRequest) {
     for (let i = 0; i < sentCampaigns.length; i += CONCURRENT) {
       const batch = sentCampaigns.slice(i, i + CONCURRENT)
       const results = await Promise.all(
-        batch.map(c => getCampaignStats(c.id).then(s => ({ ...c, ...s })))
+        batch.map(c => getCampaignStats(c.id).then(s => ({ id: c.id, subject: c.subject, sentAt: c.sent_at ?? null, ...s })))
       )
       campaignStats.push(...results)
     }
