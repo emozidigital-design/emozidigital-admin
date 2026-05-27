@@ -71,10 +71,13 @@ export default function BlogPage() {
     }
   }
 
-  async function deletePost(id: string) {
+  async function deletePost(id: string, slug: string) {
     if (!confirm("Are you sure you want to delete this post?")) return;
     try {
-      const res = await fetch(`/api/blog?id=${id}`, { method: 'DELETE' });
+      const [res] = await Promise.all([
+        fetch(`/api/blog?id=${id}`, { method: 'DELETE' }),
+        fetch(`/api/blog/agentbazar?slug=${encodeURIComponent(slug)}`, { method: 'DELETE' }),
+      ]);
       if (res.ok) mutate();
     } catch (err) {
       console.error("Failed to delete post", err);
@@ -232,7 +235,7 @@ export default function BlogPage() {
                           <Globe className="w-4 h-4" />
                         </button>
                         <button
-                          onClick={() => deletePost(post.id)}
+                          onClick={() => deletePost(post.id, post.slug)}
                           className="p-2 text-zinc-400 hover:text-red-400 hover:bg-red-400/10 rounded-lg transition-all"
                           title="Delete"
                         >
