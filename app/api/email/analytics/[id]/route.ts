@@ -8,11 +8,12 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 
   const campaignId = params.id
 
-  // Send stats per status
+  // Send stats per status — high limit to bypass Supabase's default 1000-row cap
   const { data: sends } = await supabaseAdmin
     .from("email_sends")
     .select("status, ses_message_id")
     .eq("campaign_id", campaignId)
+    .limit(100000)
 
   const totals = { sent: 0, delivered: 0, bounced: 0, failed: 0 }
   const messageIds: string[] = []
@@ -32,6 +33,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
         .from("email_events")
         .select("event_type")
         .in("ses_message_id", messageIds.slice(i, i + BATCH))
+        .limit(1000000)
       for (const e of events ?? []) {
         if (e.event_type === "open") opens++
         else if (e.event_type === "click") clicks++

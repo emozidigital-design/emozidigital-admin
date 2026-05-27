@@ -25,6 +25,7 @@ async function getCampaignStats(campaignId: string) {
       .from("email_events")
       .select("event_type")
       .in("ses_message_id", messageIds.slice(i, i + BATCH))
+      .limit(1000000)
     for (const e of events ?? []) {
       if (e.event_type === "open")           opens++
       else if (e.event_type === "click")     clicks++
