@@ -89,7 +89,7 @@ export async function GET(req: NextRequest) {
     const emails = [
       ...campaignStats.map(c => ({
         id: c.id, type: "campaign" as const,
-        subject: c.subject, sentAt: c.sent_at,
+        subject: c.subject, sentAt: c.sentAt,
         totalSent: c.total, totalOpened: c.opens, totalClicked: c.clicks,
         spamReports: c.spam, bounced: c.bounced,
       })),
