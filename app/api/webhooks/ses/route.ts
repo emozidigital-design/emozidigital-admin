@@ -40,7 +40,11 @@ export async function POST(req: NextRequest) {
 
   const eventType = notification.eventType as string
   const mail = notification.mail as Record<string, unknown> | undefined
-  const sesMessageId = (mail?.messageId as string) ?? null
+  const rawMsgId = (mail?.messageId as string) ?? null
+  // SES SNS payloads for Open/Click events wrap the message ID in angle brackets
+  // (e.g. "<0102abc...@us-east-1.amazonses.com>") while the SES SDK returns the
+  // bare ID. Strip them so the value matches what is stored in email_sends.
+  const sesMessageId = rawMsgId ? rawMsgId.replace(/^<|>$/g, "").trim() : null
 
   // Log raw event
   await supabase.from("email_events").insert({
