@@ -4,37 +4,69 @@ import { requireAuth } from "@/lib/require-auth"
 
 export const maxDuration = 60 // seconds — extend timeout for large datasets
 
-// Reusable: same logic as /api/email/analytics/[id] but inlined here
-async function getCampaignStats(campaignId: string) {
-  // Use a high limit to bypass Supabase's default 1000-row cap.
-  // Campaigns rarely exceed 10k sends; 100k is a safe upper bound.
-  const { data: sends } = await supabaseAdmin
-    .from("email_sends")
-    .select("status, ses_message_id")
-    .eq("campaign_id", campaignId)
-    .limit(100000)
+// Fetch open/click/spam/bounce counts for ALL campaigns in one SQL round-trip.
+// Previously this ran N separate queries per campaign which timed out for large lists.
+async function getAllCampaignEventCounts(campaignIds: string[], clientId?: string | null): Promise<Map<string, { total: number; opens: number; clicks: number; spam: number; bounced: number }>> {
+  if (campaignIds.length === 0) return new Map()
 
-  const messageIds = (sends ?? [])
-    .map(s => s.ses_message_id)
-    .filter(Boolean) as string[]
+  // Single query: join email_sends → email_events grouped by campaign
+  const { data, error } = await supabaseAdmin.rpc("get_campaign_event_counts", {
+    p_campaign_ids: campaignIds,
+  })
 
-  let opens = 0, clicks = 0, spam = 0, bounced = 0
-  const BATCH = 5000
-  for (let i = 0; i < messageIds.length; i += BATCH) {
-    const { data: events } = await supabaseAdmin
-      .from("email_events")
-      .select("event_type")
-      .in("ses_message_id", messageIds.slice(i, i + BATCH))
+  // Fallback if RPC not available — use a single aggregated SQL via supabase
+  if (error || !data) {
+    // Get all sends for all campaigns in one query
+    let sendsQuery = supabaseAdmin
+      .from("email_sends")
+      .select("campaign_id, ses_message_id")
+      .in("campaign_id", campaignIds)
       .limit(1000000)
-    for (const e of events ?? []) {
-      if (e.event_type === "open")           opens++
-      else if (e.event_type === "click")     clicks++
-      else if (e.event_type === "complaint") spam++
-      else if (e.event_type === "bounce")    bounced++
+    if (clientId) sendsQuery = sendsQuery.eq("client_id", clientId)
+    const { data: allSends } = await sendsQuery
+
+    const sends = allSends ?? []
+    const allMessageIds = sends.map(s => s.ses_message_id).filter(Boolean) as string[]
+
+    // Map messageId → campaignId for fast lookup
+    const msgToCampaign = new Map<string, string>()
+    const campaignTotals = new Map<string, number>()
+    for (const s of sends) {
+      if (s.ses_message_id) msgToCampaign.set(s.ses_message_id, s.campaign_id)
+      campaignTotals.set(s.campaign_id, (campaignTotals.get(s.campaign_id) ?? 0) + 1)
     }
+
+    // Fetch all events for all message IDs in batches of 5000
+    const counts = new Map<string, { total: number; opens: number; clicks: number; spam: number; bounced: number }>()
+    for (const id of campaignIds) counts.set(id, { total: campaignTotals.get(id) ?? 0, opens: 0, clicks: 0, spam: 0, bounced: 0 })
+
+    const BATCH = 5000
+    for (let i = 0; i < allMessageIds.length; i += BATCH) {
+      const { data: events } = await supabaseAdmin
+        .from("email_events")
+        .select("ses_message_id, event_type")
+        .in("ses_message_id", allMessageIds.slice(i, i + BATCH))
+        .limit(1000000)
+      for (const e of events ?? []) {
+        const cid = msgToCampaign.get(e.ses_message_id)
+        if (!cid) continue
+        const c = counts.get(cid)
+        if (!c) continue
+        if (e.event_type === "open")           c.opens++
+        else if (e.event_type === "click")     c.clicks++
+        else if (e.event_type === "complaint") c.spam++
+        else if (e.event_type === "bounce")    c.bounced++
+      }
+    }
+    return counts
   }
 
-  return { total: sends?.length ?? 0, opens, clicks, spam, bounced }
+  // RPC returned data — parse it
+  const counts = new Map<string, { total: number; opens: number; clicks: number; spam: number; bounced: number }>()
+  for (const row of data as Array<{ campaign_id: string; total: number; opens: number; clicks: number; spam: number; bounced: number }>) {
+    counts.set(row.campaign_id, { total: row.total, opens: row.opens, clicks: row.clicks, spam: row.spam, bounced: row.bounced })
+  }
+  return counts
 }
 
 export async function GET(req: NextRequest) {
@@ -73,18 +105,14 @@ export async function GET(req: NextRequest) {
     if (nErr) return NextResponse.json({ error: nErr.message }, { status: 500 })
     const sentNewsletters = newsletters ?? []
 
-    // ── 3. Per-campaign stats — run in parallel batches of 5 ─────────────────
-    // This is exactly what the analytics page does per-campaign; we just batch them.
-    const CONCURRENT = 5
-    const campaignStats: Array<{ id: string; subject: string; sentAt: string | null; total: number; opens: number; clicks: number; spam: number; bounced: number }> = []
+    // ── 3. All-campaign stats in one batched query (avoids N round-trips) ───────
+    const campaignIds = sentCampaigns.map(c => c.id)
+    const eventCounts = await getAllCampaignEventCounts(campaignIds, clientId)
 
-    for (let i = 0; i < sentCampaigns.length; i += CONCURRENT) {
-      const batch = sentCampaigns.slice(i, i + CONCURRENT)
-      const results = await Promise.all(
-        batch.map(c => getCampaignStats(c.id).then(s => ({ id: c.id, subject: c.subject, sentAt: c.sent_at ?? null, ...s })))
-      )
-      campaignStats.push(...results)
-    }
+    const campaignStats: Array<{ id: string; subject: string; sentAt: string | null; total: number; opens: number; clicks: number; spam: number; bounced: number }> = sentCampaigns.map(c => {
+      const counts = eventCounts.get(c.id) ?? { total: 0, opens: 0, clicks: 0, spam: 0, bounced: 0 }
+      return { id: c.id, subject: c.subject, sentAt: c.sent_at ?? null, ...counts }
+    })
 
     // ── 4. Build unified emails list ─────────────────────────────────────────
     const emails = [
