@@ -134,7 +134,7 @@ export async function GET(req: NextRequest) {
     }
 
     for (const c of campaignStats) {
-      const date = c.sent_at?.slice(0, 10)
+      const date = c.sentAt?.slice(0, 10)
       if (!date || !dayMap.has(date)) continue
       const day = dayMap.get(date)!
       day.sent    += c.total
