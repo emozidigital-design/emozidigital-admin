@@ -22,6 +22,7 @@ interface TemplateOption {
 interface EmailTag {
   id: string
   name: string
+  contact_count?: number
 }
 
 interface Campaign {
@@ -46,7 +47,6 @@ const STATUS_STYLE: Record<string, string> = {
 }
 
 const INPUT_CLS = "border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#003434]/20 bg-white w-full"
-const tagLabel = (n: number) => `${n} ${n === 1 ? "tag" : "tags"}`
 
 export default function CampaignsPage() {
   const { clientId } = useClient()
@@ -98,9 +98,14 @@ export default function CampaignsPage() {
     setLoading(true)
     const params = new URLSearchParams()
     if (clientId) params.set("client_id", clientId)
-    fetch(`/api/email/campaigns?${params}`)
-      .then(r => r.json())
-      .then(d => setCampaigns(Array.isArray(d) ? d : []))
+    Promise.all([
+      fetch(`/api/email/campaigns?${params}`).then(r => r.json()),
+      clientId ? fetch(`/api/email/tags?${params}`).then(r => r.json()) : Promise.resolve([]),
+    ])
+      .then(([d, tg]) => {
+        setCampaigns(Array.isArray(d) ? d : [])
+        if (Array.isArray(tg)) setTags(tg)
+      })
       .finally(() => setLoading(false))
   }, [clientId])
 
@@ -305,6 +310,8 @@ export default function CampaignsPage() {
   }
 
   // ── Derived ──────────────────────────────────────────────────────────────
+
+  const tagMap = new Map(tags.map(t => [t.id, t]))
 
   const filteredCampaigns = campaigns
     .filter(c => filterStatus === "all" || c.status === filterStatus)
@@ -518,7 +525,20 @@ export default function CampaignsPage() {
                   <p className="text-xs text-zinc-400 mt-0.5">
                     {c.email_senders?.from_name} · {c.email_templates?.name}
                     {Array.isArray(c.tag_ids) && c.tag_ids.length > 0 ? (
-                      <> · <span className="text-[#003434]">{tagLabel(c.tag_ids.length)}</span></>
+                      <>
+                        {c.tag_ids.map((tid, i) => {
+                          const tag = tagMap.get(tid)
+                          return (
+                            <span key={tid}>
+                              {" · "}
+                              <span className="text-[#003434] font-medium">{tag?.name ?? tid}</span>
+                              {tag?.contact_count != null && (
+                                <span className="text-zinc-400 font-normal"> ({tag.contact_count})</span>
+                              )}
+                            </span>
+                          )
+                        })}
+                      </>
                     ) : null}
                   </p>
                   {c.sent_at && (
@@ -620,9 +640,19 @@ export default function CampaignsPage() {
               <div>
                 <p className="text-[11px] text-zinc-400 font-semibold uppercase tracking-wider">Audience</p>
                 {Array.isArray(previewCampaign.tag_ids) && previewCampaign.tag_ids.length > 0 ? (
-                  <p className="text-xs text-[#003434] font-semibold mt-0.5">
-                    {tagLabel(previewCampaign.tag_ids.length)}
-                  </p>
+                  <div className="flex flex-wrap gap-1 mt-0.5">
+                    {previewCampaign.tag_ids.map(tid => {
+                      const tag = tagMap.get(tid)
+                      return (
+                        <span key={tid} className="inline-flex items-center gap-1 text-xs font-semibold text-[#003434]">
+                          {tag?.name ?? tid}
+                          {tag?.contact_count != null && (
+                            <span className="text-zinc-400 font-normal">({tag.contact_count})</span>
+                          )}
+                        </span>
+                      )
+                    })}
+                  </div>
                 ) : (
                   <p className="text-xs text-zinc-400 mt-0.5">—</p>
                 )}
