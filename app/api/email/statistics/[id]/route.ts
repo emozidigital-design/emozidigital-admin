@@ -99,16 +99,13 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 
     const total = count ?? 0
     const recipients = {
-      data: pageRows.map((s: {
-        sent_at: string | null
-        ses_message_id: string | null
-        email_contacts: { email: string; name: string } | null
-      }) => {
+      data: pageRows.map((s) => {
         const ev = s.ses_message_id ? (pageEventMap.get(s.ses_message_id) ?? { opened: false, clicked: false, spam: false, bounced: false }) : { opened: false, clicked: false, spam: false, bounced: false }
+        const contact = Array.isArray(s.email_contacts) ? s.email_contacts[0] : s.email_contacts
         return {
           sentAt:  s.sent_at,
-          email:   s.email_contacts?.email ?? "—",
-          name:    s.email_contacts?.name  ?? "",
+          email:   contact?.email ?? "—",
+          name:    contact?.name  ?? "",
           opened:  ev.opened,
           clicked: ev.clicked,
           spam:    ev.spam,
