@@ -8,7 +8,7 @@ import { exportToCSV } from "@/lib/exportCSV"
 import { useClientUpdate } from "@/lib/useClientUpdate"
 import OnboardingViewer from "./_components/OnboardingViewer"
 
-const fetcher = (url: string) => fetch(url).then(r => r.json())
+const fetcher = (url: string) => fetch(url).then(r => { if (!r.ok) throw new Error(`${r.status}`); return r.json() })
 
 function todayStr() {
   return new Date().toISOString().split("T")[0].replace(/-/g, "")

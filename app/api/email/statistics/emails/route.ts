@@ -36,14 +36,14 @@ export async function GET(req: NextRequest) {
     // ── 2. Fetch enough rows to fill this page from each table ────────────────
     // Strategy: fetch (offset + pageSize) rows from each, merge+sort, slice.
     // Capped at 500 to prevent runaway queries on deep page navigation.
-    const fetchLimit = Math.min(page * pageSize, 500)
+    const fetchLimit = Math.min(page * pageSize, 2000)
 
     let cq = supabaseAdmin
       .from("email_campaigns")
       .select("id, subject, sent_at")
       .eq("status", "sent")
       .order("sent_at", { ascending: false })
-      .limit(fetchLimit)
+      .limit(fetchLimit + 1) // +1 to detect truncation; sliced to fetchLimit after merge
     if (clientId) cq = cq.eq("client_id", clientId)
     if (fromDate) cq = cq.gte("sent_at", `${fromDate}T00:00:00`)
     if (toDate)   cq = cq.lte("sent_at", `${toDate}T23:59:59`)
@@ -53,7 +53,7 @@ export async function GET(req: NextRequest) {
       .select("id, subject, sent_at, sent_count, opens_count, clicks_count")
       .eq("status", "sent")
       .order("sent_at", { ascending: false })
-      .limit(fetchLimit)
+      .limit(fetchLimit + 1)
     if (clientId) nq = nq.eq("client_id", clientId)
     if (fromDate) nq = nq.gte("sent_at", `${fromDate}T00:00:00`)
     if (toDate)   nq = nq.lte("sent_at", `${toDate}T23:59:59`)

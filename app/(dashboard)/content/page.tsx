@@ -5,7 +5,7 @@ import useSWR from "swr"
 import { toast } from "react-hot-toast"
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, startOfWeek, endOfWeek, isSameMonth, isSameDay, addMonths, subMonths } from "date-fns"
 
-const fetcher = (url: string) => fetch(url).then(r => r.json())
+const fetcher = (url: string) => fetch(url).then(r => { if (!r.ok) throw new Error(`${r.status}`); return r.json() })
 
 type RevisionHistoryItem = {
   caption: string

@@ -21,11 +21,11 @@ stable
 as $$
   select
     es.campaign_id,
-    count(*)                                                          as total_sent,
-    count(*) filter (where ee.event_type = 'open')                   as opens,
-    count(*) filter (where ee.event_type = 'click')                  as clicks,
-    count(*) filter (where ee.event_type = 'complaint')              as spam,
-    count(*) filter (where ee.event_type = 'bounce')                 as bounced
+    count(distinct es.id)                                                     as total_sent,
+    count(distinct case when ee.event_type = 'open'      then ee.id end)      as opens,
+    count(distinct case when ee.event_type = 'click'     then ee.id end)      as clicks,
+    count(distinct case when ee.event_type = 'complaint' then ee.id end)      as spam,
+    count(distinct case when ee.event_type = 'bounce'    then ee.id end)      as bounced
   from email_sends es
   left join email_events ee on ee.ses_message_id = es.ses_message_id
   where es.campaign_id = any(p_campaign_ids)
@@ -53,5 +53,18 @@ language sql
 as $$
   update email_campaigns
   set clicks_count = coalesce(clicks_count, 0) + 1
+  where id = p_id;
+$$;
+
+
+-- ── 4. Increment campaign sent_count cumulatively (called by send route) ──────
+-- Replaces the previous overwrite pattern (sent_count = batch_size).
+-- Each send batch adds to the running total so multi-batch campaigns are correct.
+create or replace function increment_campaign_sent_count(p_id uuid, p_increment int)
+returns void
+language sql
+as $$
+  update email_campaigns
+  set sent_count = coalesce(sent_count, 0) + p_increment
   where id = p_id;
 $$;

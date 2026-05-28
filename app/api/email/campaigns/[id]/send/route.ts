@@ -99,9 +99,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     failed += results.filter(r => r.status === "rejected").length
   }
 
+  await supabaseAdmin.rpc("increment_campaign_sent_count", { p_id: campaignId, p_increment: sent })
   await supabaseAdmin
     .from("email_campaigns")
-    .update({ status: "sent", sent_at: new Date().toISOString(), sent_count: sent })
+    .update({ status: "sent", sent_at: new Date().toISOString() })
     .eq("id", campaignId)
 
   return NextResponse.json({ sent, failed })

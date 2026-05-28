@@ -93,10 +93,12 @@ export async function POST(req: NextRequest) {
       .single()
     if (sendRow?.newsletter_send_id) {
       const rpc = eventType === "Open" ? "increment_newsletter_opens" : "increment_newsletter_clicks"
-      await supabase.rpc(rpc, { p_id: sendRow.newsletter_send_id })
+      const { error: rpcErr } = await supabase.rpc(rpc, { p_id: sendRow.newsletter_send_id })
+      if (rpcErr) console.error(`[ses-webhook] ${rpc} failed:`, rpcErr.message)
     } else if (sendRow?.campaign_id) {
       const rpc = eventType === "Open" ? "increment_campaign_opens" : "increment_campaign_clicks"
-      await supabase.rpc(rpc, { p_id: sendRow.campaign_id })
+      const { error: rpcErr } = await supabase.rpc(rpc, { p_id: sendRow.campaign_id })
+      if (rpcErr) console.error(`[ses-webhook] ${rpc} failed:`, rpcErr.message)
     }
   }
 

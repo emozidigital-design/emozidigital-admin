@@ -28,7 +28,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     return NextResponse.json({ contacts: [], total: count ?? 0, page, limit: safeLimit })
   }
 
-  // Step 2: fetch full contact details, preserving the tag-join order
+  // Step 2: fetch full contact details, then re-sort to match tag-join order
   const { data: contacts, error: contactError } = await supabaseAdmin
     .from("email_contacts")
     .select("id, first_name, last_name, email, phone")
@@ -36,7 +36,10 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 
   if (contactError) return NextResponse.json({ error: contactError.message }, { status: 500 })
 
-  return NextResponse.json({ contacts: contacts ?? [], total: count ?? 0, page, limit: safeLimit })
+  const idOrder = new Map(contactIds.map((id, i) => [id, i]))
+  const sorted = (contacts ?? []).slice().sort((a, b) => (idOrder.get(a.id) ?? 0) - (idOrder.get(b.id) ?? 0))
+
+  return NextResponse.json({ contacts: sorted, total: count ?? 0, page, limit: safeLimit })
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {

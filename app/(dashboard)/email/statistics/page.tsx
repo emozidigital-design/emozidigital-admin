@@ -237,15 +237,6 @@ export default function StatisticsPage() {
   const [page, setPage]         = useState(1)
   const [pageSize, setPageSize] = useState(10)
 
-  function buildParams(extras: Record<string, string | number> = {}) {
-    const p = new URLSearchParams()
-    if (clientId) p.set("client_id", clientId)
-    if (dateFrom) p.set("from", dateFrom)
-    if (dateTo)   p.set("to", dateTo)
-    for (const [k, v] of Object.entries(extras)) p.set(k, String(v))
-    return p
-  }
-
   // Load charts (summary + daily series) — runs on client/date change only
   function loadCharts(from: string, to: string) {
     setChartsLoading(true)
