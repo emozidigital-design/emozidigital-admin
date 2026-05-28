@@ -4,78 +4,11 @@ import { requireAuth } from "@/lib/require-auth"
 
 export const maxDuration = 60
 
-// Use a DB-side aggregation function if available; avoids pulling raw event rows into Node.
-// Run scratch/sql_campaign_stats_fn.sql in Supabase once to enable this path.
-async function getCampaignEventCounts(
-  campaignIds: string[]
-): Promise<Map<string, { total: number; opens: number; clicks: number; spam: number; bounced: number }>> {
-  const counts = new Map<string, { total: number; opens: number; clicks: number; spam: number; bounced: number }>()
-  if (campaignIds.length === 0) return counts
-
-  // ── Fast path: DB-side aggregation (no raw rows shipped to Node) ──────────
-  const { data: rpcRows, error: rpcErr } = await supabaseAdmin
-    .rpc("get_campaign_event_counts", { p_campaign_ids: campaignIds })
-
-  if (!rpcErr && rpcRows) {
-    for (const r of rpcRows as Array<{ campaign_id: string; total_sent: number; opens: number; clicks: number; spam: number; bounced: number }>) {
-      counts.set(r.campaign_id, {
-        total: Number(r.total_sent),
-        opens: Number(r.opens),
-        clicks: Number(r.clicks),
-        spam: Number(r.spam),
-        bounced: Number(r.bounced),
-      })
-    }
-    // Fill zero counts for campaigns with no sends
-    for (const id of campaignIds) {
-      if (!counts.has(id)) counts.set(id, { total: 0, opens: 0, clicks: 0, spam: 0, bounced: 0 })
-    }
-    return counts
-  }
-
-  // ── Slow path: fetch raw sends + events if RPC not yet deployed ───────────
-  const { data: sendRows } = await supabaseAdmin
-    .from("email_sends")
-    .select("campaign_id, ses_message_id")
-    .in("campaign_id", campaignIds)
-    .limit(1000000)
-
-  const sends = sendRows ?? []
-  const msgToCampaign = new Map<string, string>()
-  const campaignTotals = new Map<string, number>()
-
-  for (const s of sends) {
-    if (s.ses_message_id) msgToCampaign.set(s.ses_message_id, s.campaign_id)
-    campaignTotals.set(s.campaign_id, (campaignTotals.get(s.campaign_id) ?? 0) + 1)
-  }
-  for (const id of campaignIds) {
-    counts.set(id, { total: campaignTotals.get(id) ?? 0, opens: 0, clicks: 0, spam: 0, bounced: 0 })
-  }
-
-  const allMessageIds = sends.map(s => s.ses_message_id).filter(Boolean) as string[]
-  const BATCH = 5000
-  for (let i = 0; i < allMessageIds.length; i += BATCH) {
-    const { data: events } = await supabaseAdmin
-      .from("email_events")
-      .select("ses_message_id, event_type")
-      .in("ses_message_id", allMessageIds.slice(i, i + BATCH))
-      .limit(1000000)
-
-    for (const e of events ?? []) {
-      const cid = msgToCampaign.get(e.ses_message_id)
-      if (!cid) continue
-      const c = counts.get(cid)
-      if (!c) continue
-      if (e.event_type === "open")           c.opens++
-      else if (e.event_type === "click")     c.clicks++
-      else if (e.event_type === "complaint") c.spam++
-      else if (e.event_type === "bounce")    c.bounced++
-    }
-  }
-
-  return counts
-}
-
+// Chart-only endpoint: summary + daily series.
+// Avoids the slow email_sends→email_events join by using:
+//   - newsletter_sends.sent_count / opens_count (already denormalized)
+//   - email_sends count per campaign (just a count, no event join)
+//   - email_events aggregate only for summary open/spam/bounce rates
 export async function GET(req: NextRequest) {
   const unauth = await requireAuth()
   if (unauth) return unauth
@@ -86,10 +19,10 @@ export async function GET(req: NextRequest) {
     const fromDate = searchParams.get("from")
     const toDate   = searchParams.get("to")
 
-    // ── 1. Campaigns + newsletters fetched in parallel ───────────────────────
+    // ── 1. Campaigns + newsletters metadata (IDs + dates only) ───────────────
     let cq = supabaseAdmin
       .from("email_campaigns")
-      .select("id, subject, sent_at")
+      .select("id, sent_at")
       .eq("status", "sent")
       .order("sent_at", { ascending: false })
     if (clientId) cq = cq.eq("client_id", clientId)
@@ -98,7 +31,7 @@ export async function GET(req: NextRequest) {
 
     let nq = supabaseAdmin
       .from("newsletter_sends")
-      .select("id, subject, sent_at, sent_count, opens_count, clicks_count")
+      .select("id, sent_at, sent_count, opens_count")
       .eq("status", "sent")
       .order("sent_at", { ascending: false })
     if (clientId) nq = nq.eq("client_id", clientId)
@@ -113,36 +46,64 @@ export async function GET(req: NextRequest) {
 
     const sentCampaigns   = campaigns   ?? []
     const sentNewsletters = newsletters ?? []
+    const campaignIds     = sentCampaigns.map(c => c.id)
 
-    // ── 2. Event counts (DB aggregate or fallback) ───────────────────────────
-    const eventCounts = await getCampaignEventCounts(sentCampaigns.map(c => c.id))
+    // ── 2. Campaign send counts + event summary via RPC (fast) ────────────────
+    // If RPC not deployed, fall back to a simple count-only query (no event join).
+    // Summary open/spam/bounce rates use newsletter denormalized counts + RPC data.
+    interface CampaignCounts { total: number; opens: number; spam: number; bounced: number }
+    const eventCounts = new Map<string, CampaignCounts>()
 
-    // ── 3. Build unified emails list ─────────────────────────────────────────
-    const campaignRows = sentCampaigns.map(c => {
-      const ev = eventCounts.get(c.id) ?? { total: 0, opens: 0, clicks: 0, spam: 0, bounced: 0 }
-      return {
-        id: c.id, type: "campaign" as const,
-        subject: c.subject, sentAt: c.sent_at ?? null,
-        totalSent: ev.total, totalOpened: ev.opens, totalClicked: ev.clicks,
-        spamReports: ev.spam, bounced: ev.bounced,
+    if (campaignIds.length > 0) {
+      const { data: rpcRows, error: rpcErr } = await supabaseAdmin
+        .rpc("get_campaign_event_counts", { p_campaign_ids: campaignIds })
+
+      if (!rpcErr && rpcRows) {
+        // RPC deployed — full accurate counts
+        for (const r of rpcRows as Array<{ campaign_id: string; total_sent: number; opens: number; clicks: number; spam: number; bounced: number }>) {
+          eventCounts.set(r.campaign_id, {
+            total: Number(r.total_sent), opens: Number(r.opens),
+            spam: Number(r.spam), bounced: Number(r.bounced),
+          })
+        }
+        for (const id of campaignIds) {
+          if (!eventCounts.has(id)) eventCounts.set(id, { total: 0, opens: 0, spam: 0, bounced: 0 })
+        }
+      } else {
+        // RPC not deployed — fast fallback: count sends only, skip event join
+        // Open/spam/bounce rates will be 0 for campaigns (newsletters still accurate via denormalized cols)
+        const BATCH = 200 // keep IN clause small
+        for (let i = 0; i < campaignIds.length; i += BATCH) {
+          const batch = campaignIds.slice(i, i + BATCH)
+          const { data: sendRows } = await supabaseAdmin
+            .from("email_sends")
+            .select("campaign_id")
+            .in("campaign_id", batch)
+            .limit(1000000)
+          for (const s of sendRows ?? []) {
+            const cur = eventCounts.get(s.campaign_id) ?? { total: 0, opens: 0, spam: 0, bounced: 0 }
+            cur.total++
+            eventCounts.set(s.campaign_id, cur)
+          }
+        }
+        for (const id of campaignIds) {
+          if (!eventCounts.has(id)) eventCounts.set(id, { total: 0, opens: 0, spam: 0, bounced: 0 })
+        }
       }
+    }
+
+    // ── 3. Summary totals ─────────────────────────────────────────────────────
+    let totalSent = 0, totalOpened = 0, totalSpam = 0, totalBounced = 0
+    eventCounts.forEach(c => {
+      totalSent    += c.total
+      totalOpened  += c.opens
+      totalSpam    += c.spam
+      totalBounced += c.bounced
     })
-
-    const newsletterRows = sentNewsletters.map(n => ({
-      id: n.id, type: "newsletter" as const,
-      subject: n.subject, sentAt: n.sent_at,
-      totalSent: n.sent_count ?? 0, totalOpened: n.opens_count ?? 0, totalClicked: n.clicks_count ?? 0,
-      spamReports: 0, bounced: 0,
-    }))
-
-    const emails = [...campaignRows, ...newsletterRows]
-      .sort((a, b) => (b.sentAt ?? "").localeCompare(a.sentAt ?? ""))
-
-    // ── 4. Summary ───────────────────────────────────────────────────────────
-    const totalSent    = emails.reduce((a, e) => a + e.totalSent, 0)
-    const totalOpened  = emails.reduce((a, e) => a + e.totalOpened, 0)
-    const totalSpam    = emails.reduce((a, e) => a + e.spamReports, 0)
-    const totalBounced = emails.reduce((a, e) => a + e.bounced, 0)
+    for (const n of sentNewsletters) {
+      totalSent   += n.sent_count  ?? 0
+      totalOpened += n.opens_count ?? 0
+    }
 
     const summary = {
       totalSent,
@@ -151,7 +112,7 @@ export async function GET(req: NextRequest) {
       avgBounceRate: totalSent > 0 ? (totalBounced / totalSent) * 100 : 0,
     }
 
-    // ── 5. Daily series ──────────────────────────────────────────────────────
+    // ── 4. Daily series ───────────────────────────────────────────────────────
     const allDates = [
       ...sentCampaigns.map(c  => c.sent_at?.slice(0, 10)),
       ...sentNewsletters.map(n => n.sent_at?.slice(0, 10)),
@@ -170,14 +131,16 @@ export async function GET(req: NextRequest) {
       }
     }
 
-    for (const c of campaignRows) {
-      const date = c.sentAt?.slice(0, 10)
+    for (const c of sentCampaigns) {
+      const date = c.sent_at?.slice(0, 10)
       if (!date || !dayMap.has(date)) continue
+      const counts = eventCounts.get(c.id)
+      if (!counts) continue
       const day = dayMap.get(date)!
-      day.sent    += c.totalSent
-      day.opens   += c.totalOpened
-      day.spam    += c.spamReports
-      day.bounced += c.bounced
+      day.sent    += counts.total
+      day.opens   += counts.opens
+      day.spam    += counts.spam
+      day.bounced += counts.bounced
     }
     for (const n of sentNewsletters) {
       const date = n.sent_at?.slice(0, 10)
@@ -197,7 +160,9 @@ export async function GET(req: NextRequest) {
         bouncePct: d.sent > 0 ? (d.bounced / d.sent) * 100 : 0,
       }))
 
-    return NextResponse.json({ summary, dailySeries, emails })
+    const res = NextResponse.json({ summary, dailySeries })
+    res.headers.set("Cache-Control", "s-maxage=60, stale-while-revalidate=300")
+    return res
   } catch (err) {
     console.error("[statistics]", err)
     return NextResponse.json({ error: String(err) }, { status: 500 })
