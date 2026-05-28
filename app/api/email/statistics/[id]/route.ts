@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server"
 import { supabaseAdmin } from "@/lib/supabase-server"
 import { requireAuth } from "@/lib/require-auth"
 
+export const maxDuration = 30
+
 const LIMIT = 10
 
 export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
