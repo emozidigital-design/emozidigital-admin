@@ -17,51 +17,29 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   if (type === "campaign") {
     // ── Campaign detail ─────────────────────────────────────────────────────
 
-    const { data: campaign, error: cErr } = await supabaseAdmin
-      .from("email_campaigns")
-      .select("id, subject, sent_at")
-      .eq("id", params.id)
-      .single()
+    const [campaignResult, sendsResult] = await Promise.all([
+      supabaseAdmin
+        .from("email_campaigns")
+        .select("id, subject, sent_at, sent_count, opens_count, clicks_count, bounced_count, spam_count")
+        .eq("id", params.id)
+        .single(),
+      supabaseAdmin
+        .from("email_sends")
+        .select("sent_at, status, ses_message_id, email_contacts(email, name)")
+        .eq("campaign_id", params.id)
+        .order("sent_at", { ascending: false })
+        .range(from, to),
+    ])
 
-    if (cErr || !campaign) return NextResponse.json({ error: "not found" }, { status: 404 })
+    const campaign = campaignResult.data
+    if (campaignResult.error || !campaign) return NextResponse.json({ error: "not found" }, { status: 404 })
 
-    // Get send stats for summary
-    const { data: allSends } = await supabaseAdmin
-      .from("email_sends")
-      .select("status, ses_message_id")
-      .eq("campaign_id", params.id)
-
-    const sends = allSends ?? []
-    const totalSent = sends.length
-    const allMessageIds = sends.map(s => s.ses_message_id).filter(Boolean) as string[]
-
-    // All events for summary stats
     interface EventRow { ses_message_id: string; event_type: string; raw_payload: Record<string, unknown> }
-    const allEvents: EventRow[] = []
-    for (let i = 0; i < allMessageIds.length; i += 5000) {
-      const { data } = await supabaseAdmin
-        .from("email_events")
-        .select("ses_message_id, event_type, raw_payload")
-        .in("ses_message_id", allMessageIds.slice(i, i + 5000))
-      if (data) allEvents.push(...(data as EventRow[]))
-    }
 
-    let totalOpened = 0, totalClicked = 0, totalSpam = 0, totalBounced = 0
-    const openedIds = new Set<string>()
-    const clickedIds = new Set<string>()
-
-    for (const e of allEvents) {
-      if (e.event_type === "open" && !openedIds.has(e.ses_message_id)) {
-        openedIds.add(e.ses_message_id)
-        totalOpened++
-      }
-      if (e.event_type === "click" && !clickedIds.has(e.ses_message_id)) {
-        clickedIds.add(e.ses_message_id)
-        totalClicked++
-      }
-      if (e.event_type === "complaint") totalSpam++
-      if (e.event_type === "bounce") totalBounced++
-    }
+    const totalSent    = campaign.sent_count    ?? 0
+    const totalOpened  = campaign.opens_count   ?? 0
+    const totalBounced = campaign.bounced_count ?? 0
+    const totalSpam    = campaign.spam_count    ?? 0
 
     const summary = {
       totalSent,
@@ -71,14 +49,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     }
 
     // ── Paginated recipients ─────────────────────────────────────────────────
-    const { data: pageSends, count } = await supabaseAdmin
-      .from("email_sends")
-      .select("sent_at, status, ses_message_id, email_contacts(email, name)", { count: "exact" })
-      .eq("campaign_id", params.id)
-      .order("sent_at", { ascending: false })
-      .range(from, to)
-
-    const pageRows = pageSends ?? []
+    const pageRows       = sendsResult.data ?? []
     const pageMessageIds = pageRows.map((s: { ses_message_id: string | null }) => s.ses_message_id).filter(Boolean) as string[]
 
     const pageEventMap = new Map<string, { opened: boolean; clicked: boolean; spam: boolean; bounced: boolean }>()
@@ -97,7 +68,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       }
     }
 
-    const total = count ?? 0
+    const total = totalSent
     const recipients = {
       data: pageRows.map((s) => {
         const ev = s.ses_message_id ? (pageEventMap.get(s.ses_message_id) ?? { opened: false, clicked: false, spam: false, bounced: false }) : { opened: false, clicked: false, spam: false, bounced: false }
@@ -117,22 +88,44 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
       totalPages: Math.ceil(total / LIMIT),
     }
 
-    // ── Links table (click events with URL) ──────────────────────────────────
-    const clickEvents = allEvents.filter(e => e.event_type === "click")
-    const linkTotals  = new Map<string, { total: number; uniqueIds: Set<string> }>()
+    // ── Links table (page 1 only — skip on pagination) ───────────────────────
+    const linkTotals = new Map<string, { total: number; uniqueIds: Set<string> }>()
 
-    for (const e of clickEvents) {
-      let url: string | null = null
-      try {
-        const p = e.raw_payload as Record<string, unknown>
-        const click = p?.click as Record<string, unknown> | undefined
-        url = (click?.link ?? p?.link ?? p?.linkUrl ?? p?.url) as string | null
-      } catch { /* skip unparseable */ }
-      if (!url) continue
-      const cur = linkTotals.get(url) ?? { total: 0, uniqueIds: new Set<string>() }
-      cur.total++
-      cur.uniqueIds.add(e.ses_message_id)
-      linkTotals.set(url, cur)
+    if (page === 1 && (campaign.clicks_count ?? 0) > 0) {
+      const { data: sendMsgIds } = await supabaseAdmin
+        .from("email_sends")
+        .select("ses_message_id")
+        .eq("campaign_id", params.id)
+        .not("ses_message_id", "is", null)
+        .limit(100000)
+
+      const campaignMsgIds = (sendMsgIds ?? []).map(s => s.ses_message_id).filter(Boolean) as string[]
+
+      if (campaignMsgIds.length > 0) {
+        const clickEventRows: EventRow[] = []
+        for (let i = 0; i < campaignMsgIds.length; i += 5000) {
+          const { data } = await supabaseAdmin
+            .from("email_events")
+            .select("ses_message_id, event_type, raw_payload")
+            .in("ses_message_id", campaignMsgIds.slice(i, i + 5000))
+            .eq("event_type", "click")
+          if (data) clickEventRows.push(...(data as EventRow[]))
+        }
+
+        for (const e of clickEventRows) {
+          let url: string | null = null
+          try {
+            const p = e.raw_payload as Record<string, unknown>
+            const click = p?.click as Record<string, unknown> | undefined
+            url = (click?.link ?? p?.link ?? p?.linkUrl ?? p?.url) as string | null
+          } catch { /* skip unparseable */ }
+          if (!url) continue
+          const cur = linkTotals.get(url) ?? { total: 0, uniqueIds: new Set<string>() }
+          cur.total++
+          cur.uniqueIds.add(e.ses_message_id)
+          linkTotals.set(url, cur)
+        }
+      }
     }
 
     const links = Array.from(linkTotals.entries())

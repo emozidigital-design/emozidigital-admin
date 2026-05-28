@@ -63,6 +63,16 @@ export async function POST(req: NextRequest) {
         .update({ bounced: true, subscribed: false })
         .eq("email", r.emailAddress)
     }
+    if (sesMessageId) {
+      const { data: sendRow } = await supabase
+        .from("email_sends")
+        .select("campaign_id")
+        .eq("ses_message_id", sesMessageId)
+        .single()
+      if (sendRow?.campaign_id) {
+        await supabase.rpc("increment_campaign_bounced", { p_campaign_id: sendRow.campaign_id })
+      }
+    }
   }
 
   if (eventType === "Complaint") {
@@ -73,6 +83,16 @@ export async function POST(req: NextRequest) {
         .from("email_contacts")
         .update({ complained: true, subscribed: false })
         .eq("email", r.emailAddress)
+    }
+    if (sesMessageId) {
+      const { data: sendRow } = await supabase
+        .from("email_sends")
+        .select("campaign_id")
+        .eq("ses_message_id", sesMessageId)
+        .single()
+      if (sendRow?.campaign_id) {
+        await supabase.rpc("increment_campaign_spam", { p_campaign_id: sendRow.campaign_id })
+      }
     }
   }
 
