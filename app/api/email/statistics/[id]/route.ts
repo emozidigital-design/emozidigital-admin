@@ -94,39 +94,25 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     const linkTotals = new Map<string, { total: number; uniqueIds: Set<string> }>()
 
     if (page === 1 && (campaign.clicks_count ?? 0) > 0) {
-      const { data: sendMsgIds } = await supabaseAdmin
-        .from("email_sends")
-        .select("ses_message_id")
-        .eq("campaign_id", params.id)
-        .not("ses_message_id", "is", null)
-        .limit(100000)
+      // Single join query — avoids fetching 100k message IDs into JS then batching
+      const { data: clickEventRows } = await supabaseAdmin
+        .from("email_events")
+        .select("ses_message_id, raw_payload, email_sends!inner(campaign_id)")
+        .eq("email_sends.campaign_id", params.id)
+        .eq("event_type", "click")
 
-      const campaignMsgIds = (sendMsgIds ?? []).map(s => s.ses_message_id).filter(Boolean) as string[]
-
-      if (campaignMsgIds.length > 0) {
-        const clickEventRows: EventRow[] = []
-        for (let i = 0; i < campaignMsgIds.length; i += 5000) {
-          const { data } = await supabaseAdmin
-            .from("email_events")
-            .select("ses_message_id, event_type, raw_payload")
-            .in("ses_message_id", campaignMsgIds.slice(i, i + 5000))
-            .eq("event_type", "click")
-          if (data) clickEventRows.push(...(data as EventRow[]))
-        }
-
-        for (const e of clickEventRows) {
-          let url: string | null = null
-          try {
-            const p = e.raw_payload as Record<string, unknown>
-            const click = p?.click as Record<string, unknown> | undefined
-            url = (click?.link ?? p?.link ?? p?.linkUrl ?? p?.url) as string | null
-          } catch { /* skip unparseable */ }
-          if (!url) continue
-          const cur = linkTotals.get(url) ?? { total: 0, uniqueIds: new Set<string>() }
-          cur.total++
-          cur.uniqueIds.add(e.ses_message_id)
-          linkTotals.set(url, cur)
-        }
+      for (const e of (clickEventRows ?? []) as unknown as EventRow[]) {
+        let url: string | null = null
+        try {
+          const p = e.raw_payload as Record<string, unknown>
+          const click = p?.click as Record<string, unknown> | undefined
+          url = (click?.link ?? p?.link ?? p?.linkUrl ?? p?.url) as string | null
+        } catch { /* skip unparseable */ }
+        if (!url) continue
+        const cur = linkTotals.get(url) ?? { total: 0, uniqueIds: new Set<string>() }
+        cur.total++
+        cur.uniqueIds.add(e.ses_message_id)
+        linkTotals.set(url, cur)
       }
     }
 
