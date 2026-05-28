@@ -1339,14 +1339,14 @@ export default function NewslettersPage() {
       ) : (
         <div className="bg-white border border-zinc-200 rounded-2xl overflow-hidden">
           {/* Table header */}
-          <div className="hidden sm:grid grid-cols-[1fr_160px_80px_100px_100px_90px_150px_40px] gap-2 px-5 py-3 border-b border-zinc-100 bg-zinc-50/80">
-            <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wide">Newsletter subject</p>
-            <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wide">Selected tags</p>
-            <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wide text-right">Emails sent</p>
-            <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wide text-right">Opens</p>
-            <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wide text-right">Unopen</p>
-            <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wide text-right">Clicks</p>
-            <p className="text-xs font-semibold text-zinc-400 uppercase tracking-wide">Status</p>
+          <div className="hidden sm:grid grid-cols-[1fr_160px_80px_100px_100px_90px_150px_40px] gap-2 px-5 py-3 border-b border-[#002828] bg-[#003434]">
+            <p className="text-xs font-semibold text-white uppercase tracking-wide">Newsletter subject</p>
+            <p className="text-xs font-semibold text-white uppercase tracking-wide">Selected tags</p>
+            <p className="text-xs font-semibold text-white uppercase tracking-wide text-right">Emails sent</p>
+            <p className="text-xs font-semibold text-white uppercase tracking-wide text-right">Opens</p>
+            <p className="text-xs font-semibold text-white uppercase tracking-wide text-right">Unopen</p>
+            <p className="text-xs font-semibold text-white uppercase tracking-wide text-right">Clicks</p>
+            <p className="text-xs font-semibold text-white uppercase tracking-wide">Status</p>
             <p />
           </div>
 

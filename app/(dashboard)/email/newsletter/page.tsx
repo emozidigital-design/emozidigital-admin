@@ -577,13 +577,13 @@ export default function NewsletterPage() {
         {/* Table */}
         <div className="bg-white border border-zinc-200 rounded-2xl overflow-hidden shadow-sm">
           {/* Table header */}
-          <div className="grid grid-cols-[1fr_170px_90px_90px_80px_140px_40px] gap-0 border-b border-zinc-200 px-5 py-3 bg-zinc-50/70">
-            <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest">Newsletter subject</span>
-            <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest">Recipients</span>
-            <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest text-right">Sent</span>
-            <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest text-right">Opens</span>
-            <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest text-right">Clicks</span>
-            <span className="text-[11px] font-bold text-zinc-400 uppercase tracking-widest">Status</span>
+          <div className="grid grid-cols-[1fr_170px_90px_90px_80px_140px_40px] gap-0 border-b border-[#002828] px-5 py-3 bg-[#003434]">
+            <span className="text-[11px] font-bold text-white uppercase tracking-widest">Newsletter subject</span>
+            <span className="text-[11px] font-bold text-white uppercase tracking-widest">Recipients</span>
+            <span className="text-[11px] font-bold text-white uppercase tracking-widest text-right">Sent</span>
+            <span className="text-[11px] font-bold text-white uppercase tracking-widest text-right">Opens</span>
+            <span className="text-[11px] font-bold text-white uppercase tracking-widest text-right">Clicks</span>
+            <span className="text-[11px] font-bold text-white uppercase tracking-widest">Status</span>
             <span />
           </div>
 
