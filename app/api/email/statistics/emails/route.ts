@@ -35,8 +35,8 @@ export async function GET(req: NextRequest) {
 
     // ── 2. Fetch enough rows to fill this page from each table ────────────────
     // Strategy: fetch (offset + pageSize) rows from each, merge+sort, slice.
-    // This is correct for any page because we pull enough candidates from both tables.
-    const fetchLimit = page * pageSize
+    // Capped at 500 to prevent runaway queries on deep page navigation.
+    const fetchLimit = Math.min(page * pageSize, 500)
 
     let cq = supabaseAdmin
       .from("email_campaigns")

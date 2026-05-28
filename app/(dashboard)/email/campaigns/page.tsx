@@ -526,7 +526,7 @@ export default function CampaignsPage() {
                     {c.email_senders?.from_name} · {c.email_templates?.name}
                     {Array.isArray(c.tag_ids) && c.tag_ids.length > 0 ? (
                       <>
-                        {c.tag_ids.map((tid, i) => {
+                        {c.tag_ids.map((tid) => {
                           const tag = tagMap.get(tid)
                           return (
                             <span key={tid}>

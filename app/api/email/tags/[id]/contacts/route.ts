@@ -12,11 +12,12 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   const safeLimit = [10, 20, 50].includes(limit) ? limit : 20
   const offset = (page - 1) * safeLimit
 
-  // Step 1: get contact_ids for this tag
+  // Step 1: get contact_ids for this tag, ordered by when they were tagged
   const { data: tagRows, error: tagError, count } = await supabaseAdmin
     .from("email_contact_tags")
     .select("contact_id", { count: "exact" })
     .eq("tag_id", params.id)
+    .order("created_at", { ascending: true })
     .range(offset, offset + safeLimit - 1)
 
   if (tagError) return NextResponse.json({ error: tagError.message }, { status: 500 })
@@ -27,12 +28,11 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     return NextResponse.json({ contacts: [], total: count ?? 0, page, limit: safeLimit })
   }
 
-  // Step 2: fetch full contact details
+  // Step 2: fetch full contact details, preserving the tag-join order
   const { data: contacts, error: contactError } = await supabaseAdmin
     .from("email_contacts")
     .select("id, first_name, last_name, email, phone")
     .in("id", contactIds)
-    .order("created_at", { ascending: true })
 
   if (contactError) return NextResponse.json({ error: contactError.message }, { status: 500 })
 
