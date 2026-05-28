@@ -69,7 +69,7 @@ Create 3 advanced, realistic image generation prompts relevant for the above blo
 
 === PART 4 - FAQ'S GENERATION ===
 
-Create 5 frequently asked questions (FAQs) relevant for the above blog post, specifically designed for B2B travel industry.
+Create 5 frequently asked questions (FAQs) relevant for the above blog post, specifically designed for B2B travel industry. Add those FAQs to the FAQ builder section in JSON response.
 
 == REQUIRED JSON RESPONSE FORMAT ===
 Return exactly this JSON structure (all fields required):
