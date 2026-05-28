@@ -27,6 +27,7 @@ export type GeneratedBlogData = {
   category: string
   industry: string
   image_prompts: string[]
+  schema_faq: { question: string; answer: string }[]
 }
 
 type Props = {
@@ -368,6 +369,17 @@ export function AIGeneratePanel({ onApply, defaultExpanded = false }: Props) {
                     <p key={i} className="text-zinc-400 text-xs leading-snug border-l-2 border-[#70BF4B]/30 pl-2">
                       {i + 1}. {prompt}
                     </p>
+                  ))}
+                </div>
+              )}
+              {result.schema_faq?.length > 0 && (
+                <div className="bg-[#001a1a] border border-[#003434] rounded-xl p-3 space-y-3">
+                  <p className="text-[9px] text-zinc-600 font-bold uppercase">FAQs ({result.schema_faq.length})</p>
+                  {result.schema_faq.map((faq, i) => (
+                    <div key={i} className="border-l-2 border-[#70BF4B]/30 pl-2 space-y-0.5">
+                      <p className="text-white text-xs font-semibold">{faq.question}</p>
+                      <p className="text-zinc-400 text-xs leading-snug">{faq.answer}</p>
+                    </div>
                   ))}
                 </div>
               )}

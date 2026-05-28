@@ -301,6 +301,10 @@ export default function BlogEditor({ initialData, isNew = false }: BlogEditorPro
     const categories = INDUSTRY_CATEGORIES[industry] ?? []
     const category = categories.includes(data.category) ? data.category : (categories[0] ?? post.category)
 
+    const faqs = Array.isArray(data.schema_faq) && data.schema_faq.length
+      ? data.schema_faq.map(f => ({ q: f.question, a: f.answer }))
+      : post.schema_faq
+
     updatePost({
       title: data.title || post.title,
       slug: data.slug || post.slug,
@@ -314,6 +318,7 @@ export default function BlogEditor({ initialData, isNew = false }: BlogEditorPro
       industry,
       category,
       image_prompts: Array.isArray(data.image_prompts) && data.image_prompts.length ? data.image_prompts : post.image_prompts,
+      schema_faq: faqs,
     })
     setIsSlugEdited(true)
   }
