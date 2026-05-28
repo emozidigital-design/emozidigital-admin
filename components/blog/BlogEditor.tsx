@@ -302,7 +302,7 @@ export default function BlogEditor({ initialData, isNew = false }: BlogEditorPro
     const category = categories.includes(data.category) ? data.category : (categories[0] ?? post.category)
 
     const faqs = Array.isArray(data.schema_faq) && data.schema_faq.length
-      ? data.schema_faq.map(f => ({ q: f.question, a: f.answer }))
+      ? data.schema_faq.map((f: any) => ({ q: f.question ?? f.q ?? '', a: f.answer ?? f.a ?? '' })).filter(f => f.q)
       : post.schema_faq
 
     updatePost({

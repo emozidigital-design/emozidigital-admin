@@ -100,6 +100,7 @@ export function AIGeneratePanel({ onApply, defaultExpanded = false }: Props) {
       }
 
       const { data } = await res.json()
+      console.log('[AI Generate] schema_faq from API:', data?.schema_faq)
       setSteps(STEPS.map(s => ({ ...s, done: true })))
       await new Promise(r => setTimeout(r, 400))
       setResult(data)
