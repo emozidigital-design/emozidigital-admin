@@ -6,19 +6,37 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   const unauth = await requireAuth()
   if (unauth) return unauth
 
-  const { data, error } = await supabaseAdmin
+  const url = new URL(req.url)
+  const page = parseInt(url.searchParams.get("page") ?? "1", 10)
+  const limit = parseInt(url.searchParams.get("limit") ?? "20", 10)
+  const safeLimit = [10, 20, 50].includes(limit) ? limit : 20
+  const offset = (page - 1) * safeLimit
+
+  // Step 1: get contact_ids for this tag
+  const { data: tagRows, error: tagError, count } = await supabaseAdmin
     .from("email_contact_tags")
-    .select("email_contacts(id, first_name, last_name, email, phone)")
+    .select("contact_id", { count: "exact" })
     .eq("tag_id", params.id)
+    .range(offset, offset + safeLimit - 1)
+
+  if (tagError) return NextResponse.json({ error: tagError.message }, { status: 500 })
+
+  const contactIds = (tagRows ?? []).map((r: { contact_id: string }) => r.contact_id)
+
+  if (contactIds.length === 0) {
+    return NextResponse.json({ contacts: [], total: count ?? 0, page, limit: safeLimit })
+  }
+
+  // Step 2: fetch full contact details
+  const { data: contacts, error: contactError } = await supabaseAdmin
+    .from("email_contacts")
+    .select("id, first_name, last_name, email, phone")
+    .in("id", contactIds)
     .order("created_at", { ascending: true })
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (contactError) return NextResponse.json({ error: contactError.message }, { status: 500 })
 
-  const contacts = (data ?? [])
-    .map((r: Record<string, unknown>) => r.email_contacts)
-    .filter(Boolean)
-
-  return NextResponse.json({ contacts })
+  return NextResponse.json({ contacts: contacts ?? [], total: count ?? 0, page, limit: safeLimit })
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {

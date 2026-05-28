@@ -34,6 +34,9 @@ interface RawCampaign {
   scheduled_at: string | null
   created_at: string
   tag_ids: string[]
+  sent_count: number
+  opens_count: number
+  clicks_count: number
 }
 
 interface RawNewsletter {
@@ -112,32 +115,22 @@ export default function NewslettersPage() {
       clientId
         ? fetch(`/api/email/tags?${p}`).then(r => r.json())
         : Promise.resolve([]),
-      // Fetch aggregated stats (sends + events) for campaigns so we get real counts
-      fetch(`/api/email/statistics?${p}`).then(r => r.ok ? r.json() : Promise.resolve(null)).catch(() => null),
     ])
-      .then(([campaigns, newsletters, tags, statsData]) => {
+      .then(([campaigns, newsletters, tags]) => {
         const tagMap = new Map<string, string>(
           (Array.isArray(tags) ? tags : []).map((t: Tag) => [t.id, t.name])
         )
 
-        // Build a lookup map from the statistics API: campaign id → { totalSent, totalOpened, totalClicked }
-        interface StatRow { id: string; type: string; totalSent: number; totalOpened: number; totalClicked: number }
-        const statsMap = new Map<string, StatRow>()
-        for (const row of (statsData?.emails ?? []) as StatRow[]) {
-          statsMap.set(row.id, row)
-        }
-
         const unified: UnifiedEmail[] = []
 
-        // Campaigns — populate send/open/click counts from statistics API
+        // Campaigns — counts come directly from denormalized columns
         for (const c of (Array.isArray(campaigns) ? campaigns : []) as RawCampaign[]) {
-          const tagNames = (c.tag_ids ?? []).map((id: string) => tagMap.get(id) ?? id)
-          const stat       = statsMap.get(c.id)
-          const sent       = stat?.totalSent    ?? null
-          const openCount  = stat?.totalOpened  ?? null
-          const clickCount = stat?.totalClicked ?? null
-          const openPct    = sent && sent > 0 && openCount  !== null ? (openCount  / sent) * 100 : null
-          const clickPct   = sent && sent > 0 && clickCount !== null ? (clickCount / sent) * 100 : null
+          const tagNames   = (c.tag_ids ?? []).map((id: string) => tagMap.get(id) ?? id)
+          const sent       = c.sent_count   ?? 0
+          const openCount  = c.opens_count  ?? 0
+          const clickCount = c.clicks_count ?? 0
+          const openPct    = sent > 0 ? (openCount  / sent) * 100 : 0
+          const clickPct   = sent > 0 ? (clickCount / sent) * 100 : 0
           unified.push({
             id: c.id, type: "campaign",
             subject: c.subject,

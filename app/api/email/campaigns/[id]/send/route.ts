@@ -101,7 +101,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   await supabaseAdmin
     .from("email_campaigns")
-    .update({ status: "sent", sent_at: new Date().toISOString() })
+    .update({ status: "sent", sent_at: new Date().toISOString(), sent_count: sent })
     .eq("id", campaignId)
 
   return NextResponse.json({ sent, failed })

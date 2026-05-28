@@ -76,7 +76,8 @@ The email section (`app/(dashboard)/email/`) is the largest feature area. Key de
 - **Newsletter sending**: Handled by a **Supabase Edge Function** (`newsletter-send`) to avoid Vercel's 10s timeout. The Next.js route resolves recipients and creates the `newsletter_sends` record, then fires the Edge Function asynchronously.
 - **Campaigns**: Sent directly from the Next.js route handler in batches. Stats computed by joining `email_sends` → `email_events` per campaign.
 - **Statistics page** (`/email/statistics`): Aggregates all campaigns + newsletters into daily time-series. Accepts `?from=YYYY-MM-DD&to=YYYY-MM-DD` date filters. Uses `BarChart` component from `components/charts/BarChart.tsx`.
-- **Supabase 1000-row default limit**: Always paginate or use `.limit(100000)` when fetching `email_sends` or `email_contact_tags` — the default 1000-row cap silently truncates sends.
+- **Supabase 1000-row default limit**: Always use `.limit(100000)` (or paginate) on every query against `email_sends`, `email_contact_tags`, and `email_events`. The default 1000-row PostgREST cap silently truncates results and causes incorrect open/click counts for large campaigns.
+- **Open/click tracking flow**: SNS webhook (`/api/webhooks/ses`) writes every event to `email_events` keyed by `ses_message_id`. Campaign stats are computed on-demand by joining `email_sends` → `email_events`. Newsletter stats use a denormalized `opens_count`/`clicks_count` on `newsletter_sends`, incremented via RPC (`increment_newsletter_opens`, `increment_newsletter_clicks`).
 
 ### Blog subsystem
 
@@ -120,4 +121,18 @@ AWS_REGION
 AGENTBAZAR_SUPABASE_URL
 AGENTBAZAR_SUPABASE_SERVICE_ROLE_KEY
 OPENAI_API
+NOTION_API_KEY
+NOTION_CLIENTS_DB
+NOTION_SOCIAL_ACCOUNTS_DB
+NOTION_BRAND_ASSETS_DB
+NOTION_ONBOARDING_DB
+NOTION_CONTENT_CALENDAR_DB
+BREVO_API_KEY
+GITHUB_TOKEN
+CLIENT_JWT_SECRET
+NEXT_PUBLIC_CLIENT_PORTAL_URL
+OWNER_WHATSAPP
+INTERNAL_SECRET
+N8N_ONBOARDING_WEBHOOK_URL
+AGENTBAZAR_REVALIDATE_SECRET
 ```
