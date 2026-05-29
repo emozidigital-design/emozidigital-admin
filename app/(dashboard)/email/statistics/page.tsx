@@ -276,6 +276,56 @@ export default function StatisticsPage() {
     loadEmails(1, pageSize, dateFrom, dateTo)
   }, [clientId]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Poll opens/clicks/sent every 10s — update email rows in-place without full reload
+  const emailsDataRef  = useRef<EmailsPage | null>(null)
+  const dateFromRef    = useRef(dateFrom)
+  const dateToRef      = useRef(dateTo)
+  const pageRef        = useRef(page)
+  const pageSizeRef    = useRef(pageSize)
+  useEffect(() => { emailsDataRef.current  = emailsData  }, [emailsData])
+  useEffect(() => { dateFromRef.current    = dateFrom    }, [dateFrom])
+  useEffect(() => { dateToRef.current      = dateTo      }, [dateTo])
+  useEffect(() => { pageRef.current        = page        }, [page])
+  useEffect(() => { pageSizeRef.current    = pageSize    }, [pageSize])
+
+  useEffect(() => {
+    const tick = async () => {
+      const current = emailsDataRef.current
+      if (!current || current.emails.length === 0) return
+      const campaignIds   = current.emails.filter(e => e.type === "campaign").map(e => e.id)
+      const newsletterIds = current.emails.filter(e => e.type === "newsletter").map(e => e.id)
+      const p = new URLSearchParams()
+      if (campaignIds.length)   p.set("campaign_ids",   campaignIds.join(","))
+      if (newsletterIds.length) p.set("newsletter_ids", newsletterIds.join(","))
+      try {
+        const res = await fetch(`/api/email/stats-poll?${p}`)
+        if (!res.ok) return
+        const { campaigns, newsletters } = await res.json()
+        type StatRow = { id: string; sent_count: number; opens_count: number; clicks_count: number; status: string }
+        const cMap = new Map<string, StatRow>(campaigns.map((c: StatRow) => [c.id, c]))
+        const nMap = new Map<string, StatRow>(newsletters.map((n: StatRow) => [n.id, n]))
+        setEmailsData(prev => {
+          if (!prev) return prev
+          return {
+            ...prev,
+            emails: prev.emails.map(row => {
+              const fresh = row.type === "campaign" ? cMap.get(row.id) : nMap.get(row.id)
+              if (!fresh) return row
+              return {
+                ...row,
+                totalSent:    fresh.sent_count   ?? row.totalSent,
+                totalOpened:  fresh.opens_count  ?? row.totalOpened,
+                totalClicked: fresh.clicks_count ?? row.totalClicked,
+              }
+            }),
+          }
+        })
+      } catch { /* silent — next tick will retry */ }
+    }
+    const id = setInterval(tick, 10_000)
+    return () => clearInterval(id)
+  }, []) // stable interval — reads state via refs
+
   function handleDateChange(from: string, to: string) {
     setDateFrom(from)
     setDateTo(to)
