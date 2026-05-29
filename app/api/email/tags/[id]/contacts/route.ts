@@ -15,9 +15,10 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   // Step 1: get contact_ids for this tag, ordered by when they were tagged
   const { data: tagRows, error: tagError, count } = await supabaseAdmin
     .from("email_contact_tags")
-    .select("contact_id", { count: "exact" })
+    .select("contact_id, created_at", { count: "exact" })
     .eq("tag_id", params.id)
     .order("created_at", { ascending: true })
+    .order("contact_id", { ascending: true })
     .range(offset, offset + safeLimit - 1)
 
   if (tagError) return NextResponse.json({ error: tagError.message }, { status: 500 })

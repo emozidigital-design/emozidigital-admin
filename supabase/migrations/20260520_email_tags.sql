@@ -11,6 +11,7 @@ create table email_tags (
 create table email_contact_tags (
   contact_id uuid not null references email_contacts(id) on delete cascade,
   tag_id uuid not null references email_tags(id) on delete cascade,
+  created_at timestamptz default now(),
   primary key (contact_id, tag_id)
 );
 
