@@ -666,7 +666,7 @@ export default function NewslettersPage() {
           if (mode === "test") {
             toast.success(`Test email sent to ${TEST_EMAIL}`)
           } else {
-            toast.success(`Queued for ${data.total.toLocaleString()} recipients — sending in background`)
+            toast.success(`Sent to ${data.sent?.toLocaleString() ?? data.total?.toLocaleString() ?? 0} recipients${data.failed ? ` (${data.failed} failed)` : ""}`)
             closeOverlay()
           }
         } else {
