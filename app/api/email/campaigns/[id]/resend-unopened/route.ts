@@ -21,52 +21,30 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   if (cErr || !campaign) return NextResponse.json({ error: "campaign not found" }, { status: 404 })
 
-  // Paginate RPC in chunks to bypass PostgREST project-level max_rows cap
-  const RPC_PAGE = 1000
-  let rpcPage = 0
-  const allContacts: Array<{ email: string; name: string | null; opened: boolean }> = []
+  // Single query: eligible (subscribed, not bounced, not complained) contacts who never opened.
+  // Replaces the old two-step: RPC(email+opened) → re-query email_contacts by email.
+  type EligibleContact = { id: string; email: string; name: string | null }
+  const eligibleContacts: EligibleContact[] = []
+  const PAGE = 1000
+  let page = 0
   while (true) {
-    const { data, error: rpcErr } = await supabaseAdmin
-      .rpc("get_campaign_contacts_with_opens", { p_campaign_id: params.id })
-      .range(rpcPage * RPC_PAGE, (rpcPage + 1) * RPC_PAGE - 1)
-    if (rpcErr) return NextResponse.json({ error: rpcErr.message }, { status: 500 })
+    const { data, error } = await supabaseAdmin
+      .rpc("get_campaign_eligible_unopened", { p_campaign_id: params.id })
+      .range(page * PAGE, (page + 1) * PAGE - 1)
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     if (!data || data.length === 0) break
-    allContacts.push(...(data as typeof allContacts))
-    if (data.length < RPC_PAGE) break
-    rpcPage++
-  }
-
-  if (allContacts.length === 0) {
-    return NextResponse.json({ error: "no sends found for this campaign" }, { status: 400 })
-  }
-
-  // Filter to eligible unopened contacts — need subscribed/bounced/complained status too
-  const unopenedEmails = (allContacts as Array<{ email: string; name: string | null; opened: boolean }>)
-    .filter(c => !c.opened)
-    .map(c => c.email)
-
-  if (unopenedEmails.length === 0) {
-    return NextResponse.json({ error: "all recipients have already opened this campaign" }, { status: 400 })
-  }
-
-  // Fetch contact eligibility (subscribed, bounced, complained) for unopened contacts
-  const eligibleContacts: Array<{ id: string; email: string; name: string | null }> = []
-  for (let i = 0; i < unopenedEmails.length; i += 1000) {
-    const { data: contacts } = await supabaseAdmin
-      .from("email_contacts")
-      .select("id, email, name, subscribed, bounced, complained")
-      .in("email", unopenedEmails.slice(i, i + 1000))
-      .eq("subscribed", true)
-      .eq("bounced", false)
-      .eq("complained", false)
-    if (contacts) eligibleContacts.push(...contacts)
+    eligibleContacts.push(...(data as EligibleContact[]))
+    if (data.length < PAGE) break
+    page++
   }
 
   if (eligibleContacts.length === 0) {
     return NextResponse.json({ error: "no eligible unopened contacts" }, { status: 400 })
   }
 
-  // If scheduling, create a new campaign record and return without sending
+  const subject = overrideSubject ?? campaign.subject
+
+  // If scheduling, create a draft campaign record and return
   if (scheduled_at) {
     const { data: newCampaign, error: createErr } = await supabaseAdmin
       .from("email_campaigns")
@@ -75,7 +53,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         sender_id: campaign.sender_id,
         template_id: campaign.template_id,
         tag_ids: campaign.tag_ids ?? [],
-        subject: overrideSubject ?? campaign.subject,
+        subject,
         status: "scheduled",
         scheduled_at,
       })
@@ -93,7 +71,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       sender_id: campaign.sender_id,
       template_id: campaign.template_id,
       tag_ids: campaign.tag_ids ?? [],
-      subject: overrideSubject ?? campaign.subject,
+      subject,
       status: "sending",
     })
     .select("id")
@@ -102,7 +80,6 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if (createErr || !newCampaign) return NextResponse.json({ error: "failed to create resend campaign" }, { status: 500 })
 
   const newCampaignId = newCampaign.id
-  const subject = overrideSubject ?? campaign.subject
   let sent = 0
   let failed = 0
   const BATCH = 10
