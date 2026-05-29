@@ -190,11 +190,14 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     sent += batchSent
     failed += rows.length - batchSent
 
-    // Checkpoint after each batch so a timeout leaves a partial count, not zero
-    await supabaseAdmin
-      .from("newsletter_sends")
-      .update({ sent_count: sent, failed_count: failed })
-      .eq("id", newRecord.id)
+    const batchIndex = i / BATCH
+    const isLastBatch = i + BATCH >= unopenedRecipients.length
+    if (!isLastBatch && batchIndex % 5 === 4) {
+      await supabaseAdmin
+        .from("newsletter_sends")
+        .update({ sent_count: sent, failed_count: failed })
+        .eq("id", newRecord.id)
+    }
   }
 
   // ── Mark newsletter_sends as sent with final counts ──────────────────────────

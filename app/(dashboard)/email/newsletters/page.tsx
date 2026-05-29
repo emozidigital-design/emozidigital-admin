@@ -337,8 +337,9 @@ export default function NewslettersPage() {
     const tick = async () => {
       const current = itemsRef.current
       if (current.length === 0) return
-      const campaignIds   = current.filter(i => i.type === "campaign").map(i => i.id)
-      const newsletterIds = current.filter(i => i.type === "newsletter").map(i => i.id)
+      // Only poll items still in-flight — "sent" counts never change
+      const campaignIds   = current.filter(i => i.type === "campaign"   && i.status === "sending").map(i => i.id)
+      const newsletterIds = current.filter(i => i.type === "newsletter" && i.status === "sending").map(i => i.id)
       const p = new URLSearchParams()
       if (campaignIds.length)   p.set("campaign_ids",   campaignIds.join(","))
       if (newsletterIds.length) p.set("newsletter_ids", newsletterIds.join(","))
@@ -362,7 +363,8 @@ export default function NewslettersPage() {
             sent, openCount, openPct,
             unopenCount: Math.max(0, sent - openCount),
             clickCount, clickPct,
-            status: fresh.status ?? item.status,
+            // Never downgrade a status — only allow forward transitions (sending → sent/failed)
+            status: item.status === "sent" ? item.status : (fresh.status ?? item.status),
           }
         }))
       } catch { /* silent — next tick will retry */ }

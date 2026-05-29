@@ -124,11 +124,14 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     sent += batchSent
     failed += rows.length - batchSent
 
-    // Checkpoint after each batch so a timeout leaves a partial count, not zero
-    await supabaseAdmin
-      .from("email_campaigns")
-      .update({ sent_count: sent })
-      .eq("id", newCampaignId)
+    const batchIndex = i / BATCH
+    const isLastBatch = i + BATCH >= eligibleContacts.length
+    if (!isLastBatch && batchIndex % 5 === 4) {
+      await supabaseAdmin
+        .from("email_campaigns")
+        .update({ sent_count: sent })
+        .eq("id", newCampaignId)
+    }
   }
 
   await supabaseAdmin

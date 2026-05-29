@@ -101,11 +101,16 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     sent += batchSent
     failed += rows.length - batchSent
 
-    // Checkpoint after each batch so a timeout leaves a partial count, not zero
-    await supabaseAdmin
-      .from("email_campaigns")
-      .update({ sent_count: sent })
-      .eq("id", campaignId)
+    // Checkpoint every 5 batches (50 contacts) so a timeout leaves a partial count, not zero.
+    // The post-loop update handles the final value, so no checkpoint on the very last batch.
+    const batchIndex = i / BATCH
+    const isLastBatch = i + BATCH >= contacts.length
+    if (!isLastBatch && batchIndex % 5 === 4) {
+      await supabaseAdmin
+        .from("email_campaigns")
+        .update({ sent_count: sent })
+        .eq("id", campaignId)
+    }
   }
 
   await supabaseAdmin

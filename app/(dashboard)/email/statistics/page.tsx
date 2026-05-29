@@ -277,16 +277,8 @@ export default function StatisticsPage() {
   }, [clientId]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Poll opens/clicks/sent every 10s — update email rows in-place without full reload
-  const emailsDataRef  = useRef<EmailsPage | null>(null)
-  const dateFromRef    = useRef(dateFrom)
-  const dateToRef      = useRef(dateTo)
-  const pageRef        = useRef(page)
-  const pageSizeRef    = useRef(pageSize)
-  useEffect(() => { emailsDataRef.current  = emailsData  }, [emailsData])
-  useEffect(() => { dateFromRef.current    = dateFrom    }, [dateFrom])
-  useEffect(() => { dateToRef.current      = dateTo      }, [dateTo])
-  useEffect(() => { pageRef.current        = page        }, [page])
-  useEffect(() => { pageSizeRef.current    = pageSize    }, [pageSize])
+  const emailsDataRef = useRef<EmailsPage | null>(null)
+  useEffect(() => { emailsDataRef.current = emailsData }, [emailsData])
 
   useEffect(() => {
     const tick = async () => {
