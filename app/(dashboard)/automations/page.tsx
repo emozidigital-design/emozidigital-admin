@@ -34,7 +34,7 @@ const fetcher = (url: string) => fetch(url).then(r => { if (!r.ok) throw new Err
 
 // ─── Automation definitions ───────────────────────────────────────────────────
 
-const N8N_EDITOR_BASE = "https://emozi-n8n.onrender.com/workflow"
+const N8N_EDITOR_BASE = "https://n8n.emozidigital.com/workflow"
 
 const AUTOMATIONS: Automation[] = [
   {
@@ -485,7 +485,7 @@ export default function AutomationsPage() {
           </p>
         </div>
         <a
-          href="https://emozi-n8n.onrender.com"
+          href="https://n8n.emozidigital.com"
           target="_blank"
           rel="noopener noreferrer"
           className="flex items-center gap-1.5 text-xs font-medium px-3 py-2 rounded-xl border border-purple-500/30 bg-purple-500/10 text-purple-300 hover:bg-purple-500/20 transition-all"

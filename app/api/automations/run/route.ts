@@ -3,7 +3,7 @@ import { supabase } from '@/lib/supabase'
 
 export const dynamic = 'force-dynamic'
 
-const N8N_BASE = process.env.N8N_WEBHOOK_BASE ?? 'https://emozi-n8n.onrender.com/webhook'
+const N8N_BASE = process.env.N8N_WEBHOOK_BASE ?? 'https://n8n.emozidigital.com/webhook'
 
 // Map workflow IDs to their n8n webhook paths
 const WEBHOOK_MAP: Record<string, string> = {
