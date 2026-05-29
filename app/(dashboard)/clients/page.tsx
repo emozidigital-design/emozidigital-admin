@@ -24,10 +24,16 @@ type Client = {
 // ─── Badge ────────────────────────────────────────────────────────────────────
 
 const STATUS_COLOR: Record<string, string> = {
-  Active:   "bg-[#70BF4B]/15 text-[#70BF4B] border-[#70BF4B]/30",
-  Inactive: "bg-zinc-700/30 text-zinc-400 border-zinc-600/30",
-  Pending:  "bg-yellow-500/15 text-yellow-400 border-yellow-500/30",
-  Completed:"bg-sky-500/15 text-sky-400 border-sky-500/30",
+  draft:     "bg-zinc-200 text-zinc-900 border-zinc-300",
+  Draft:     "bg-zinc-200 text-zinc-900 border-zinc-300",
+  pending:   "bg-yellow-700 text-white border-yellow-800",
+  Pending:   "bg-yellow-700 text-white border-yellow-800",
+  submitted: "bg-blue-600 text-white border-blue-700",
+  Submitted: "bg-blue-600 text-white border-blue-700",
+  active:    "bg-green-600 text-white border-green-700",
+  Active:    "bg-green-600 text-white border-green-700",
+  Inactive:  "bg-zinc-200 text-zinc-900 border-zinc-300",
+  Completed: "bg-blue-600 text-white border-blue-700",
 }
 const RISK_COLOR: Record<string, string> = {
   Low:    "bg-[#D0F255]/10 text-[#D0F255] border-[#D0F255]/25",
@@ -314,12 +320,12 @@ export default function ClientsPage() {
           <div className="hidden md:block overflow-x-auto">
             <table className="w-full">
               <thead>
-                <tr className="border-b border-zinc-100">
+                <tr className="border-b border-zinc-800 bg-zinc-900">
                   {COLS.map(col => (
                     <th
                       key={col.key}
                       onClick={() => toggleSort(col.key)}
-                      className="text-left text-[10px] font-semibold text-zinc-500 uppercase tracking-widest px-4 py-3.5 cursor-pointer hover:text-[#70BF4B] transition-colors select-none whitespace-nowrap"
+                      className="text-left text-[10px] font-bold text-white uppercase tracking-widest px-4 py-3.5 cursor-pointer hover:text-[#70BF4B] transition-colors select-none whitespace-nowrap"
                     >
                       {col.label}
                       <SortIcon active={sort.key === col.key} dir={sort.dir} />
