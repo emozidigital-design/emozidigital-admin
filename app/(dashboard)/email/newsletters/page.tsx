@@ -315,7 +315,8 @@ function NewsletterWizard({ editItem, clientId, isAgentBazar, posts, loadingPost
           method, headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ ...buildPayload(), status: "draft" }),
         })
-        if (!res.ok) throw new Error("Save failed")
+        const saveData = await res.json()
+        if (!res.ok) throw new Error(saveData.error ?? "Save failed")
         toast.success("Saved as draft")
         closeOverlay()
       }
@@ -338,7 +339,8 @@ function NewsletterWizard({ editItem, clientId, isAgentBazar, posts, loadingPost
         method, headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ ...buildPayload(), status: "scheduled", scheduled_at: new Date(scheduleDateTime).toISOString() }),
       })
-      if (!res.ok) throw new Error("Save failed")
+      const schedData = await res.json()
+      if (!res.ok) throw new Error(schedData.error ?? "Save failed")
       toast.success("Newsletter scheduled!")
       setShowScheduleModal(false)
       closeOverlay()
