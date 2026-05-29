@@ -165,6 +165,50 @@ function TagMultiSelect({ allTags, value, onChange, placeholder = "Filter by tag
   )
 }
 
+// ─── Live preview iframe ──────────────────────────────────────────────────────────
+
+function NewsletterPreviewFrame({ blogPostId, senderId, clientId, newsletterTemplateId, trendingPostIds }: {
+  blogPostId: string
+  senderId: string
+  clientId: string | null
+  newsletterTemplateId: string | null
+  trendingPostIds: string[]
+}) {
+  const [html, setHtml] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    setLoading(true)
+    fetch("/api/email/newsletter/preview", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ blog_post_id: blogPostId, sender_id: senderId, client_id: clientId, newsletter_template_id: newsletterTemplateId, trending_post_ids: trendingPostIds }),
+    })
+      .then(r => r.text())
+      .then(setHtml)
+      .catch(() => setHtml(null))
+      .finally(() => setLoading(false))
+  }, [blogPostId, senderId, clientId, newsletterTemplateId, trendingPostIds.join(",")])
+
+  if (loading) return (
+    <div className="flex items-center justify-center h-48 rounded-xl border border-zinc-100 bg-zinc-50">
+      <div className="w-5 h-5 border-2 border-zinc-300 border-t-zinc-600 rounded-full animate-spin" />
+    </div>
+  )
+  if (!html) return (
+    <div className="flex items-center justify-center h-24 rounded-xl border border-zinc-100 bg-zinc-50 text-xs text-zinc-400">Failed to load preview</div>
+  )
+  return (
+    <iframe
+      srcDoc={html}
+      className="w-full rounded-xl border border-zinc-100"
+      style={{ height: "600px" }}
+      sandbox="allow-same-origin"
+      title="Newsletter preview"
+    />
+  )
+}
+
 // ─── Newsletter wizard props ─────────────────────────────────────────────────────
 
 interface NewsletterWizardProps {
@@ -495,50 +539,13 @@ function NewsletterWizard({ editItem, clientId, isAgentBazar, posts, loadingPost
               <p className="text-sm font-semibold text-zinc-700">Newsletter preview</p>
               <button onClick={() => setStep(2)} className="text-xs text-zinc-400 hover:text-zinc-600">← Edit config</button>
             </div>
-            {activeTemplate ? (
-              <div className="border border-zinc-100 rounded-xl overflow-hidden max-w-lg mx-auto bg-zinc-50 p-4 text-center">
-                <p className="text-xs font-semibold text-zinc-500 mb-1">Custom template: {activeTemplate.name}</p>
-                <p className="text-xs text-zinc-400">Variables will be substituted at send time.</p>
-                <div className="mt-3 text-left text-xs font-mono text-zinc-400 bg-white border border-zinc-100 rounded-lg p-3 max-h-48 overflow-y-auto whitespace-pre-wrap break-all">
-                  {activeTemplate.html_body.slice(0, 400)}{activeTemplate.html_body.length > 400 ? "…" : ""}
-                </div>
-              </div>
-            ) : isAgentBazar ? (
-              <div className="border border-zinc-100 rounded-xl overflow-hidden max-w-lg mx-auto text-sm">
-                <div style={{ background: "#001D4A" }} className="px-6 py-3 text-center"><p className="text-white text-xs font-bold tracking-wider">agentBazar.in</p></div>
-                <div className="px-6 pt-4 pb-3" style={{ borderBottom: "2px solid #F47920" }}>
-                  <p className="italic text-zinc-700">Hello [subscriber],</p>
-                  <p className="font-bold text-zinc-800 text-xs mt-0.5">Today&apos;s Highlight</p>
-                </div>
-                {selectedPost.cover_image_url && <img src={selectedPost.cover_image_url} alt="" className="w-full h-40 object-cover" onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none" }} />}
-                <div className="px-6 py-4">
-                  <p style={{ color: "#F47920" }} className="font-bold text-base leading-snug mb-2">{selectedPost.title}</p>
-                  {selectedPost.excerpt && <p className="text-zinc-700 text-xs leading-relaxed font-semibold mb-4">{selectedPost.excerpt}</p>}
-                  <span style={{ background: "#F47920" }} className="inline-block text-white text-xs font-bold italic px-5 py-2 rounded">Read Full Blog...</span>
-                </div>
-                <div style={{ background: "#1a6b3a" }} className="px-6 py-4 text-center">
-                  <p className="text-white text-xs mb-0.5">For the latest Travel Blog & Updates</p>
-                  <p className="text-white font-bold text-sm mb-2">Join Our WhatsApp Community Now</p>
-                  <span className="inline-block bg-white text-xs font-bold px-5 py-1.5 rounded-full" style={{ color: "#1a6b3a" }}>▶ JOIN NOW</span>
-                </div>
-                <div className="px-6 py-5 border-t border-zinc-100 bg-white text-center">
-                  <p className="text-[10px] text-zinc-400 tracking-widest uppercase mb-3">agentbazar.in</p>
-                  <p className="text-[10px] font-bold text-zinc-800 underline mb-1">Unsubscribe from AgentBazar</p>
-                </div>
-              </div>
-            ) : (
-              <div className="border border-zinc-100 rounded-xl overflow-hidden max-w-lg mx-auto">
-                <div className="bg-[#003434] px-6 py-4"><p className="text-white text-sm font-semibold">{senders.find(s => s.id === senderId)?.from_name ?? "Sender"}</p></div>
-                {selectedPost.cover_image_url && <img src={selectedPost.cover_image_url} alt="" className="w-full h-48 object-cover" onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none" }} />}
-                <div className="p-6">
-                  <p className="text-xs font-semibold text-zinc-400 uppercase tracking-widest mb-2">{selectedPost.category}</p>
-                  <h2 className="text-xl font-bold text-zinc-900 mb-3 leading-snug">{selectedPost.title}</h2>
-                  {selectedPost.excerpt && <p className="text-sm text-zinc-600 mb-5 leading-relaxed">{selectedPost.excerpt}</p>}
-                  <span className="inline-block bg-[#003434] text-white text-sm font-semibold px-5 py-2.5 rounded-lg">Read the full article →</span>
-                </div>
-                <div className="px-6 py-4 border-t border-zinc-100"><p className="text-xs text-zinc-400 text-center">You received this because you subscribed. <span className="underline">Unsubscribe</span></p></div>
-              </div>
-            )}
+            <NewsletterPreviewFrame
+              blogPostId={selectedPost.id}
+              senderId={senderId}
+              clientId={clientId ?? null}
+              newsletterTemplateId={selectedTemplateId || null}
+              trendingPostIds={isAgentBazar ? trendingPosts.map(p => p.id) : []}
+            />
             <div className="mt-5 grid grid-cols-3 gap-3 text-center">
               <div className="bg-zinc-50 border border-zinc-100 rounded-xl p-3"><p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wide mb-1">Subject</p><p className="text-xs font-semibold text-zinc-700 truncate">{nlSubject}</p></div>
               <div className="bg-zinc-50 border border-zinc-100 rounded-xl p-3"><p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wide mb-1">Recipients</p><p className="text-xs font-semibold text-zinc-700 capitalize">{isAgentBazar ? "All contacts" : filterTagIds.length > 0 ? `${filterTagIds.length} tag${filterTagIds.length === 1 ? "" : "s"}` : "Leads"}</p></div>
