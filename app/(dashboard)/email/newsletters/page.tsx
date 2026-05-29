@@ -1020,50 +1020,6 @@ export default function NewslettersPage() {
 
   useEffect(() => { fetchList() }, [fetchList])
 
-  // ─── Poll opens/clicks/sent every 10s without a full list refetch ────────────
-  const itemsRef = useRef<UnifiedEmail[]>([])
-  useEffect(() => { itemsRef.current = items }, [items])
-
-  useEffect(() => {
-    const tick = async () => {
-      const current = itemsRef.current
-      if (current.length === 0) return
-      // Only poll items still in-flight — "sent" counts never change
-      const campaignIds   = current.filter(i => i.type === "campaign"   && i.status === "sending").map(i => i.id)
-      const newsletterIds = current.filter(i => i.type === "newsletter" && i.status === "sending").map(i => i.id)
-      const p = new URLSearchParams()
-      if (campaignIds.length)   p.set("campaign_ids",   campaignIds.join(","))
-      if (newsletterIds.length) p.set("newsletter_ids", newsletterIds.join(","))
-      try {
-        const res = await fetch(`/api/email/stats-poll?${p}`)
-        if (!res.ok) return
-        const { campaigns, newsletters } = await res.json()
-        type StatRow = { id: string; sent_count: number; opens_count: number; clicks_count: number; status: string }
-        const cMap = new Map<string, StatRow>(campaigns.map((c: StatRow) => [c.id, c]))
-        const nMap = new Map<string, StatRow>(newsletters.map((n: StatRow) => [n.id, n]))
-        setItems(prev => prev.map(item => {
-          const fresh = item.type === "campaign" ? cMap.get(item.id) : nMap.get(item.id)
-          if (!fresh) return item
-          const sent       = fresh.sent_count   ?? item.sent      ?? 0
-          const openCount  = fresh.opens_count  ?? item.openCount ?? 0
-          const clickCount = fresh.clicks_count ?? item.clickCount ?? 0
-          const openPct    = sent > 0 ? (openCount  / sent) * 100 : 0
-          const clickPct   = sent > 0 ? (clickCount / sent) * 100 : 0
-          return {
-            ...item,
-            sent, openCount, openPct,
-            unopenCount: Math.max(0, sent - openCount),
-            clickCount, clickPct,
-            // Never downgrade a status — only allow forward transitions (sending → sent/failed)
-            status: item.status === "sent" ? item.status : (fresh.status ?? item.status),
-          }
-        }))
-      } catch { /* silent — next tick will retry */ }
-    }
-    const id = setInterval(tick, 10_000)
-    return () => clearInterval(id)
-  }, []) // stable interval — reads items via ref
-
   // ─── Load senders + tags for overlay ────────────────────────────────────────
   useEffect(() => {
     if (!clientId) return
