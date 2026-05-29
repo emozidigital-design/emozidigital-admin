@@ -237,6 +237,10 @@ export default function StatisticsPage() {
   const [page, setPage]         = useState(1)
   const [pageSize, setPageSize] = useState(10)
 
+  // Manual stats reconcile
+  const [reconciling, setReconciling] = useState(false)
+  const [reconcileMsg, setReconcileMsg] = useState<string | null>(null)
+
   // Load charts (summary + daily series) — runs on client/date change only
   function loadCharts(from: string, to: string) {
     setChartsLoading(true)
@@ -345,8 +349,39 @@ export default function StatisticsPage() {
             </p>
           </div>
         </div>
-        <DateRangePicker from={dateFrom} to={dateTo} onChange={handleDateChange} />
+        <div className="flex items-center gap-2">
+          <DateRangePicker from={dateFrom} to={dateTo} onChange={handleDateChange} />
+          <button
+            onClick={async () => {
+              setReconciling(true)
+              setReconcileMsg(null)
+              try {
+                const res = await fetch("/api/cron/reconcile-email-stats", { method: "POST" })
+                const data = await res.json()
+                if (!res.ok) throw new Error(data.error)
+                setReconcileMsg(`Synced — ${data.campaigns_updated ?? 0} campaigns, ${data.newsletters_updated ?? 0} newsletters`)
+                loadCharts(dateFrom, dateTo)
+                loadEmails(page, pageSize, dateFrom, dateTo)
+              } catch (e: unknown) {
+                setReconcileMsg(e instanceof Error ? e.message : "Sync failed")
+              } finally {
+                setReconciling(false)
+              }
+            }}
+            disabled={reconciling}
+            title="Reconcile opens/clicks counts from raw event data"
+            className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium border border-zinc-200 rounded-lg bg-white text-zinc-600 hover:bg-zinc-50 disabled:opacity-50 transition-colors shrink-0"
+          >
+            <svg className={`w-3.5 h-3.5 ${reconciling ? "animate-spin" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+            </svg>
+            {reconciling ? "Syncing…" : "Sync stats"}
+          </button>
+        </div>
       </div>
+      {reconcileMsg && (
+        <p className="text-xs text-zinc-500 mb-4">{reconcileMsg}</p>
+      )}
 
       {/* Summary cards */}
       {chartsLoading ? (
