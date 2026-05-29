@@ -165,6 +165,697 @@ function TagMultiSelect({ allTags, value, onChange, placeholder = "Filter by tag
   )
 }
 
+// ─── Newsletter wizard props ─────────────────────────────────────────────────────
+
+interface NewsletterWizardProps {
+  editItem: UnifiedEmail | null
+  clientId: string | null
+  isAgentBazar: boolean
+  posts: BlogPost[]
+  loadingPosts: boolean
+  senders: Sender[]
+  allTags: Tag[]
+  newsletterTemplates: NewsletterTemplate[]
+  loadingTemplates: boolean
+  closeOverlay: () => void
+  loadNewsletterTemplates: () => void
+}
+
+function NewsletterWizard({ editItem, clientId, isAgentBazar, posts, loadingPosts, senders, allTags, newsletterTemplates, loadingTemplates, closeOverlay, loadNewsletterTemplates }: NewsletterWizardProps) {
+  const initNs = editItem?.raw
+  const [step, setStep] = useState<1 | 2 | 3>(initNs?.blog_post_id ? 2 : 1)
+  const [isDuplicating] = useState(initNs?.subject?.startsWith("[D] ") ?? false)
+  const [selectedPost, setSelectedPost] = useState<BlogPost | null>(
+    initNs ? (posts.find(p => p.id === initNs.blog_post_id) ?? null) : null
+  )
+  const [trendingPosts, setTrendingPosts] = useState<BlogPost[]>(
+    initNs?.trending_post_ids?.map(id => posts.find(p => p.id === id)).filter(Boolean) as BlogPost[] ?? []
+  )
+  const [postSearch, setPostSearch] = useState("")
+  const [senderId, setSenderId] = useState(initNs?.sender_id ?? "")
+  const [filterTagIds, setFilterTagIds] = useState<string[]>(initNs?.tag_ids ?? [])
+  const [nlSubject, setNlSubject] = useState(initNs?.subject ?? "")
+  const [selectedTemplateId, setSelectedTemplateId] = useState(initNs?.newsletter_template_id ?? (newsletterTemplates.length === 1 ? newsletterTemplates[0].id : ""))
+  const [editingRecordId] = useState(editItem?.id ?? null)
+  const [editingRecordStatus] = useState(initNs?.status ?? "draft")
+  const [saving, setSaving] = useState(false)
+  const [sendDropdownOpen, setSendDropdownOpen] = useState(false)
+  const sendDropdownRef = useRef<HTMLDivElement>(null)
+  const [showScheduleModal, setShowScheduleModal] = useState(false)
+  const [scheduleDateTime, setScheduleDateTime] = useState("")
+  const [editorOpen, setEditorOpen] = useState(false)
+  const [editorTemplate, setEditorTemplate] = useState<NewsletterTemplate | null>(null)
+  const [showVarRef, setShowVarRef] = useState(false)
+  const [tmplMenuId, setTmplMenuId] = useState<string | null>(null)
+  const tmplMenuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    const h = (e: MouseEvent) => { if (sendDropdownRef.current && !sendDropdownRef.current.contains(e.target as Node)) setSendDropdownOpen(false) }
+    document.addEventListener("mousedown", h)
+    return () => document.removeEventListener("mousedown", h)
+  }, [])
+  useEffect(() => {
+    const h = (e: MouseEvent) => { if (tmplMenuRef.current && !tmplMenuRef.current.contains(e.target as Node)) setTmplMenuId(null) }
+    document.addEventListener("mousedown", h)
+    return () => document.removeEventListener("mousedown", h)
+  }, [])
+
+  const filteredPosts = posts.filter(p =>
+    p.title.toLowerCase().includes(postSearch.toLowerCase()) ||
+    (p.category ?? "").toLowerCase().includes(postSearch.toLowerCase())
+  )
+  const activeTemplate = newsletterTemplates.find(t => t.id === selectedTemplateId)
+
+  const buildPayload = () => ({
+    blog_post_id: selectedPost!.id,
+    sender_id: senderId,
+    subject: nlSubject,
+    client_id: clientId || null,
+    recipient_type: isAgentBazar ? "list" : (filterTagIds.length > 0 ? "tags" : "leads"),
+    tag_ids: filterTagIds,
+    newsletter_template_id: selectedTemplateId || null,
+    trending_post_ids: isAgentBazar ? trendingPosts.map(p => p.id) : [],
+  })
+
+  const validateStep3 = () => {
+    if (!selectedPost || !senderId || !nlSubject) { toast.error("Fill all required fields"); return false }
+    if (!isAgentBazar && filterTagIds.length === 0) { toast.error("Select at least one tag"); return false }
+    return true
+  }
+
+  const handleSaveWithMode = async (mode: "draft" | "test" | "schedule" | "send") => {
+    if (!validateStep3()) return
+    if (mode === "schedule") { setShowScheduleModal(true); setSendDropdownOpen(false); return }
+    setSaving(true)
+    setSendDropdownOpen(false)
+    try {
+      if (mode === "send" || mode === "test") {
+        const res = await fetch("/api/email/newsletter/send", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...buildPayload(), ...(mode === "test" ? { test_email: TEST_EMAIL } : {}) }),
+        })
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error)
+        if (mode === "test") {
+          toast.success(`Test email sent to ${TEST_EMAIL}`)
+        } else {
+          toast.success(`Sent to ${data.sent?.toLocaleString() ?? data.total?.toLocaleString() ?? 0} recipients${data.failed ? ` (${data.failed} failed)` : ""}`)
+          closeOverlay()
+        }
+      } else {
+        const isExisting = editingRecordId && editingRecordStatus === "draft"
+        const url = isExisting ? `/api/email/newsletter/${editingRecordId}` : "/api/email/newsletter"
+        const method = isExisting ? "PATCH" : "POST"
+        const res = await fetch(url, {
+          method, headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...buildPayload(), status: "draft" }),
+        })
+        if (!res.ok) throw new Error("Save failed")
+        toast.success("Saved as draft")
+        closeOverlay()
+      }
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Operation failed")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleScheduleConfirm = async () => {
+    if (!scheduleDateTime) { toast.error("Pick a date and time"); return }
+    if (!validateStep3()) return
+    setSaving(true)
+    try {
+      const isExisting = editingRecordId && editingRecordStatus === "draft"
+      const url = isExisting ? `/api/email/newsletter/${editingRecordId}` : "/api/email/newsletter"
+      const method = isExisting ? "PATCH" : "POST"
+      const res = await fetch(url, {
+        method, headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...buildPayload(), status: "scheduled", scheduled_at: new Date(scheduleDateTime).toISOString() }),
+      })
+      if (!res.ok) throw new Error("Save failed")
+      toast.success("Newsletter scheduled!")
+      setShowScheduleModal(false)
+      closeOverlay()
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Schedule failed")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const deleteTemplate = async (id: string) => {
+    if (!confirm("Delete this newsletter template?")) return
+    try {
+      const res = await fetch(`/api/email/templates/${id}`, { method: "DELETE" })
+      if (!res.ok) throw new Error((await res.json()).error)
+      toast.success("Template deleted")
+      if (selectedTemplateId === id) setSelectedTemplateId("")
+      loadNewsletterTemplates()
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Delete failed")
+    }
+  }
+
+  return (
+    <div className="w-full">
+      {/* Back + header */}
+      <div className="flex items-center gap-3 mb-6">
+        <button onClick={closeOverlay} className="flex items-center gap-1.5 text-sm text-zinc-500 hover:text-zinc-800 transition-colors">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+          Newsletter / Campaign
+        </button>
+        <span className="text-zinc-300">/</span>
+        <span className="text-sm font-medium text-zinc-700 flex items-center gap-2">
+          {editingRecordId && editingRecordStatus === "draft" ? "Edit draft" : "New newsletter"}
+          {isDuplicating && <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 tracking-wide uppercase">Duplicate</span>}
+        </span>
+      </div>
+
+      {/* Steps */}
+      <div className="flex items-center gap-1 mb-7 bg-zinc-50 border border-zinc-200 rounded-2xl px-5 py-3">
+        {([1, 2, 3] as const).map((s, i) => (
+          <div key={s} className="flex items-center gap-2.5 flex-1">
+            <button
+              onClick={() => { if (s < step || (s === 2 && selectedPost)) setStep(s) }}
+              className={`w-7 h-7 rounded-full text-xs font-bold border-2 transition-all shrink-0 ${step === s ? "bg-[#003434] text-white border-[#003434] shadow-sm" : step > s ? "bg-emerald-500 text-white border-emerald-500 cursor-pointer" : "bg-white text-zinc-400 border-zinc-300 cursor-default"}`}
+            >
+              {step > s ? "✓" : s}
+            </button>
+            <span className={`text-xs font-semibold tracking-tight ${step === s ? "text-zinc-800" : step > s ? "text-emerald-600" : "text-zinc-400"}`}>
+              {s === 1 ? (isAgentBazar ? "Pick posts" : "Pick post") : s === 2 ? "Configure" : "Preview & send"}
+            </span>
+            {i < 2 && <div className="flex-1 h-px bg-zinc-200 mx-1" />}
+          </div>
+        ))}
+      </div>
+
+      {/* Step 1 */}
+      {step === 1 && (
+        <div className="bg-white border border-zinc-200 rounded-2xl p-6 space-y-4">
+          <p className="text-sm font-semibold text-zinc-700 mb-1">{isAgentBazar ? "Select hero post (Today's Highlight)" : "Select a blog post"}</p>
+          <input type="text" placeholder="Search by title or category…" value={postSearch} onChange={e => setPostSearch(e.target.value)} className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#003434]/20 mb-3" />
+          {loadingPosts ? (
+            <div className="py-8 text-center"><div className="w-5 h-5 border-2 border-[#003434]/20 border-t-[#003434] rounded-full animate-spin mx-auto mb-2" /><p className="text-sm text-zinc-400">Loading posts…</p></div>
+          ) : filteredPosts.length === 0 ? (
+            <p className="text-sm text-zinc-400 py-4 text-center">No published posts found.</p>
+          ) : (
+            <div className="space-y-2 max-h-[320px] overflow-y-auto pr-1">
+              {filteredPosts.map(post => {
+                const isSelected = selectedPost?.id === post.id
+                return (
+                  <button key={post.id} onClick={() => { setSelectedPost(post); setNlSubject(post.title); setTrendingPosts(prev => prev.filter(t => t.id !== post.id)); if (!isAgentBazar) setStep(2) }} className={`w-full text-left flex gap-4 p-3 rounded-lg border transition-all group ${isSelected ? "border-[#003434] bg-[#003434]/5" : "border-zinc-100 hover:border-[#003434] hover:bg-[#003434]/5"}`}>
+                    {post.cover_image_url ? <img src={post.cover_image_url} alt="" className="w-16 h-16 object-cover rounded-md shrink-0" onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none" }} /> : <div className="w-16 h-16 rounded-md shrink-0 bg-zinc-100 flex items-center justify-center"><span className="text-zinc-300 text-xs">No img</span></div>}
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-zinc-800 group-hover:text-[#003434] truncate">{post.title}</p>
+                      <p className="text-xs text-zinc-400 mt-0.5">{post.category} · {post.published_at ? new Date(post.published_at).toLocaleDateString("en-IN") : "No date"}</p>
+                      {post.excerpt && <p className="text-xs text-zinc-500 mt-1 line-clamp-2">{post.excerpt}</p>}
+                    </div>
+                    {isSelected && <span className="text-xs font-semibold text-[#003434] shrink-0 self-center">Hero ✓</span>}
+                  </button>
+                )
+              })}
+            </div>
+          )}
+          {isAgentBazar && selectedPost && (
+            <div className="border-t border-zinc-100 pt-4">
+              <p className="text-sm font-semibold text-zinc-700 mb-1">Select up to 2 trending posts <span className="ml-2 text-xs font-normal text-zinc-400">({trendingPosts.length}/2 selected)</span></p>
+              <div className="space-y-2 max-h-[280px] overflow-y-auto pr-1">
+                {filteredPosts.filter(p => p.id !== selectedPost.id).map(post => {
+                  const isSel = trendingPosts.some(t => t.id === post.id)
+                  const isDisabled = !isSel && trendingPosts.length >= 2
+                  const toggleTrending = () => {
+                    if (isDisabled) return
+                    setTrendingPosts(prev => prev.some(t => t.id === post.id) ? prev.filter(t => t.id !== post.id) : [...prev, post])
+                  }
+                  return (
+                    <button key={post.id} onClick={toggleTrending} disabled={isDisabled} className={`w-full text-left flex gap-4 p-3 rounded-lg border transition-all ${isSel ? "border-[#F47920] bg-orange-50" : isDisabled ? "border-zinc-100 opacity-40 cursor-not-allowed" : "border-zinc-100 hover:border-[#F47920] hover:bg-orange-50/40"}`}>
+                      {post.cover_image_url ? <img src={post.cover_image_url} alt="" className="w-14 h-14 object-cover rounded-md shrink-0" onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none" }} /> : <div className="w-14 h-14 rounded-md shrink-0 bg-zinc-100 flex items-center justify-center"><span className="text-zinc-300 text-xs">No img</span></div>}
+                      <div className="min-w-0 flex-1"><p className="text-sm font-medium text-zinc-800 truncate">{post.title}</p><p className="text-xs text-zinc-400 mt-0.5">{post.category}</p></div>
+                      {isSel && <span className="text-xs font-semibold text-[#F47920] shrink-0 self-center">Trending ✓</span>}
+                    </button>
+                  )
+                })}
+              </div>
+              <button onClick={() => setStep(2)} className="mt-4 w-full bg-[#003434] text-white text-sm py-2.5 rounded-xl hover:bg-[#004848] active:scale-[0.98] transition-all font-semibold shadow-sm">Continue to configure →</button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Step 2 */}
+      {step === 2 && selectedPost && (
+        <div className="bg-white border border-zinc-200 rounded-2xl p-6 space-y-5">
+          <div className="flex items-center gap-3 p-3 bg-zinc-50 rounded-lg border border-zinc-100">
+            {selectedPost.cover_image_url && <img src={selectedPost.cover_image_url} alt="" className="w-12 h-12 object-cover rounded-md shrink-0" onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none" }} />}
+            <div className="min-w-0"><p className="text-sm font-semibold text-zinc-800 truncate">{selectedPost.title}</p><p className="text-xs text-zinc-400">{selectedPost.category}</p></div>
+            <button onClick={() => setStep(1)} className="ml-auto text-xs text-zinc-400 hover:text-zinc-600 shrink-0">Change</button>
+          </div>
+          {isAgentBazar && trendingPosts.length > 0 && (
+            <div className="flex gap-2 flex-wrap">
+              {trendingPosts.map(p => <span key={p.id} className="text-xs bg-orange-50 text-orange-700 border border-orange-200 px-2 py-0.5 rounded-full truncate max-w-[200px]">Trending: {p.title}</span>)}
+            </div>
+          )}
+          {!loadingTemplates && (
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-xs font-medium text-zinc-500">Newsletter template</label>
+                {newsletterTemplates.length > 0 && <button type="button" onClick={() => { setEditorTemplate(null); setEditorOpen(true) }} className="text-xs font-medium text-[#003434] hover:underline">+ New template</button>}
+              </div>
+              {newsletterTemplates.length === 0 ? (
+                <div className="flex items-center gap-2 p-3 rounded-lg border border-zinc-100 bg-zinc-50">
+                  <span className="text-xs text-zinc-400 flex-1">No newsletter templates yet — using default system layout.</span>
+                  <button type="button" onClick={() => { setEditorTemplate(null); setEditorOpen(true) }} className="text-xs font-medium text-[#003434] hover:underline shrink-0">+ Create one</button>
+                </div>
+              ) : (
+                <>
+                  <div className="flex items-center gap-2">
+                    <select value={selectedTemplateId} onChange={e => setSelectedTemplateId(e.target.value)} className="flex-1 border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#003434]/20 bg-white">
+                      <option value="">Default system layout</option>
+                      {newsletterTemplates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+                    </select>
+                    {selectedTemplateId && (() => {
+                      const selTmpl = newsletterTemplates.find(t => t.id === selectedTemplateId)
+                      if (!selTmpl) return null
+                      return (
+                        <div className="relative shrink-0" ref={tmplMenuId === selTmpl.id ? tmplMenuRef : undefined}>
+                          <button type="button" onClick={() => setTmplMenuId(tmplMenuId === selTmpl.id ? null : selTmpl.id)} className="w-8 h-8 flex items-center justify-center rounded-lg border border-zinc-200 hover:bg-zinc-100 text-zinc-400 hover:text-zinc-700 transition-colors">
+                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><circle cx="10" cy="4" r="1.5" /><circle cx="10" cy="10" r="1.5" /><circle cx="10" cy="16" r="1.5" /></svg>
+                          </button>
+                          {tmplMenuId === selTmpl.id && (
+                            <div className="absolute right-0 top-9 z-50 bg-white border border-zinc-200 rounded-xl shadow-xl py-1.5 w-28 ring-1 ring-black/5">
+                              <button type="button" onClick={() => { setEditorTemplate(selTmpl); setEditorOpen(true); setTmplMenuId(null) }} className="w-full text-left px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-50 font-medium">Edit</button>
+                              <div className="border-t border-zinc-100 my-1" />
+                              <button type="button" onClick={() => { deleteTemplate(selTmpl.id); setTmplMenuId(null) }} className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 font-medium">Delete</button>
+                            </div>
+                          )}
+                        </div>
+                      )
+                    })()}
+                  </div>
+                  {selectedTemplateId ? <p className="text-xs text-emerald-600 mt-1">✓ Custom template selected</p> : <p className="text-xs text-zinc-400 mt-1">Using the default branded layout</p>}
+                </>
+              )}
+            </div>
+          )}
+          <div>
+            <label className="text-xs font-medium text-zinc-500 block mb-1">Subject line</label>
+            <input type="text" value={nlSubject} onChange={e => setNlSubject(e.target.value)} className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#003434]/20" placeholder="Email subject…" />
+          </div>
+          <div>
+            <label className="text-xs font-medium text-zinc-500 block mb-1">Sender</label>
+            <select value={senderId} onChange={e => setSenderId(e.target.value)} className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#003434]/20 bg-white">
+              <option value="">Select a verified sender…</option>
+              {senders.map(s => <option key={s.id} value={s.id}>{s.from_name} &lt;{s.from_email}&gt;</option>)}
+            </select>
+            {senders.length === 0 && <p className="text-xs text-amber-600 mt-1">No verified senders found.</p>}
+          </div>
+          {!isAgentBazar && (
+            <div>
+              <label className="text-xs font-medium text-zinc-500 block mb-1">Target tags <span className="font-normal text-zinc-400">(required)</span></label>
+              {allTags.length === 0 ? <p className="text-xs text-amber-600">No tags found. Create tags first.</p> : <TagMultiSelect allTags={allTags} value={filterTagIds} onChange={setFilterTagIds} placeholder="Select tags…" />}
+            </div>
+          )}
+          {isAgentBazar && allTags.length > 0 && (
+            <div>
+              <label className="text-xs font-medium text-zinc-500 block mb-1">Filter by tag <span className="font-normal text-zinc-400">(optional)</span></label>
+              <TagMultiSelect allTags={allTags} value={filterTagIds} onChange={setFilterTagIds} placeholder="All contacts" />
+            </div>
+          )}
+          <button onClick={() => { if (senderId && nlSubject && (isAgentBazar || filterTagIds.length > 0)) setStep(3) }} disabled={!senderId || !nlSubject || (!isAgentBazar && filterTagIds.length === 0)} className="w-full bg-[#003434] text-white text-sm py-2.5 rounded-xl hover:bg-[#004848] disabled:opacity-40 active:scale-[0.98] transition-all font-semibold shadow-sm">Preview newsletter →</button>
+        </div>
+      )}
+
+      {/* Step 3 */}
+      {step === 3 && selectedPost && (
+        <div className="space-y-4">
+          <div className="bg-white border border-zinc-200 rounded-2xl p-6">
+            <div className="flex items-center justify-between mb-4">
+              <p className="text-sm font-semibold text-zinc-700">Newsletter preview</p>
+              <button onClick={() => setStep(2)} className="text-xs text-zinc-400 hover:text-zinc-600">← Edit config</button>
+            </div>
+            {activeTemplate ? (
+              <div className="border border-zinc-100 rounded-xl overflow-hidden max-w-lg mx-auto bg-zinc-50 p-4 text-center">
+                <p className="text-xs font-semibold text-zinc-500 mb-1">Custom template: {activeTemplate.name}</p>
+                <p className="text-xs text-zinc-400">Variables will be substituted at send time.</p>
+                <div className="mt-3 text-left text-xs font-mono text-zinc-400 bg-white border border-zinc-100 rounded-lg p-3 max-h-48 overflow-y-auto whitespace-pre-wrap break-all">
+                  {activeTemplate.html_body.slice(0, 400)}{activeTemplate.html_body.length > 400 ? "…" : ""}
+                </div>
+              </div>
+            ) : isAgentBazar ? (
+              <div className="border border-zinc-100 rounded-xl overflow-hidden max-w-lg mx-auto text-sm">
+                <div style={{ background: "#001D4A" }} className="px-6 py-3 text-center"><p className="text-white text-xs font-bold tracking-wider">agentBazar.in</p></div>
+                <div className="px-6 pt-4 pb-3" style={{ borderBottom: "2px solid #F47920" }}>
+                  <p className="italic text-zinc-700">Hello [subscriber],</p>
+                  <p className="font-bold text-zinc-800 text-xs mt-0.5">Today&apos;s Highlight</p>
+                </div>
+                {selectedPost.cover_image_url && <img src={selectedPost.cover_image_url} alt="" className="w-full h-40 object-cover" onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none" }} />}
+                <div className="px-6 py-4">
+                  <p style={{ color: "#F47920" }} className="font-bold text-base leading-snug mb-2">{selectedPost.title}</p>
+                  {selectedPost.excerpt && <p className="text-zinc-700 text-xs leading-relaxed font-semibold mb-4">{selectedPost.excerpt}</p>}
+                  <span style={{ background: "#F47920" }} className="inline-block text-white text-xs font-bold italic px-5 py-2 rounded">Read Full Blog...</span>
+                </div>
+                <div style={{ background: "#1a6b3a" }} className="px-6 py-4 text-center">
+                  <p className="text-white text-xs mb-0.5">For the latest Travel Blog & Updates</p>
+                  <p className="text-white font-bold text-sm mb-2">Join Our WhatsApp Community Now</p>
+                  <span className="inline-block bg-white text-xs font-bold px-5 py-1.5 rounded-full" style={{ color: "#1a6b3a" }}>▶ JOIN NOW</span>
+                </div>
+                <div className="px-6 py-5 border-t border-zinc-100 bg-white text-center">
+                  <p className="text-[10px] text-zinc-400 tracking-widest uppercase mb-3">agentbazar.in</p>
+                  <p className="text-[10px] font-bold text-zinc-800 underline mb-1">Unsubscribe from AgentBazar</p>
+                </div>
+              </div>
+            ) : (
+              <div className="border border-zinc-100 rounded-xl overflow-hidden max-w-lg mx-auto">
+                <div className="bg-[#003434] px-6 py-4"><p className="text-white text-sm font-semibold">{senders.find(s => s.id === senderId)?.from_name ?? "Sender"}</p></div>
+                {selectedPost.cover_image_url && <img src={selectedPost.cover_image_url} alt="" className="w-full h-48 object-cover" onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none" }} />}
+                <div className="p-6">
+                  <p className="text-xs font-semibold text-zinc-400 uppercase tracking-widest mb-2">{selectedPost.category}</p>
+                  <h2 className="text-xl font-bold text-zinc-900 mb-3 leading-snug">{selectedPost.title}</h2>
+                  {selectedPost.excerpt && <p className="text-sm text-zinc-600 mb-5 leading-relaxed">{selectedPost.excerpt}</p>}
+                  <span className="inline-block bg-[#003434] text-white text-sm font-semibold px-5 py-2.5 rounded-lg">Read the full article →</span>
+                </div>
+                <div className="px-6 py-4 border-t border-zinc-100"><p className="text-xs text-zinc-400 text-center">You received this because you subscribed. <span className="underline">Unsubscribe</span></p></div>
+              </div>
+            )}
+            <div className="mt-5 grid grid-cols-3 gap-3 text-center">
+              <div className="bg-zinc-50 border border-zinc-100 rounded-xl p-3"><p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wide mb-1">Subject</p><p className="text-xs font-semibold text-zinc-700 truncate">{nlSubject}</p></div>
+              <div className="bg-zinc-50 border border-zinc-100 rounded-xl p-3"><p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wide mb-1">Recipients</p><p className="text-xs font-semibold text-zinc-700 capitalize">{isAgentBazar ? "All contacts" : filterTagIds.length > 0 ? `${filterTagIds.length} tag${filterTagIds.length === 1 ? "" : "s"}` : "Leads"}</p></div>
+              <div className="bg-zinc-50 border border-zinc-100 rounded-xl p-3"><p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wide mb-1">Template</p><p className="text-xs font-semibold text-zinc-700 truncate">{activeTemplate?.name ?? "Default"}</p></div>
+            </div>
+          </div>
+
+          {/* Action buttons */}
+          <div className="flex items-center gap-3">
+            <div className="relative flex-1" ref={sendDropdownRef}>
+              <div className="flex rounded-xl overflow-hidden border-2 border-[#003434] shadow-sm">
+                <button onClick={() => handleSaveWithMode("draft")} disabled={saving} className="flex-1 bg-white text-[#003434] text-sm py-3 font-semibold hover:bg-[#003434]/[0.04] disabled:opacity-50 transition-colors border-r-2 border-[#003434]">
+                  {saving ? "Saving…" : "Save draft"}
+                </button>
+                <button onClick={() => setSendDropdownOpen(v => !v)} disabled={saving} className="bg-white text-[#003434] px-4 hover:bg-[#003434]/[0.04] disabled:opacity-50 transition-colors">
+                  <svg className={`w-4 h-4 transition-transform ${sendDropdownOpen ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
+                </button>
+              </div>
+              {sendDropdownOpen && (
+                <div className="absolute bottom-full mb-2 left-0 right-0 bg-white border border-zinc-200 rounded-2xl shadow-xl py-1.5 z-50 ring-1 ring-black/5">
+                  <button onClick={() => handleSaveWithMode("test")} disabled={saving} className="w-full text-left px-4 py-2.5 hover:bg-zinc-50 transition-colors disabled:opacity-50 rounded-lg">
+                    <span className="text-sm font-semibold text-zinc-800">Save and test</span>
+                    <span className="block text-xs text-zinc-400 mt-0.5">Send a test to {TEST_EMAIL}</span>
+                  </button>
+                  <button onClick={() => handleSaveWithMode("schedule")} disabled={saving} className="w-full text-left px-4 py-2.5 hover:bg-zinc-50 transition-colors disabled:opacity-50">
+                    <span className="text-sm font-semibold text-zinc-800">Save and schedule</span>
+                    <span className="block text-xs text-zinc-400 mt-0.5">Pick a date and time to send</span>
+                  </button>
+                  <div className="border-t border-zinc-100 my-1.5 mx-4" />
+                  <button onClick={() => handleSaveWithMode("send")} disabled={saving} className="w-full text-left px-4 py-2.5 hover:bg-[#003434]/[0.05] transition-colors disabled:opacity-50">
+                    <span className="text-sm font-bold text-[#003434]">Save and send now</span>
+                    <span className="block text-xs text-zinc-400 mt-0.5">Send to all recipients immediately</span>
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      <EmailEditorModal
+        open={editorOpen}
+        onClose={() => { setEditorOpen(false); setEditorTemplate(null); loadNewsletterTemplates() }}
+        clientId={clientId ?? ""}
+        initialTemplate={editorTemplate ? { id: editorTemplate.id, name: editorTemplate.name, subject: editorTemplate.subject, html_body: editorTemplate.html_body, template_type: "newsletter" } : undefined}
+        onSaved={(id) => { loadNewsletterTemplates(); setSelectedTemplateId(id) }}
+        defaultTemplateType="newsletter"
+      />
+
+      {/* Variable reference panel (accessible but collapsed) */}
+      <div className="mt-6 border border-zinc-100 rounded-xl overflow-hidden">
+        <button onClick={() => setShowVarRef(v => !v)} className="w-full flex items-center justify-between px-4 py-3 bg-zinc-50 hover:bg-zinc-100 transition-colors text-xs text-zinc-500 font-medium">
+          Template variable reference <span>{showVarRef ? "▲" : "▼"}</span>
+        </button>
+        {showVarRef && (
+          <div className="divide-y divide-zinc-50 bg-white">
+            {VARIABLE_REFERENCE.map(v => (
+              <div key={v.key} className="flex items-center gap-3 px-4 py-1.5">
+                <code className="font-mono text-xs text-[#003434] shrink-0">{v.key}</code>
+                <span className="text-xs text-zinc-400">{v.desc}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Schedule modal */}
+      {showScheduleModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm mx-4">
+            <h3 className="text-base font-semibold text-zinc-800 mb-1">Schedule newsletter</h3>
+            <p className="text-xs text-zinc-400 mb-4">Pick a date and time to send this newsletter.</p>
+            <input type="datetime-local" value={scheduleDateTime} onChange={e => setScheduleDateTime(e.target.value)} min={new Date().toISOString().slice(0, 16)} className="w-full border border-zinc-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#003434]/20 mb-4" />
+            <div className="flex gap-2">
+              <button onClick={() => setShowScheduleModal(false)} className="flex-1 border border-zinc-200 text-zinc-600 text-sm py-2.5 rounded-xl hover:bg-zinc-50 font-medium">Cancel</button>
+              <button onClick={handleScheduleConfirm} disabled={saving || !scheduleDateTime} className="flex-1 bg-[#003434] text-white text-sm py-2.5 rounded-xl hover:bg-[#004444] disabled:opacity-40 font-medium">{saving ? "Scheduling…" : "Schedule"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Campaign form props ─────────────────────────────────────────────────────────
+
+interface CampaignFormProps {
+  editItem: UnifiedEmail | null
+  clientId: string | null
+  senders: Sender[]
+  allTags: Tag[]
+  campaignTemplates: TemplateOption[]
+  loadingCampaignData: boolean
+  closeOverlay: () => void
+}
+
+function CampaignForm({ editItem, clientId, senders, allTags, campaignTemplates, loadingCampaignData, closeOverlay }: CampaignFormProps) {
+  const initC = editItem?.rawCampaign
+  const [form, setForm] = useState({
+    client_id: clientId ?? "",
+    sender_id: initC?.sender_id ?? "",
+    template_id: initC?.template_id ?? "",
+    subject: initC?.subject ?? "",
+    scheduled_at: initC?.scheduled_at ? initC.scheduled_at.slice(0, 16) : "",
+  })
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>(initC?.tag_ids ?? [])
+  const [saving, setSaving] = useState(false)
+  const [sending, setSending] = useState(false)
+  const [sendingTest, setSendingTest] = useState(false)
+  const [scheduling, setScheduling] = useState(false)
+  const [previewCampaign, setPreviewCampaign] = useState<RawCampaign | null>(null)
+  const [showSchedulePicker, setShowSchedulePicker] = useState(false)
+  const [scheduleDateTime, setScheduleDateTime] = useState("")
+  const tagMap = new Map(allTags.map(t => [t.id, t]))
+
+  const toggleTag = (id: string) => setSelectedTagIds(prev => prev.includes(id) ? prev.filter(t => t !== id) : [...prev, id])
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (selectedTagIds.length === 0) { toast.error("Select at least one tag to target"); return }
+    setSaving(true)
+    try {
+      let res: Response
+      if (initC) {
+        res = await fetch(`/api/email/campaigns/${initC.id}`, {
+          method: "PATCH", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...form, tag_ids: selectedTagIds, scheduled_at: form.scheduled_at || null }),
+        })
+      } else {
+        res = await fetch("/api/email/campaigns", {
+          method: "POST", headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...form, tag_ids: selectedTagIds, scheduled_at: form.scheduled_at || null }),
+        })
+      }
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      toast.success(initC ? "Campaign updated" : "Campaign created")
+      setPreviewCampaign(data)
+      setShowSchedulePicker(false)
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Error")
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const handleSend = async (id: string) => {
+    if (!confirm("Send this campaign now to all eligible contacts?")) return
+    setSending(true)
+    try {
+      const res = await fetch(`/api/email/campaigns/${id}/send`, { method: "POST" })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      toast.success(`Sent to ${data.sent} contacts${data.failed ? ` (${data.failed} failed)` : ""}`)
+      setPreviewCampaign(null)
+      closeOverlay()
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Send error")
+    } finally {
+      setSending(false)
+    }
+  }
+
+  const handleSaveTest = async (campaign: RawCampaign) => {
+    setSendingTest(true)
+    try {
+      const res = await fetch(`/api/email/campaigns/${campaign.id}/send-test`, { method: "POST" })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      toast.success(`Test email sent to ${TEST_EMAIL}`)
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Test send error")
+    } finally {
+      setSendingTest(false)
+    }
+  }
+
+  const handleSaveSchedule = async (campaign: RawCampaign) => {
+    if (!scheduleDateTime) { toast.error("Pick a date and time"); return }
+    setScheduling(true)
+    try {
+      const res = await fetch(`/api/email/campaigns/${campaign.id}`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ scheduled_at: new Date(scheduleDateTime).toISOString() }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      setPreviewCampaign(data)
+      setShowSchedulePicker(false)
+      setScheduleDateTime("")
+      toast.success("Campaign scheduled!")
+      closeOverlay()
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Schedule error")
+    } finally {
+      setScheduling(false)
+    }
+  }
+
+  return (
+    <div className="w-full">
+      {/* Back + header */}
+      <div className="flex items-center gap-3 mb-6">
+        <button onClick={closeOverlay} className="flex items-center gap-1.5 text-sm text-zinc-500 hover:text-zinc-800 transition-colors">
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
+          Newsletter / Campaign
+        </button>
+        <span className="text-zinc-300">/</span>
+        <span className="text-sm font-medium text-zinc-700">{initC ? "Edit campaign" : "New campaign"}</span>
+      </div>
+
+      <form onSubmit={handleSubmit} className="bg-white border border-zinc-200 rounded-xl p-5 space-y-3 mb-6">
+        <p className="text-sm font-semibold text-zinc-700">{initC ? "Edit campaign" : "New campaign"}</p>
+        {loadingCampaignData ? (
+          <p className="text-xs text-zinc-400 py-2">Loading options…</p>
+        ) : (
+          <div className="grid sm:grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-zinc-500 mb-1 block">Sender</label>
+              <select value={form.sender_id} onChange={e => setForm(f => ({ ...f, sender_id: e.target.value }))} className={INPUT_CLS} required>
+                <option value="">Select sender…</option>
+                {senders.filter(s => s.dkim_status === "verified").map(s => <option key={s.id} value={s.id}>{s.from_name} &lt;{s.from_email}&gt;</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-zinc-500 mb-1 block">Template</label>
+              <select value={form.template_id} onChange={e => setForm(f => ({ ...f, template_id: e.target.value }))} className={INPUT_CLS} required>
+                <option value="">Select template…</option>
+                {campaignTemplates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs text-zinc-500 mb-1 block">Subject</label>
+              <input className={INPUT_CLS} placeholder="Email subject line" value={form.subject} onChange={e => setForm(f => ({ ...f, subject: e.target.value }))} required />
+            </div>
+            <div>
+              <label className="text-xs text-zinc-500 mb-1 block">Schedule (optional)</label>
+              <input type="datetime-local" className="border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#003434]/20" value={form.scheduled_at} onChange={e => setForm(f => ({ ...f, scheduled_at: e.target.value }))} />
+            </div>
+          </div>
+        )}
+        {allTags.length > 0 && (
+          <div>
+            <label className="text-xs text-zinc-500 mb-2 block">Target tags <span className="text-zinc-400 font-normal">(required)</span></label>
+            <div className="flex flex-wrap gap-2">
+              {allTags.map(tag => {
+                const active = selectedTagIds.includes(tag.id)
+                return (
+                  <button key={tag.id} type="button" onClick={() => toggleTag(tag.id)} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${active ? "bg-[#003434] border-[#003434] text-white" : "bg-white border-zinc-200 text-zinc-600 hover:border-[#003434]/40 hover:text-[#003434]"}`}>
+                    {active && <span className="text-[10px] leading-none">✓</span>}
+                    {tag.name}
+                  </button>
+                )
+              })}
+            </div>
+          </div>
+        )}
+        <div className="flex gap-2">
+          <button type="submit" disabled={saving || loadingCampaignData} className="bg-[#003434] text-white text-sm px-4 py-2 rounded-lg hover:bg-[#004444] disabled:opacity-50 transition-colors">
+            {saving ? "Saving…" : initC ? "Update & Preview" : "Create & Preview"}
+          </button>
+          <button type="button" onClick={closeOverlay} className="text-sm text-zinc-500 hover:text-zinc-700 px-4 py-2">Cancel</button>
+        </div>
+      </form>
+
+      {/* Preview modal */}
+      {previewCampaign && (
+        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[90vh]">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-100 shrink-0">
+              <p className="font-semibold text-zinc-800">Campaign Preview</p>
+              <button onClick={() => { setPreviewCampaign(null); setShowSchedulePicker(false); setScheduleDateTime("") }} className="text-zinc-400 hover:text-zinc-700 p-1 rounded-lg hover:bg-zinc-100 transition-colors">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+            <div className="px-5 py-3 bg-zinc-50 border-b border-zinc-100 grid grid-cols-3 gap-3 shrink-0">
+              <div><p className="text-[11px] text-zinc-400 font-semibold uppercase tracking-wider">Subject</p><p className="text-xs text-zinc-700 font-semibold truncate mt-0.5">{previewCampaign.subject}</p></div>
+              <div><p className="text-[11px] text-zinc-400 font-semibold uppercase tracking-wider">From</p><p className="text-xs text-zinc-700 font-semibold truncate mt-0.5">{previewCampaign.email_senders?.from_name ?? "—"}</p></div>
+              <div>
+                <p className="text-[11px] text-zinc-400 font-semibold uppercase tracking-wider">Audience</p>
+                {Array.isArray(previewCampaign.tag_ids) && previewCampaign.tag_ids.length > 0 ? (
+                  <div className="flex flex-wrap gap-1 mt-0.5">
+                    {previewCampaign.tag_ids.map(tid => {
+                      const tag = tagMap.get(tid)
+                      return <span key={tid} className="text-xs font-semibold text-[#003434]">{tag?.name ?? tid}{tag?.contact_count != null && <span className="text-zinc-400 font-normal"> ({tag.contact_count})</span>}</span>
+                    })}
+                  </div>
+                ) : <p className="text-xs text-zinc-400 mt-0.5">—</p>}
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto px-5 py-4">
+              {previewCampaign.email_templates?.html_body ? (
+                <div className="border border-zinc-100 rounded-xl overflow-hidden bg-white" dangerouslySetInnerHTML={{ __html: previewCampaign.email_templates.html_body }} />
+              ) : (
+                <div className="border border-dashed border-zinc-200 rounded-xl p-8 text-center text-zinc-400 text-sm">No template preview available</div>
+              )}
+            </div>
+            <div className="px-5 py-4 border-t border-zinc-100 shrink-0">
+              {showSchedulePicker && (
+                <div className="mb-3 flex items-center gap-2 bg-zinc-50 border border-zinc-200 rounded-xl p-3">
+                  <input type="datetime-local" value={scheduleDateTime} onChange={e => setScheduleDateTime(e.target.value)} min={new Date().toISOString().slice(0, 16)} className="flex-1 border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#003434]/20 bg-white" />
+                  <button onClick={() => handleSaveSchedule(previewCampaign)} disabled={scheduling || !scheduleDateTime} className="bg-[#003434] text-white text-sm px-4 py-2 rounded-lg hover:bg-[#004444] disabled:opacity-50 font-medium whitespace-nowrap">{scheduling ? "Scheduling…" : "Confirm Schedule"}</button>
+                </div>
+              )}
+              <div className="flex gap-2">
+                <button onClick={() => handleSaveTest(previewCampaign)} disabled={sendingTest} className="flex-1 border border-zinc-200 text-zinc-700 text-sm py-2.5 rounded-xl hover:bg-zinc-50 font-medium disabled:opacity-50">{sendingTest ? "Sending test…" : "Save & Test"}</button>
+                <button onClick={() => setShowSchedulePicker(v => !v)} className={`flex-1 border text-sm py-2.5 rounded-xl font-medium transition-colors ${showSchedulePicker ? "bg-[#003434] border-[#003434] text-white" : "border-[#003434] text-[#003434] hover:bg-[#003434]/5"}`}>Save & Schedule</button>
+                <button onClick={() => { setPreviewCampaign(null); setShowSchedulePicker(false); handleSend(previewCampaign.id) }} disabled={sending} className="flex-1 bg-[#003434] text-white text-sm py-2.5 rounded-xl hover:bg-[#004444] font-semibold disabled:opacity-50">{sending ? "Sending…" : "Save & Send"}</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Main page component ─────────────────────────────────────────────────────────
 
 export default function NewslettersPage() {
@@ -628,683 +1319,36 @@ export default function NewslettersPage() {
   }
 
   // ═══════════════════════════════════════════════════════════════════════════════
-  // NEWSLETTER WIZARD (inline)
-  // ═══════════════════════════════════════════════════════════════════════════════
-
-  const NewsletterWizard = () => {
-    const initNs = editItem?.raw
-    const [step, setStep] = useState<1 | 2 | 3>(initNs?.blog_post_id ? 2 : 1)
-    const [isDuplicating] = useState(initNs?.subject?.startsWith("[D] ") ?? false)
-    const [selectedPost, setSelectedPost] = useState<BlogPost | null>(
-      initNs ? (posts.find(p => p.id === initNs.blog_post_id) ?? null) : null
-    )
-    const [trendingPosts, setTrendingPosts] = useState<BlogPost[]>(
-      initNs?.trending_post_ids?.map(id => posts.find(p => p.id === id)).filter(Boolean) as BlogPost[] ?? []
-    )
-    const [postSearch, setPostSearch] = useState("")
-    const [senderId, setSenderId] = useState(initNs?.sender_id ?? "")
-    const [filterTagIds, setFilterTagIds] = useState<string[]>(initNs?.tag_ids ?? [])
-    const [nlSubject, setNlSubject] = useState(initNs?.subject ?? "")
-    const [selectedTemplateId, setSelectedTemplateId] = useState(initNs?.newsletter_template_id ?? (newsletterTemplates.length === 1 ? newsletterTemplates[0].id : ""))
-    const [editingRecordId] = useState(editItem?.id ?? null)
-    const [editingRecordStatus] = useState(initNs?.status ?? "draft")
-    const [saving, setSaving] = useState(false)
-    const [sendDropdownOpen, setSendDropdownOpen] = useState(false)
-    const sendDropdownRef = useRef<HTMLDivElement>(null)
-    const [showScheduleModal, setShowScheduleModal] = useState(false)
-    const [scheduleDateTime, setScheduleDateTime] = useState("")
-    const [editorOpen, setEditorOpen] = useState(false)
-    const [editorTemplate, setEditorTemplate] = useState<NewsletterTemplate | null>(null)
-    const [showVarRef, setShowVarRef] = useState(false)
-    const [tmplMenuId, setTmplMenuId] = useState<string | null>(null)
-    const tmplMenuRef = useRef<HTMLDivElement>(null)
-
-    useEffect(() => {
-      const h = (e: MouseEvent) => { if (sendDropdownRef.current && !sendDropdownRef.current.contains(e.target as Node)) setSendDropdownOpen(false) }
-      document.addEventListener("mousedown", h)
-      return () => document.removeEventListener("mousedown", h)
-    }, [])
-    useEffect(() => {
-      const h = (e: MouseEvent) => { if (tmplMenuRef.current && !tmplMenuRef.current.contains(e.target as Node)) setTmplMenuId(null) }
-      document.addEventListener("mousedown", h)
-      return () => document.removeEventListener("mousedown", h)
-    }, [])
-
-    const filteredPosts = posts.filter(p =>
-      p.title.toLowerCase().includes(postSearch.toLowerCase()) ||
-      (p.category ?? "").toLowerCase().includes(postSearch.toLowerCase())
-    )
-    const activeTemplate = newsletterTemplates.find(t => t.id === selectedTemplateId)
-
-    const buildPayload = () => ({
-      blog_post_id: selectedPost!.id,
-      sender_id: senderId,
-      subject: nlSubject,
-      client_id: clientId || null,
-      recipient_type: isAgentBazar ? "list" : (filterTagIds.length > 0 ? "tags" : "leads"),
-      tag_ids: filterTagIds,
-      newsletter_template_id: selectedTemplateId || null,
-      trending_post_ids: isAgentBazar ? trendingPosts.map(p => p.id) : [],
-    })
-
-    const validateStep3 = () => {
-      if (!selectedPost || !senderId || !nlSubject) { toast.error("Fill all required fields"); return false }
-      if (!isAgentBazar && filterTagIds.length === 0) { toast.error("Select at least one tag"); return false }
-      return true
-    }
-
-    const handleSaveWithMode = async (mode: "draft" | "test" | "schedule" | "send") => {
-      if (!validateStep3()) return
-      if (mode === "schedule") { setShowScheduleModal(true); setSendDropdownOpen(false); return }
-      setSaving(true)
-      setSendDropdownOpen(false)
-      try {
-        if (mode === "send" || mode === "test") {
-          const res = await fetch("/api/email/newsletter/send", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ ...buildPayload(), ...(mode === "test" ? { test_email: TEST_EMAIL } : {}) }),
-          })
-          const data = await res.json()
-          if (!res.ok) throw new Error(data.error)
-          if (mode === "test") {
-            toast.success(`Test email sent to ${TEST_EMAIL}`)
-          } else {
-            toast.success(`Sent to ${data.sent?.toLocaleString() ?? data.total?.toLocaleString() ?? 0} recipients${data.failed ? ` (${data.failed} failed)` : ""}`)
-            closeOverlay()
-          }
-        } else {
-          const isExisting = editingRecordId && editingRecordStatus === "draft"
-          const url = isExisting ? `/api/email/newsletter/${editingRecordId}` : "/api/email/newsletter"
-          const method = isExisting ? "PATCH" : "POST"
-          const res = await fetch(url, {
-            method, headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ ...buildPayload(), status: "draft" }),
-          })
-          if (!res.ok) throw new Error("Save failed")
-          toast.success("Saved as draft")
-          closeOverlay()
-        }
-      } catch (err: unknown) {
-        toast.error(err instanceof Error ? err.message : "Operation failed")
-      } finally {
-        setSaving(false)
-      }
-    }
-
-    const handleScheduleConfirm = async () => {
-      if (!scheduleDateTime) { toast.error("Pick a date and time"); return }
-      if (!validateStep3()) return
-      setSaving(true)
-      try {
-        const isExisting = editingRecordId && editingRecordStatus === "draft"
-        const url = isExisting ? `/api/email/newsletter/${editingRecordId}` : "/api/email/newsletter"
-        const method = isExisting ? "PATCH" : "POST"
-        const res = await fetch(url, {
-          method, headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ ...buildPayload(), status: "scheduled", scheduled_at: new Date(scheduleDateTime).toISOString() }),
-        })
-        if (!res.ok) throw new Error("Save failed")
-        toast.success("Newsletter scheduled!")
-        setShowScheduleModal(false)
-        closeOverlay()
-      } catch (err: unknown) {
-        toast.error(err instanceof Error ? err.message : "Schedule failed")
-      } finally {
-        setSaving(false)
-      }
-    }
-
-    const deleteTemplate = async (id: string) => {
-      if (!confirm("Delete this newsletter template?")) return
-      try {
-        const res = await fetch(`/api/email/templates/${id}`, { method: "DELETE" })
-        if (!res.ok) throw new Error((await res.json()).error)
-        toast.success("Template deleted")
-        if (selectedTemplateId === id) setSelectedTemplateId("")
-        loadNewsletterTemplates()
-      } catch (err: unknown) {
-        toast.error(err instanceof Error ? err.message : "Delete failed")
-      }
-    }
-
-    return (
-      <div className="w-full">
-        {/* Back + header */}
-        <div className="flex items-center gap-3 mb-6">
-          <button onClick={closeOverlay} className="flex items-center gap-1.5 text-sm text-zinc-500 hover:text-zinc-800 transition-colors">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
-            Newsletter / Campaign
-          </button>
-          <span className="text-zinc-300">/</span>
-          <span className="text-sm font-medium text-zinc-700 flex items-center gap-2">
-            {editingRecordId && editingRecordStatus === "draft" ? "Edit draft" : "New newsletter"}
-            {isDuplicating && <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold bg-amber-50 text-amber-700 border border-amber-200 tracking-wide uppercase">Duplicate</span>}
-          </span>
-        </div>
-
-        {/* Steps */}
-        <div className="flex items-center gap-1 mb-7 bg-zinc-50 border border-zinc-200 rounded-2xl px-5 py-3">
-          {([1, 2, 3] as const).map((s, i) => (
-            <div key={s} className="flex items-center gap-2.5 flex-1">
-              <button
-                onClick={() => { if (s < step || (s === 2 && selectedPost)) setStep(s) }}
-                className={`w-7 h-7 rounded-full text-xs font-bold border-2 transition-all shrink-0 ${step === s ? "bg-[#003434] text-white border-[#003434] shadow-sm" : step > s ? "bg-emerald-500 text-white border-emerald-500 cursor-pointer" : "bg-white text-zinc-400 border-zinc-300 cursor-default"}`}
-              >
-                {step > s ? "✓" : s}
-              </button>
-              <span className={`text-xs font-semibold tracking-tight ${step === s ? "text-zinc-800" : step > s ? "text-emerald-600" : "text-zinc-400"}`}>
-                {s === 1 ? (isAgentBazar ? "Pick posts" : "Pick post") : s === 2 ? "Configure" : "Preview & send"}
-              </span>
-              {i < 2 && <div className="flex-1 h-px bg-zinc-200 mx-1" />}
-            </div>
-          ))}
-        </div>
-
-        {/* Step 1 */}
-        {step === 1 && (
-          <div className="bg-white border border-zinc-200 rounded-2xl p-6 space-y-4">
-            <p className="text-sm font-semibold text-zinc-700 mb-1">{isAgentBazar ? "Select hero post (Today's Highlight)" : "Select a blog post"}</p>
-            <input type="text" placeholder="Search by title or category…" value={postSearch} onChange={e => setPostSearch(e.target.value)} className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#003434]/20 mb-3" />
-            {loadingPosts ? (
-              <div className="py-8 text-center"><div className="w-5 h-5 border-2 border-[#003434]/20 border-t-[#003434] rounded-full animate-spin mx-auto mb-2" /><p className="text-sm text-zinc-400">Loading posts…</p></div>
-            ) : filteredPosts.length === 0 ? (
-              <p className="text-sm text-zinc-400 py-4 text-center">No published posts found.</p>
-            ) : (
-              <div className="space-y-2 max-h-[320px] overflow-y-auto pr-1">
-                {filteredPosts.map(post => {
-                  const isSelected = selectedPost?.id === post.id
-                  return (
-                    <button key={post.id} onClick={() => { setSelectedPost(post); setNlSubject(post.title); setTrendingPosts(prev => prev.filter(t => t.id !== post.id)); if (!isAgentBazar) setStep(2) }} className={`w-full text-left flex gap-4 p-3 rounded-lg border transition-all group ${isSelected ? "border-[#003434] bg-[#003434]/5" : "border-zinc-100 hover:border-[#003434] hover:bg-[#003434]/5"}`}>
-                      {post.cover_image_url ? <img src={post.cover_image_url} alt="" className="w-16 h-16 object-cover rounded-md shrink-0" onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none" }} /> : <div className="w-16 h-16 rounded-md shrink-0 bg-zinc-100 flex items-center justify-center"><span className="text-zinc-300 text-xs">No img</span></div>}
-                      <div className="min-w-0 flex-1">
-                        <p className="text-sm font-medium text-zinc-800 group-hover:text-[#003434] truncate">{post.title}</p>
-                        <p className="text-xs text-zinc-400 mt-0.5">{post.category} · {post.published_at ? new Date(post.published_at).toLocaleDateString("en-IN") : "No date"}</p>
-                        {post.excerpt && <p className="text-xs text-zinc-500 mt-1 line-clamp-2">{post.excerpt}</p>}
-                      </div>
-                      {isSelected && <span className="text-xs font-semibold text-[#003434] shrink-0 self-center">Hero ✓</span>}
-                    </button>
-                  )
-                })}
-              </div>
-            )}
-            {isAgentBazar && selectedPost && (
-              <div className="border-t border-zinc-100 pt-4">
-                <p className="text-sm font-semibold text-zinc-700 mb-1">Select up to 2 trending posts <span className="ml-2 text-xs font-normal text-zinc-400">({trendingPosts.length}/2 selected)</span></p>
-                <div className="space-y-2 max-h-[280px] overflow-y-auto pr-1">
-                  {filteredPosts.filter(p => p.id !== selectedPost.id).map(post => {
-                    const isSel = trendingPosts.some(t => t.id === post.id)
-                    const isDisabled = !isSel && trendingPosts.length >= 2
-                    const toggleTrending = () => {
-                      if (isDisabled) return
-                      setTrendingPosts(prev => prev.some(t => t.id === post.id) ? prev.filter(t => t.id !== post.id) : [...prev, post])
-                    }
-                    return (
-                      <button key={post.id} onClick={toggleTrending} disabled={isDisabled} className={`w-full text-left flex gap-4 p-3 rounded-lg border transition-all ${isSel ? "border-[#F47920] bg-orange-50" : isDisabled ? "border-zinc-100 opacity-40 cursor-not-allowed" : "border-zinc-100 hover:border-[#F47920] hover:bg-orange-50/40"}`}>
-                        {post.cover_image_url ? <img src={post.cover_image_url} alt="" className="w-14 h-14 object-cover rounded-md shrink-0" onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none" }} /> : <div className="w-14 h-14 rounded-md shrink-0 bg-zinc-100 flex items-center justify-center"><span className="text-zinc-300 text-xs">No img</span></div>}
-                        <div className="min-w-0 flex-1"><p className="text-sm font-medium text-zinc-800 truncate">{post.title}</p><p className="text-xs text-zinc-400 mt-0.5">{post.category}</p></div>
-                        {isSel && <span className="text-xs font-semibold text-[#F47920] shrink-0 self-center">Trending ✓</span>}
-                      </button>
-                    )
-                  })}
-                </div>
-                <button onClick={() => setStep(2)} className="mt-4 w-full bg-[#003434] text-white text-sm py-2.5 rounded-xl hover:bg-[#004848] active:scale-[0.98] transition-all font-semibold shadow-sm">Continue to configure →</button>
-              </div>
-            )}
-          </div>
-        )}
-
-        {/* Step 2 */}
-        {step === 2 && selectedPost && (
-          <div className="bg-white border border-zinc-200 rounded-2xl p-6 space-y-5">
-            <div className="flex items-center gap-3 p-3 bg-zinc-50 rounded-lg border border-zinc-100">
-              {selectedPost.cover_image_url && <img src={selectedPost.cover_image_url} alt="" className="w-12 h-12 object-cover rounded-md shrink-0" onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none" }} />}
-              <div className="min-w-0"><p className="text-sm font-semibold text-zinc-800 truncate">{selectedPost.title}</p><p className="text-xs text-zinc-400">{selectedPost.category}</p></div>
-              <button onClick={() => setStep(1)} className="ml-auto text-xs text-zinc-400 hover:text-zinc-600 shrink-0">Change</button>
-            </div>
-            {isAgentBazar && trendingPosts.length > 0 && (
-              <div className="flex gap-2 flex-wrap">
-                {trendingPosts.map(p => <span key={p.id} className="text-xs bg-orange-50 text-orange-700 border border-orange-200 px-2 py-0.5 rounded-full truncate max-w-[200px]">Trending: {p.title}</span>)}
-              </div>
-            )}
-            {!loadingTemplates && (
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="text-xs font-medium text-zinc-500">Newsletter template</label>
-                  {newsletterTemplates.length > 0 && <button type="button" onClick={() => { setEditorTemplate(null); setEditorOpen(true) }} className="text-xs font-medium text-[#003434] hover:underline">+ New template</button>}
-                </div>
-                {newsletterTemplates.length === 0 ? (
-                  <div className="flex items-center gap-2 p-3 rounded-lg border border-zinc-100 bg-zinc-50">
-                    <span className="text-xs text-zinc-400 flex-1">No newsletter templates yet — using default system layout.</span>
-                    <button type="button" onClick={() => { setEditorTemplate(null); setEditorOpen(true) }} className="text-xs font-medium text-[#003434] hover:underline shrink-0">+ Create one</button>
-                  </div>
-                ) : (
-                  <>
-                    <div className="flex items-center gap-2">
-                      <select value={selectedTemplateId} onChange={e => setSelectedTemplateId(e.target.value)} className="flex-1 border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#003434]/20 bg-white">
-                        <option value="">Default system layout</option>
-                        {newsletterTemplates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                      </select>
-                      {selectedTemplateId && (() => {
-                        const selTmpl = newsletterTemplates.find(t => t.id === selectedTemplateId)
-                        if (!selTmpl) return null
-                        return (
-                          <div className="relative shrink-0" ref={tmplMenuId === selTmpl.id ? tmplMenuRef : undefined}>
-                            <button type="button" onClick={() => setTmplMenuId(tmplMenuId === selTmpl.id ? null : selTmpl.id)} className="w-8 h-8 flex items-center justify-center rounded-lg border border-zinc-200 hover:bg-zinc-100 text-zinc-400 hover:text-zinc-700 transition-colors">
-                              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><circle cx="10" cy="4" r="1.5" /><circle cx="10" cy="10" r="1.5" /><circle cx="10" cy="16" r="1.5" /></svg>
-                            </button>
-                            {tmplMenuId === selTmpl.id && (
-                              <div className="absolute right-0 top-9 z-50 bg-white border border-zinc-200 rounded-xl shadow-xl py-1.5 w-28 ring-1 ring-black/5">
-                                <button type="button" onClick={() => { setEditorTemplate(selTmpl); setEditorOpen(true); setTmplMenuId(null) }} className="w-full text-left px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-50 font-medium">Edit</button>
-                                <div className="border-t border-zinc-100 my-1" />
-                                <button type="button" onClick={() => { deleteTemplate(selTmpl.id); setTmplMenuId(null) }} className="w-full text-left px-4 py-2 text-sm text-red-600 hover:bg-red-50 font-medium">Delete</button>
-                              </div>
-                            )}
-                          </div>
-                        )
-                      })()}
-                    </div>
-                    {selectedTemplateId ? <p className="text-xs text-emerald-600 mt-1">✓ Custom template selected</p> : <p className="text-xs text-zinc-400 mt-1">Using the default branded layout</p>}
-                  </>
-                )}
-              </div>
-            )}
-            <div>
-              <label className="text-xs font-medium text-zinc-500 block mb-1">Subject line</label>
-              <input type="text" value={nlSubject} onChange={e => setNlSubject(e.target.value)} className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#003434]/20" placeholder="Email subject…" />
-            </div>
-            <div>
-              <label className="text-xs font-medium text-zinc-500 block mb-1">Sender</label>
-              <select value={senderId} onChange={e => setSenderId(e.target.value)} className="w-full border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#003434]/20 bg-white">
-                <option value="">Select a verified sender…</option>
-                {senders.map(s => <option key={s.id} value={s.id}>{s.from_name} &lt;{s.from_email}&gt;</option>)}
-              </select>
-              {senders.length === 0 && <p className="text-xs text-amber-600 mt-1">No verified senders found.</p>}
-            </div>
-            {!isAgentBazar && (
-              <div>
-                <label className="text-xs font-medium text-zinc-500 block mb-1">Target tags <span className="font-normal text-zinc-400">(required)</span></label>
-                {allTags.length === 0 ? <p className="text-xs text-amber-600">No tags found. Create tags first.</p> : <TagMultiSelect allTags={allTags} value={filterTagIds} onChange={setFilterTagIds} placeholder="Select tags…" />}
-              </div>
-            )}
-            {isAgentBazar && allTags.length > 0 && (
-              <div>
-                <label className="text-xs font-medium text-zinc-500 block mb-1">Filter by tag <span className="font-normal text-zinc-400">(optional)</span></label>
-                <TagMultiSelect allTags={allTags} value={filterTagIds} onChange={setFilterTagIds} placeholder="All contacts" />
-              </div>
-            )}
-            <button onClick={() => { if (senderId && nlSubject && (isAgentBazar || filterTagIds.length > 0)) setStep(3) }} disabled={!senderId || !nlSubject || (!isAgentBazar && filterTagIds.length === 0)} className="w-full bg-[#003434] text-white text-sm py-2.5 rounded-xl hover:bg-[#004848] disabled:opacity-40 active:scale-[0.98] transition-all font-semibold shadow-sm">Preview newsletter →</button>
-          </div>
-        )}
-
-        {/* Step 3 */}
-        {step === 3 && selectedPost && (
-          <div className="space-y-4">
-            <div className="bg-white border border-zinc-200 rounded-2xl p-6">
-              <div className="flex items-center justify-between mb-4">
-                <p className="text-sm font-semibold text-zinc-700">Newsletter preview</p>
-                <button onClick={() => setStep(2)} className="text-xs text-zinc-400 hover:text-zinc-600">← Edit config</button>
-              </div>
-              {activeTemplate ? (
-                <div className="border border-zinc-100 rounded-xl overflow-hidden max-w-lg mx-auto bg-zinc-50 p-4 text-center">
-                  <p className="text-xs font-semibold text-zinc-500 mb-1">Custom template: {activeTemplate.name}</p>
-                  <p className="text-xs text-zinc-400">Variables will be substituted at send time.</p>
-                  <div className="mt-3 text-left text-xs font-mono text-zinc-400 bg-white border border-zinc-100 rounded-lg p-3 max-h-48 overflow-y-auto whitespace-pre-wrap break-all">
-                    {activeTemplate.html_body.slice(0, 400)}{activeTemplate.html_body.length > 400 ? "…" : ""}
-                  </div>
-                </div>
-              ) : isAgentBazar ? (
-                <div className="border border-zinc-100 rounded-xl overflow-hidden max-w-lg mx-auto text-sm">
-                  <div style={{ background: "#001D4A" }} className="px-6 py-3 text-center"><p className="text-white text-xs font-bold tracking-wider">agentBazar.in</p></div>
-                  <div className="px-6 pt-4 pb-3" style={{ borderBottom: "2px solid #F47920" }}>
-                    <p className="italic text-zinc-700">Hello [subscriber],</p>
-                    <p className="font-bold text-zinc-800 text-xs mt-0.5">Today&apos;s Highlight</p>
-                  </div>
-                  {selectedPost.cover_image_url && <img src={selectedPost.cover_image_url} alt="" className="w-full h-40 object-cover" onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none" }} />}
-                  <div className="px-6 py-4">
-                    <p style={{ color: "#F47920" }} className="font-bold text-base leading-snug mb-2">{selectedPost.title}</p>
-                    {selectedPost.excerpt && <p className="text-zinc-700 text-xs leading-relaxed font-semibold mb-4">{selectedPost.excerpt}</p>}
-                    <span style={{ background: "#F47920" }} className="inline-block text-white text-xs font-bold italic px-5 py-2 rounded">Read Full Blog...</span>
-                  </div>
-                  <div style={{ background: "#1a6b3a" }} className="px-6 py-4 text-center">
-                    <p className="text-white text-xs mb-0.5">For the latest Travel Blog & Updates</p>
-                    <p className="text-white font-bold text-sm mb-2">Join Our WhatsApp Community Now</p>
-                    <span className="inline-block bg-white text-xs font-bold px-5 py-1.5 rounded-full" style={{ color: "#1a6b3a" }}>▶ JOIN NOW</span>
-                  </div>
-                  <div className="px-6 py-5 border-t border-zinc-100 bg-white text-center">
-                    <p className="text-[10px] text-zinc-400 tracking-widest uppercase mb-3">agentbazar.in</p>
-                    <p className="text-[10px] font-bold text-zinc-800 underline mb-1">Unsubscribe from AgentBazar</p>
-                  </div>
-                </div>
-              ) : (
-                <div className="border border-zinc-100 rounded-xl overflow-hidden max-w-lg mx-auto">
-                  <div className="bg-[#003434] px-6 py-4"><p className="text-white text-sm font-semibold">{senders.find(s => s.id === senderId)?.from_name ?? "Sender"}</p></div>
-                  {selectedPost.cover_image_url && <img src={selectedPost.cover_image_url} alt="" className="w-full h-48 object-cover" onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none" }} />}
-                  <div className="p-6">
-                    <p className="text-xs font-semibold text-zinc-400 uppercase tracking-widest mb-2">{selectedPost.category}</p>
-                    <h2 className="text-xl font-bold text-zinc-900 mb-3 leading-snug">{selectedPost.title}</h2>
-                    {selectedPost.excerpt && <p className="text-sm text-zinc-600 mb-5 leading-relaxed">{selectedPost.excerpt}</p>}
-                    <span className="inline-block bg-[#003434] text-white text-sm font-semibold px-5 py-2.5 rounded-lg">Read the full article →</span>
-                  </div>
-                  <div className="px-6 py-4 border-t border-zinc-100"><p className="text-xs text-zinc-400 text-center">You received this because you subscribed. <span className="underline">Unsubscribe</span></p></div>
-                </div>
-              )}
-              <div className="mt-5 grid grid-cols-3 gap-3 text-center">
-                <div className="bg-zinc-50 border border-zinc-100 rounded-xl p-3"><p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wide mb-1">Subject</p><p className="text-xs font-semibold text-zinc-700 truncate">{nlSubject}</p></div>
-                <div className="bg-zinc-50 border border-zinc-100 rounded-xl p-3"><p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wide mb-1">Recipients</p><p className="text-xs font-semibold text-zinc-700 capitalize">{isAgentBazar ? "All contacts" : filterTagIds.length > 0 ? `${filterTagIds.length} tag${filterTagIds.length === 1 ? "" : "s"}` : "Leads"}</p></div>
-                <div className="bg-zinc-50 border border-zinc-100 rounded-xl p-3"><p className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wide mb-1">Template</p><p className="text-xs font-semibold text-zinc-700 truncate">{activeTemplate?.name ?? "Default"}</p></div>
-              </div>
-            </div>
-
-            {/* Action buttons */}
-            <div className="flex items-center gap-3">
-              <div className="relative flex-1" ref={sendDropdownRef}>
-                <div className="flex rounded-xl overflow-hidden border-2 border-[#003434] shadow-sm">
-                  <button onClick={() => handleSaveWithMode("draft")} disabled={saving} className="flex-1 bg-white text-[#003434] text-sm py-3 font-semibold hover:bg-[#003434]/[0.04] disabled:opacity-50 transition-colors border-r-2 border-[#003434]">
-                    {saving ? "Saving…" : "Save draft"}
-                  </button>
-                  <button onClick={() => setSendDropdownOpen(v => !v)} disabled={saving} className="bg-white text-[#003434] px-4 hover:bg-[#003434]/[0.04] disabled:opacity-50 transition-colors">
-                    <svg className={`w-4 h-4 transition-transform ${sendDropdownOpen ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
-                  </button>
-                </div>
-                {sendDropdownOpen && (
-                  <div className="absolute bottom-full mb-2 left-0 right-0 bg-white border border-zinc-200 rounded-2xl shadow-xl py-1.5 z-50 ring-1 ring-black/5">
-                    <button onClick={() => handleSaveWithMode("test")} disabled={saving} className="w-full text-left px-4 py-2.5 hover:bg-zinc-50 transition-colors disabled:opacity-50 rounded-lg">
-                      <span className="text-sm font-semibold text-zinc-800">Save and test</span>
-                      <span className="block text-xs text-zinc-400 mt-0.5">Send a test to {TEST_EMAIL}</span>
-                    </button>
-                    <button onClick={() => handleSaveWithMode("schedule")} disabled={saving} className="w-full text-left px-4 py-2.5 hover:bg-zinc-50 transition-colors disabled:opacity-50">
-                      <span className="text-sm font-semibold text-zinc-800">Save and schedule</span>
-                      <span className="block text-xs text-zinc-400 mt-0.5">Pick a date and time to send</span>
-                    </button>
-                    <div className="border-t border-zinc-100 my-1.5 mx-4" />
-                    <button onClick={() => handleSaveWithMode("send")} disabled={saving} className="w-full text-left px-4 py-2.5 hover:bg-[#003434]/[0.05] transition-colors disabled:opacity-50">
-                      <span className="text-sm font-bold text-[#003434]">Save and send now</span>
-                      <span className="block text-xs text-zinc-400 mt-0.5">Send to all recipients immediately</span>
-                    </button>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
-        )}
-
-        <EmailEditorModal
-          open={editorOpen}
-          onClose={() => { setEditorOpen(false); setEditorTemplate(null); loadNewsletterTemplates() }}
-          clientId={clientId}
-          initialTemplate={editorTemplate ? { id: editorTemplate.id, name: editorTemplate.name, subject: editorTemplate.subject, html_body: editorTemplate.html_body, template_type: "newsletter" } : undefined}
-          onSaved={(id) => { loadNewsletterTemplates(); setSelectedTemplateId(id) }}
-          defaultTemplateType="newsletter"
-        />
-
-        {/* Variable reference panel (accessible but collapsed) */}
-        <div className="mt-6 border border-zinc-100 rounded-xl overflow-hidden">
-          <button onClick={() => setShowVarRef(v => !v)} className="w-full flex items-center justify-between px-4 py-3 bg-zinc-50 hover:bg-zinc-100 transition-colors text-xs text-zinc-500 font-medium">
-            Template variable reference <span>{showVarRef ? "▲" : "▼"}</span>
-          </button>
-          {showVarRef && (
-            <div className="divide-y divide-zinc-50 bg-white">
-              {VARIABLE_REFERENCE.map(v => (
-                <div key={v.key} className="flex items-center gap-3 px-4 py-1.5">
-                  <code className="font-mono text-xs text-[#003434] shrink-0">{v.key}</code>
-                  <span className="text-xs text-zinc-400">{v.desc}</span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Schedule modal */}
-        {showScheduleModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm">
-            <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm mx-4">
-              <h3 className="text-base font-semibold text-zinc-800 mb-1">Schedule newsletter</h3>
-              <p className="text-xs text-zinc-400 mb-4">Pick a date and time to send this newsletter.</p>
-              <input type="datetime-local" value={scheduleDateTime} onChange={e => setScheduleDateTime(e.target.value)} min={new Date().toISOString().slice(0, 16)} className="w-full border border-zinc-200 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-[#003434]/20 mb-4" />
-              <div className="flex gap-2">
-                <button onClick={() => setShowScheduleModal(false)} className="flex-1 border border-zinc-200 text-zinc-600 text-sm py-2.5 rounded-xl hover:bg-zinc-50 font-medium">Cancel</button>
-                <button onClick={handleScheduleConfirm} disabled={saving || !scheduleDateTime} className="flex-1 bg-[#003434] text-white text-sm py-2.5 rounded-xl hover:bg-[#004444] disabled:opacity-40 font-medium">{saving ? "Scheduling…" : "Schedule"}</button>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    )
-  }
-
-  // ═══════════════════════════════════════════════════════════════════════════════
-  // CAMPAIGN FORM (inline)
-  // ═══════════════════════════════════════════════════════════════════════════════
-
-  const CampaignForm = () => {
-    const initC = editItem?.rawCampaign
-    const [form, setForm] = useState({
-      client_id: clientId ?? "",
-      sender_id: initC?.sender_id ?? "",
-      template_id: initC?.template_id ?? "",
-      subject: initC?.subject ?? "",
-      scheduled_at: initC?.scheduled_at ? initC.scheduled_at.slice(0, 16) : "",
-    })
-    const [selectedTagIds, setSelectedTagIds] = useState<string[]>(initC?.tag_ids ?? [])
-    const [saving, setSaving] = useState(false)
-    const [sending, setSending] = useState(false)
-    const [sendingTest, setSendingTest] = useState(false)
-    const [scheduling, setScheduling] = useState(false)
-    const [previewCampaign, setPreviewCampaign] = useState<RawCampaign | null>(null)
-    const [showSchedulePicker, setShowSchedulePicker] = useState(false)
-    const [scheduleDateTime, setScheduleDateTime] = useState("")
-    const tagMap = new Map(allTags.map(t => [t.id, t]))
-
-    const toggleTag = (id: string) => setSelectedTagIds(prev => prev.includes(id) ? prev.filter(t => t !== id) : [...prev, id])
-
-    const handleSubmit = async (e: React.FormEvent) => {
-      e.preventDefault()
-      if (selectedTagIds.length === 0) { toast.error("Select at least one tag to target"); return }
-      setSaving(true)
-      try {
-        let res: Response
-        if (initC) {
-          res = await fetch(`/api/email/campaigns/${initC.id}`, {
-            method: "PATCH", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ ...form, tag_ids: selectedTagIds, scheduled_at: form.scheduled_at || null }),
-          })
-        } else {
-          res = await fetch("/api/email/campaigns", {
-            method: "POST", headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ ...form, tag_ids: selectedTagIds, scheduled_at: form.scheduled_at || null }),
-          })
-        }
-        const data = await res.json()
-        if (!res.ok) throw new Error(data.error)
-        toast.success(initC ? "Campaign updated" : "Campaign created")
-        setPreviewCampaign(data)
-        setShowSchedulePicker(false)
-      } catch (err: unknown) {
-        toast.error(err instanceof Error ? err.message : "Error")
-      } finally {
-        setSaving(false)
-      }
-    }
-
-    const handleSend = async (id: string) => {
-      if (!confirm("Send this campaign now to all eligible contacts?")) return
-      setSending(true)
-      try {
-        const res = await fetch(`/api/email/campaigns/${id}/send`, { method: "POST" })
-        const data = await res.json()
-        if (!res.ok) throw new Error(data.error)
-        toast.success(`Sent to ${data.sent} contacts${data.failed ? ` (${data.failed} failed)` : ""}`)
-        setPreviewCampaign(null)
-        closeOverlay()
-      } catch (err: unknown) {
-        toast.error(err instanceof Error ? err.message : "Send error")
-      } finally {
-        setSending(false)
-      }
-    }
-
-    const handleSaveTest = async (campaign: RawCampaign) => {
-      setSendingTest(true)
-      try {
-        const res = await fetch(`/api/email/campaigns/${campaign.id}/send-test`, { method: "POST" })
-        const data = await res.json()
-        if (!res.ok) throw new Error(data.error)
-        toast.success(`Test email sent to ${TEST_EMAIL}`)
-      } catch (err: unknown) {
-        toast.error(err instanceof Error ? err.message : "Test send error")
-      } finally {
-        setSendingTest(false)
-      }
-    }
-
-    const handleSaveSchedule = async (campaign: RawCampaign) => {
-      if (!scheduleDateTime) { toast.error("Pick a date and time"); return }
-      setScheduling(true)
-      try {
-        const res = await fetch(`/api/email/campaigns/${campaign.id}`, {
-          method: "PATCH", headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ scheduled_at: new Date(scheduleDateTime).toISOString() }),
-        })
-        const data = await res.json()
-        if (!res.ok) throw new Error(data.error)
-        setPreviewCampaign(data)
-        setShowSchedulePicker(false)
-        setScheduleDateTime("")
-        toast.success("Campaign scheduled!")
-        closeOverlay()
-      } catch (err: unknown) {
-        toast.error(err instanceof Error ? err.message : "Schedule error")
-      } finally {
-        setScheduling(false)
-      }
-    }
-
-    return (
-      <div className="w-full">
-        {/* Back + header */}
-        <div className="flex items-center gap-3 mb-6">
-          <button onClick={closeOverlay} className="flex items-center gap-1.5 text-sm text-zinc-500 hover:text-zinc-800 transition-colors">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
-            Newsletter / Campaign
-          </button>
-          <span className="text-zinc-300">/</span>
-          <span className="text-sm font-medium text-zinc-700">{initC ? "Edit campaign" : "New campaign"}</span>
-        </div>
-
-        <form onSubmit={handleSubmit} className="bg-white border border-zinc-200 rounded-xl p-5 space-y-3 mb-6">
-          <p className="text-sm font-semibold text-zinc-700">{initC ? "Edit campaign" : "New campaign"}</p>
-          {loadingCampaignData ? (
-            <p className="text-xs text-zinc-400 py-2">Loading options…</p>
-          ) : (
-            <div className="grid sm:grid-cols-2 gap-3">
-              <div>
-                <label className="text-xs text-zinc-500 mb-1 block">Sender</label>
-                <select value={form.sender_id} onChange={e => setForm(f => ({ ...f, sender_id: e.target.value }))} className={INPUT_CLS} required>
-                  <option value="">Select sender…</option>
-                  {senders.filter(s => s.dkim_status === "verified").map(s => <option key={s.id} value={s.id}>{s.from_name} &lt;{s.from_email}&gt;</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="text-xs text-zinc-500 mb-1 block">Template</label>
-                <select value={form.template_id} onChange={e => setForm(f => ({ ...f, template_id: e.target.value }))} className={INPUT_CLS} required>
-                  <option value="">Select template…</option>
-                  {campaignTemplates.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="text-xs text-zinc-500 mb-1 block">Subject</label>
-                <input className={INPUT_CLS} placeholder="Email subject line" value={form.subject} onChange={e => setForm(f => ({ ...f, subject: e.target.value }))} required />
-              </div>
-              <div>
-                <label className="text-xs text-zinc-500 mb-1 block">Schedule (optional)</label>
-                <input type="datetime-local" className="border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#003434]/20" value={form.scheduled_at} onChange={e => setForm(f => ({ ...f, scheduled_at: e.target.value }))} />
-              </div>
-            </div>
-          )}
-          {allTags.length > 0 && (
-            <div>
-              <label className="text-xs text-zinc-500 mb-2 block">Target tags <span className="text-zinc-400 font-normal">(required)</span></label>
-              <div className="flex flex-wrap gap-2">
-                {allTags.map(tag => {
-                  const active = selectedTagIds.includes(tag.id)
-                  return (
-                    <button key={tag.id} type="button" onClick={() => toggleTag(tag.id)} className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-colors ${active ? "bg-[#003434] border-[#003434] text-white" : "bg-white border-zinc-200 text-zinc-600 hover:border-[#003434]/40 hover:text-[#003434]"}`}>
-                      {active && <span className="text-[10px] leading-none">✓</span>}
-                      {tag.name}
-                    </button>
-                  )
-                })}
-              </div>
-            </div>
-          )}
-          <div className="flex gap-2">
-            <button type="submit" disabled={saving || loadingCampaignData} className="bg-[#003434] text-white text-sm px-4 py-2 rounded-lg hover:bg-[#004444] disabled:opacity-50 transition-colors">
-              {saving ? "Saving…" : initC ? "Update & Preview" : "Create & Preview"}
-            </button>
-            <button type="button" onClick={closeOverlay} className="text-sm text-zinc-500 hover:text-zinc-700 px-4 py-2">Cancel</button>
-          </div>
-        </form>
-
-        {/* Preview modal */}
-        {previewCampaign && (
-          <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl flex flex-col max-h-[90vh]">
-              <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-100 shrink-0">
-                <p className="font-semibold text-zinc-800">Campaign Preview</p>
-                <button onClick={() => { setPreviewCampaign(null); setShowSchedulePicker(false); setScheduleDateTime("") }} className="text-zinc-400 hover:text-zinc-700 p-1 rounded-lg hover:bg-zinc-100 transition-colors">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                </button>
-              </div>
-              <div className="px-5 py-3 bg-zinc-50 border-b border-zinc-100 grid grid-cols-3 gap-3 shrink-0">
-                <div><p className="text-[11px] text-zinc-400 font-semibold uppercase tracking-wider">Subject</p><p className="text-xs text-zinc-700 font-semibold truncate mt-0.5">{previewCampaign.subject}</p></div>
-                <div><p className="text-[11px] text-zinc-400 font-semibold uppercase tracking-wider">From</p><p className="text-xs text-zinc-700 font-semibold truncate mt-0.5">{previewCampaign.email_senders?.from_name ?? "—"}</p></div>
-                <div>
-                  <p className="text-[11px] text-zinc-400 font-semibold uppercase tracking-wider">Audience</p>
-                  {Array.isArray(previewCampaign.tag_ids) && previewCampaign.tag_ids.length > 0 ? (
-                    <div className="flex flex-wrap gap-1 mt-0.5">
-                      {previewCampaign.tag_ids.map(tid => {
-                        const tag = tagMap.get(tid)
-                        return <span key={tid} className="text-xs font-semibold text-[#003434]">{tag?.name ?? tid}{tag?.contact_count != null && <span className="text-zinc-400 font-normal"> ({tag.contact_count})</span>}</span>
-                      })}
-                    </div>
-                  ) : <p className="text-xs text-zinc-400 mt-0.5">—</p>}
-                </div>
-              </div>
-              <div className="flex-1 overflow-y-auto px-5 py-4">
-                {previewCampaign.email_templates?.html_body ? (
-                  <div className="border border-zinc-100 rounded-xl overflow-hidden bg-white" dangerouslySetInnerHTML={{ __html: previewCampaign.email_templates.html_body }} />
-                ) : (
-                  <div className="border border-dashed border-zinc-200 rounded-xl p-8 text-center text-zinc-400 text-sm">No template preview available</div>
-                )}
-              </div>
-              <div className="px-5 py-4 border-t border-zinc-100 shrink-0">
-                {showSchedulePicker && (
-                  <div className="mb-3 flex items-center gap-2 bg-zinc-50 border border-zinc-200 rounded-xl p-3">
-                    <input type="datetime-local" value={scheduleDateTime} onChange={e => setScheduleDateTime(e.target.value)} min={new Date().toISOString().slice(0, 16)} className="flex-1 border border-zinc-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[#003434]/20 bg-white" />
-                    <button onClick={() => handleSaveSchedule(previewCampaign)} disabled={scheduling || !scheduleDateTime} className="bg-[#003434] text-white text-sm px-4 py-2 rounded-lg hover:bg-[#004444] disabled:opacity-50 font-medium whitespace-nowrap">{scheduling ? "Scheduling…" : "Confirm Schedule"}</button>
-                  </div>
-                )}
-                <div className="flex gap-2">
-                  <button onClick={() => handleSaveTest(previewCampaign)} disabled={sendingTest} className="flex-1 border border-zinc-200 text-zinc-700 text-sm py-2.5 rounded-xl hover:bg-zinc-50 font-medium disabled:opacity-50">{sendingTest ? "Sending test…" : "Save & Test"}</button>
-                  <button onClick={() => setShowSchedulePicker(v => !v)} className={`flex-1 border text-sm py-2.5 rounded-xl font-medium transition-colors ${showSchedulePicker ? "bg-[#003434] border-[#003434] text-white" : "border-[#003434] text-[#003434] hover:bg-[#003434]/5"}`}>Save & Schedule</button>
-                  <button onClick={() => { setPreviewCampaign(null); setShowSchedulePicker(false); handleSend(previewCampaign.id) }} disabled={sending} className="flex-1 bg-[#003434] text-white text-sm py-2.5 rounded-xl hover:bg-[#004444] font-semibold disabled:opacity-50">{sending ? "Sending…" : "Save & Send"}</button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
-    )
-  }
-
-  // ═══════════════════════════════════════════════════════════════════════════════
   // MAIN RENDER
   // ═══════════════════════════════════════════════════════════════════════════════
 
   // If overlay is active, show the wizard/form full-width
-  if (createMode === "newsletter") return <NewsletterWizard />
-  if (createMode === "campaign") return <CampaignForm />
+  if (createMode === "newsletter") return (
+    <NewsletterWizard
+      editItem={editItem}
+      clientId={clientId}
+      isAgentBazar={isAgentBazar}
+      posts={posts}
+      loadingPosts={loadingPosts}
+      senders={senders}
+      allTags={allTags}
+      newsletterTemplates={newsletterTemplates}
+      loadingTemplates={loadingTemplates}
+      closeOverlay={closeOverlay}
+      loadNewsletterTemplates={loadNewsletterTemplates}
+    />
+  )
+  if (createMode === "campaign") return (
+    <CampaignForm
+      editItem={editItem}
+      clientId={clientId}
+      senders={senders}
+      allTags={allTags}
+      campaignTemplates={campaignTemplates}
+      loadingCampaignData={loadingCampaignData}
+      closeOverlay={closeOverlay}
+    />
+  )
 
   return (
     <div className="w-full">
