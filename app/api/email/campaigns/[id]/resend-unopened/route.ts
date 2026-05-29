@@ -4,6 +4,8 @@ import { sesClient, SES_CONFIGURATION_SET } from "@/lib/ses"
 import { SendEmailCommand } from "@aws-sdk/client-ses"
 import { requireAuth } from "@/lib/require-auth"
 
+export const maxDuration = 300
+
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const unauth = await requireAuth()
   if (unauth) return unauth
@@ -140,14 +142,21 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     }))
 
     await supabaseAdmin.from("email_sends").insert(rows)
-    sent += results.filter(r => r.status === "fulfilled").length
-    failed += results.filter(r => r.status === "rejected").length
+
+    const batchSent = rows.filter(r => r.status === "sent").length
+    sent += batchSent
+    failed += rows.length - batchSent
+
+    // Checkpoint after each batch so a timeout leaves a partial count, not zero
+    await supabaseAdmin
+      .from("email_campaigns")
+      .update({ sent_count: sent })
+      .eq("id", newCampaignId)
   }
 
-  await supabaseAdmin.rpc("increment_campaign_sent_count", { p_id: newCampaignId, p_increment: sent })
   await supabaseAdmin
     .from("email_campaigns")
-    .update({ status: "sent", sent_at: new Date().toISOString() })
+    .update({ status: "sent", sent_at: new Date().toISOString(), sent_count: sent })
     .eq("id", newCampaignId)
 
   return NextResponse.json({ sent, failed, id: newCampaignId })

@@ -5,6 +5,8 @@ import { SendEmailCommand } from "@aws-sdk/client-ses"
 import { requireAuth } from "@/lib/require-auth"
 import { filterEligibleContacts, type EligibleContact } from "@/lib/email-contacts"
 
+export const maxDuration = 300
+
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const unauth = await requireAuth()
   if (unauth) return unauth
@@ -95,14 +97,20 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
     await supabaseAdmin.from("email_sends").insert(rows)
 
-    sent += results.filter(r => r.status === "fulfilled").length
-    failed += results.filter(r => r.status === "rejected").length
+    const batchSent = rows.filter(r => r.status === "sent").length
+    sent += batchSent
+    failed += rows.length - batchSent
+
+    // Checkpoint after each batch so a timeout leaves a partial count, not zero
+    await supabaseAdmin
+      .from("email_campaigns")
+      .update({ sent_count: sent })
+      .eq("id", campaignId)
   }
 
-  await supabaseAdmin.rpc("increment_campaign_sent_count", { p_id: campaignId, p_increment: sent })
   await supabaseAdmin
     .from("email_campaigns")
-    .update({ status: "sent", sent_at: new Date().toISOString() })
+    .update({ status: "sent", sent_at: new Date().toISOString(), sent_count: sent })
     .eq("id", campaignId)
 
   return NextResponse.json({ sent, failed })
