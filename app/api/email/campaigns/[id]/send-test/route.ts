@@ -19,15 +19,20 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
   if (error || !campaign) return NextResponse.json({ error: "campaign not found" }, { status: 404 })
 
   const htmlBody = (campaign.email_templates.html_body as string)
+    .replace(/\{\{first_name\}\}/gi, "Test User")
     .replace(/\{\{name\}\}/gi, "Test User")
     .replace(/\{\{email\}\}/gi, TEST_EMAIL)
     .replace(/\{\{unsubscribe\}\}/gi, "#")
+
+  const subject = campaign.subject
+    .replace(/\{\{first_name\}\}/gi, "Test User")
+    .replace(/\{\{name\}\}/gi, "Test User")
 
   const cmd = new SendEmailCommand({
     Source: `${campaign.email_senders.from_name} <${campaign.email_senders.from_email}>`,
     Destination: { ToAddresses: [TEST_EMAIL] },
     Message: {
-      Subject: { Data: `[TEST] ${campaign.subject}`, Charset: "UTF-8" },
+      Subject: { Data: `[TEST] ${subject}`, Charset: "UTF-8" },
       Body: { Html: { Data: htmlBody, Charset: "UTF-8" } },
     },
     ConfigurationSetName: SES_CONFIGURATION_SET,

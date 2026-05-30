@@ -87,8 +87,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   for (let i = 0; i < eligibleContacts.length; i += BATCH) {
     const batch = eligibleContacts.slice(i, i + BATCH)
     const results = await Promise.allSettled(batch.map(async (contact) => {
+      const firstName = contact.name ?? "there"
       const htmlBody = (campaign.email_templates.html_body as string)
-        .replace(/\{\{name\}\}/gi, contact.name ?? "there")
+        .replace(/\{\{first_name\}\}/gi, firstName)
+        .replace(/\{\{name\}\}/gi, firstName)
         .replace(/\{\{email\}\}/gi, contact.email)
 
       const unsubLink = `${process.env.NEXTAUTH_URL}/api/email/unsubscribe?email=${encodeURIComponent(contact.email)}&client=${campaign.client_id}`
@@ -96,11 +98,15 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         ? htmlBody.replace(/\{\{unsubscribe\}\}/gi, unsubLink)
         : htmlBody + `<br/><br/><small><a href="${unsubLink}">Unsubscribe</a></small>`
 
+      const personalizedSubject = subject
+        .replace(/\{\{first_name\}\}/gi, firstName)
+        .replace(/\{\{name\}\}/gi, firstName)
+
       const cmd = new SendEmailCommand({
         Source: `${campaign.email_senders.from_name} <${campaign.email_senders.from_email}>`,
         Destination: { ToAddresses: [contact.email] },
         Message: {
-          Subject: { Data: subject, Charset: "UTF-8" },
+          Subject: { Data: personalizedSubject, Charset: "UTF-8" },
           Body: { Html: { Data: finalHtml, Charset: "UTF-8" } },
         },
         ConfigurationSetName: SES_CONFIGURATION_SET,
