@@ -2,6 +2,7 @@ export type EligibleContact = {
   id: string
   email: string
   name: string | null
+  agent_name: string | null
 }
 
 type RawContact = EligibleContact & {

@@ -21,12 +21,14 @@ export async function POST(_req: NextRequest, { params }: { params: { id: string
   const htmlBody = (campaign.email_templates.html_body as string)
     .replace(/\{\{first_name\}\}/gi, "Test User")
     .replace(/\{\{name\}\}/gi, "Test User")
+    .replace(/\{\{agent_name\}\}/gi, "Test Agency")
     .replace(/\{\{email\}\}/gi, TEST_EMAIL)
     .replace(/\{\{unsubscribe\}\}/gi, "#")
 
   const subject = campaign.subject
     .replace(/\{\{first_name\}\}/gi, "Test User")
     .replace(/\{\{name\}\}/gi, "Test User")
+    .replace(/\{\{agent_name\}\}/gi, "Test Agency")
 
   const cmd = new SendEmailCommand({
     Source: `${campaign.email_senders.from_name} <${campaign.email_senders.from_email}>`,
