@@ -1390,9 +1390,9 @@ export default function NewslettersPage() {
           <p className="text-sm text-zinc-400 font-medium">{items.length === 0 ? "No newsletters or campaigns yet." : "No results match your filters."}</p>
         </div>
       ) : (
-        <div className="bg-white border border-zinc-200 rounded-2xl overflow-hidden">
+        <div className="bg-white border border-zinc-200 rounded-2xl overflow-visible">
           {/* Table header */}
-          <div className="hidden sm:grid grid-cols-[1fr_160px_80px_100px_100px_90px_150px_40px] gap-2 px-5 py-3 border-b border-[#002828] bg-[#003434]">
+          <div className="hidden sm:grid grid-cols-[1fr_160px_80px_100px_100px_90px_150px_40px] gap-2 px-5 py-3 border-b border-[#002828] bg-[#003434] rounded-t-2xl">
             <p className="text-xs font-semibold text-white uppercase tracking-wide">Newsletter subject</p>
             <p className="text-xs font-semibold text-white uppercase tracking-wide">Selected tags</p>
             <p className="text-xs font-semibold text-white uppercase tracking-wide text-right">Emails sent</p>
@@ -1411,7 +1411,7 @@ export default function NewslettersPage() {
             return (
               <div
                 key={item.id}
-                className={`grid grid-cols-1 sm:grid-cols-[1fr_160px_80px_100px_100px_90px_150px_40px] gap-1 sm:gap-2 px-5 py-3.5 border-b border-zinc-100 last:border-b-0 hover:bg-[#003434]/[0.04] transition-colors ${rowBg}`}
+                className={`grid grid-cols-1 sm:grid-cols-[1fr_160px_80px_100px_100px_90px_150px_40px] gap-1 sm:gap-2 px-5 py-3.5 border-b border-zinc-100 last:border-b-0 last:rounded-b-2xl hover:bg-[#003434]/[0.04] transition-colors ${rowBg}`}
               >
                 {/* Subject */}
                 <div className="flex items-center gap-2 min-w-0">
