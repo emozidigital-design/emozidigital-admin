@@ -2,11 +2,6 @@ import { NextRequest, NextResponse } from "next/server"
 import { supabaseAdmin } from "@/lib/supabase-server"
 import { getAgentBazarSupabase } from "@/lib/supabase-agentbazar"
 import { requireAuth } from "@/lib/require-auth"
-import { sesClient, SES_CONFIGURATION_SET } from "@/lib/ses"
-import { SendEmailCommand } from "@aws-sdk/client-ses"
-import { buildNewsletterHtml } from "@/lib/newsletter-html"
-
-export const maxDuration = 300
 
 const AGENTBAZAR_CLIENT_ID = "d5104fcd-defe-4e3d-a4cf-1893dba7b931"
 const AGENTBAZAR_BLOG_URL = "https://blog.agentbazar.in"
@@ -140,76 +135,23 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     return NextResponse.json({ scheduled: true, id: newRecord.id, total: unopenedRecipients.length })
   }
 
-  // ── Send emails via SES in batches ───────────────────────────────────────────
-  const BATCH = 10
-  let sent = 0
-  let failed = 0
-
-  for (let i = 0; i < unopenedRecipients.length; i += BATCH) {
-    const batch = unopenedRecipients.slice(i, i + BATCH)
-    const results = await Promise.allSettled(batch.map(async (contact) => {
-      const html = buildNewsletterHtml({
-        recipientName: contact.name,
-        recipientEmail: contact.email,
-        post,
-        trendingPosts,
-        ctaUrl,
-        unsubBaseUrl,
-        isAgentBazar,
-        newsletterTemplateHtml,
-        clientId: orig.client_id ?? null,
-        senderFromName: sender.from_name,
-      })
-
-      const cmd = new SendEmailCommand({
-        Source: `${sender.from_name} <${sender.from_email}>`,
-        Destination: { ToAddresses: [contact.email] },
-        Message: {
-          Subject: { Data: subject, Charset: "UTF-8" },
-          Body: { Html: { Data: html, Charset: "UTF-8" } },
-        },
-        ConfigurationSetName: SES_CONFIGURATION_SET,
-      })
-
-      const res = await sesClient.send(cmd)
-      return res.MessageId ?? null
-    }))
-
-    // Insert email_sends rows for open/click tracking via SES webhook
-    // contact_id is available here because unopenedRecipients come from eligibleMap (email_contacts rows)
-    const rows = results.map((r, idx) => ({
-      newsletter_send_id: newRecord.id,
-      contact_id: batch[idx].id,
-      ses_message_id: r.status === "fulfilled" ? r.value : null,
-      status: r.status === "fulfilled" ? "sent" : "failed",
-      ...(r.status === "fulfilled" ? { sent_at: new Date().toISOString() } : {}),
-    }))
-    await supabaseAdmin.from("email_sends").insert(rows)
-
-    const batchSent = rows.filter(r => r.status === "sent").length
-    sent += batchSent
-    failed += rows.length - batchSent
-
-    const batchIndex = i / BATCH
-    const isLastBatch = i + BATCH >= unopenedRecipients.length
-    if (!isLastBatch && batchIndex % 5 === 4) {
-      await supabaseAdmin
-        .from("newsletter_sends")
-        .update({ sent_count: sent, failed_count: failed })
-        .eq("id", newRecord.id)
-    }
+  const vpsUrl = process.env.VPS_SENDER_URL
+  const secret = process.env.INTERNAL_SECRET
+  if (!vpsUrl || !secret) {
+    return NextResponse.json({ error: "VPS_SENDER_URL or INTERNAL_SECRET not configured" }, { status: 500 })
   }
 
-  // ── Mark newsletter_sends as sent with final counts ──────────────────────────
-  await supabaseAdmin
-    .from("newsletter_sends")
-    .update({
-      status: "sent",
-      sent_at: new Date().toISOString(),
-      sent_count: sent,
-      failed_count: failed,
-    })
-    .eq("id", newRecord.id)
+  const vpsRes = await fetch(`${vpsUrl}/resend-newsletter-unopened`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", "x-internal-secret": secret },
+    body: JSON.stringify({ newsletterSendId: params.id, overrideSubject }),
+  })
 
-  return NextResponse.json({ sent, failed, id: newRecord.id, total: unopenedRecipients.length })
+  if (!vpsRes.ok) {
+    const text = await vpsRes.text()
+    await supabaseAdmin.from("newsletter_sends").update({ status: "draft" }).eq("id", newRecord.id)
+    return NextResponse.json({ error: `VPS error: ${text}` }, { status: 502 })
+  }
+
+  return NextResponse.json({ ok: true, message: "Resend started", id: newRecord.id, total: unopenedRecipients.length })
 }
