@@ -7,6 +7,8 @@ import { sesClient, SES_CONFIGURATION_SET } from "@/lib/ses"
 import { SendEmailCommand } from "@aws-sdk/client-ses"
 import { buildNewsletterHtml } from "@/lib/newsletter-html"
 
+export const maxDuration = 300
+
 const AGENTBAZAR_CLIENT_ID = "d5104fcd-defe-4e3d-a4cf-1893dba7b931"
 const AGENTBAZAR_BLOG_URL = "https://blog.agentbazar.in"
 
@@ -51,6 +53,18 @@ export async function POST(req: NextRequest) {
     post = data
   }
 
+  // ── Fetch trending posts (AgentBazar only) ───────────────────────────────────
+  type TrendingPost = { id: string; title: string; slug: string; cover_image: string | null; excerpt: string | null }
+  let trendingPosts: TrendingPost[] = []
+  if (isAgentBazar && trending_post_ids.length > 0) {
+    const { data } = await getAgentBazarSupabase()
+      .from("blog_posts")
+      .select("id, title, slug, cover_image, excerpt")
+      .in("id", trending_post_ids)
+    trendingPosts = data ?? []
+    trendingPosts.sort((a, b) => trending_post_ids.indexOf(a.id) - trending_post_ids.indexOf(b.id))
+  }
+
   // ── Fetch sender ─────────────────────────────────────────────────────────────
   const { data: sender, error: senderErr } = await supabaseAdmin
     .from("email_senders")
@@ -59,7 +73,21 @@ export async function POST(req: NextRequest) {
     .single()
   if (senderErr || !sender) return NextResponse.json({ error: "Sender not found" }, { status: 404 })
 
-  // ── Resolve recipients (needed for recipient_count on the DB record) ──────────
+  // ── Fetch newsletter template HTML ───────────────────────────────────────────
+  let newsletterTemplateHtml: string | null = null
+  if (newsletter_template_id) {
+    const { data: tmpl } = await supabaseAdmin
+      .from("email_templates")
+      .select("html_body, client_id, template_type")
+      .eq("id", newsletter_template_id)
+      .eq("template_type", "newsletter")
+      .single()
+    if (tmpl && tmpl.client_id === (client_id ?? null)) {
+      newsletterTemplateHtml = tmpl.html_body
+    }
+  }
+
+  // ── Resolve recipients ───────────────────────────────────────────────────────
   type Recipient = { email: string; name: string | null }
   let recipients: Recipient[] = []
 
@@ -95,60 +123,26 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "NEXTAUTH_URL is not configured" }, { status: 500 })
   }
 
-  // Test mode: send synchronously here (small list, no timeout risk)
+  // Test mode overrides recipients
   if (test_email) {
-    const testRecipients: Recipient[] = [{ email: test_email, name: "Admin (Test)" }]
-    const { data: record, error: recErr } = await supabaseAdmin
-      .from("newsletter_sends")
-      .insert({
-        client_id: client_id || null,
-        blog_post_id, sender_id, subject, recipient_type, tag_ids, trending_post_ids,
-        newsletter_template_id: newsletter_template_id || null,
-        status: "test", recipient_count: 1, sent_count: 0, failed_count: 0,
-      })
-      .select("id")
-      .single()
-    if (recErr || !record) return NextResponse.json({ error: "Failed to create test record" }, { status: 500 })
-
-    const trendingPosts: Array<{ id: string; title: string; slug: string; cover_image: string | null; excerpt: string | null }> = []
-    const blogBaseUrl = isAgentBazar ? AGENTBAZAR_BLOG_URL : (process.env.BLOG_BASE_URL ?? "https://emozidigital.com/blog")
-    const ctaUrl = `${blogBaseUrl}/${post.slug}`
-    let newsletterTemplateHtml: string | null = null
-    if (newsletter_template_id) {
-      const { data: tmpl } = await supabaseAdmin.from("email_templates").select("html_body, client_id, template_type").eq("id", newsletter_template_id).eq("template_type", "newsletter").single()
-      if (tmpl && tmpl.client_id === (client_id ?? null)) newsletterTemplateHtml = tmpl.html_body
-    }
-
-    const html = buildNewsletterHtml({ recipientName: testRecipients[0].name, recipientEmail: testRecipients[0].email, post, trendingPosts, ctaUrl, unsubBaseUrl, isAgentBazar, newsletterTemplateHtml, clientId: client_id || null, senderFromName: sender.from_name })
-    const cmd = new SendEmailCommand({
-      Source: `${sender.from_name} <${sender.from_email}>`,
-      Destination: { ToAddresses: [test_email] },
-      Message: { Subject: { Data: subject, Charset: "UTF-8" }, Body: { Html: { Data: html, Charset: "UTF-8" } } },
-      ConfigurationSetName: SES_CONFIGURATION_SET,
-    })
-    try {
-      const res = await sesClient.send(cmd)
-      await supabaseAdmin.from("email_sends").insert([{ newsletter_send_id: record.id, contact_id: null, ses_message_id: res.MessageId ?? null, status: "sent", sent_at: new Date().toISOString() }])
-      await supabaseAdmin.from("newsletter_sends").update({ status: "test", sent_count: 1 }).eq("id", record.id)
-      return NextResponse.json({ sent: 1, failed: 0, id: record.id, total: 1 })
-    } catch {
-      await supabaseAdmin.from("newsletter_sends").update({ status: "test", failed_count: 1 }).eq("id", record.id)
-      return NextResponse.json({ error: "Test send failed" }, { status: 500 })
-    }
-  }
-
-  if (recipients.length === 0) {
+    recipients = [{ email: test_email, name: "Admin (Test)" }]
+  } else if (recipients.length === 0) {
     return NextResponse.json({ error: "No eligible recipients found" }, { status: 400 })
   }
 
-  // ── Create newsletter_sends record then hand off to VPS ───────────────────────
+  // ── Create newsletter_sends record ───────────────────────────────────────────
   const { data: record, error: recErr } = await supabaseAdmin
     .from("newsletter_sends")
     .insert({
       client_id: client_id || null,
-      blog_post_id, sender_id, subject, recipient_type, tag_ids, trending_post_ids,
+      blog_post_id,
+      sender_id,
+      subject,
+      recipient_type,
+      tag_ids,
+      trending_post_ids,
       newsletter_template_id: newsletter_template_id || null,
-      status: "sending",
+      status: test_email ? "test" : "sending",
       recipient_count: recipients.length,
       sent_count: 0,
       failed_count: 0,
@@ -160,28 +154,83 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Failed to create newsletter record" }, { status: 500 })
   }
 
-  const vpsUrl = process.env.VPS_SENDER_URL
-  const secret = process.env.INTERNAL_SECRET
-  if (!vpsUrl || !secret) {
-    return NextResponse.json({ error: "VPS_SENDER_URL or INTERNAL_SECRET not configured" }, { status: 500 })
-  }
+  const blogBaseUrl = isAgentBazar ? AGENTBAZAR_BLOG_URL : (process.env.BLOG_BASE_URL ?? "https://emozidigital.com/blog")
+  const ctaUrl = `${blogBaseUrl}/${post.slug}`
 
-  const vpsRes = await fetch(`${vpsUrl}/send-newsletter`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "x-internal-secret": secret },
-    body: JSON.stringify({
+  // ── Send emails via SES in batches ───────────────────────────────────────────
+  const BATCH = 10
+  let sent = 0
+  let failed = 0
+
+  for (let i = 0; i < recipients.length; i += BATCH) {
+    const batch = recipients.slice(i, i + BATCH)
+    const results = await Promise.allSettled(batch.map(async (contact) => {
+      const html = buildNewsletterHtml({
+        recipientName: contact.name,
+        recipientEmail: contact.email,
+        post,
+        trendingPosts,
+        ctaUrl,
+        unsubBaseUrl,
+        isAgentBazar,
+        newsletterTemplateHtml,
+        clientId: client_id || null,
+        senderFromName: sender.from_name,
+      })
+
+      const cmd = new SendEmailCommand({
+        Source: `${sender.from_name} <${sender.from_email}>`,
+        Destination: { ToAddresses: [contact.email] },
+        Message: {
+          Subject: { Data: subject, Charset: "UTF-8" },
+          Body: { Html: { Data: html, Charset: "UTF-8" } },
+        },
+        ConfigurationSetName: SES_CONFIGURATION_SET,
+      })
+
+      const res = await sesClient.send(cmd)
+      return res.MessageId ?? null
+    }))
+
+    // Insert email_sends rows for open/click tracking via SES webhook
+    const rows = results.map((r) => ({
       newsletter_send_id: record.id,
-      blog_post_id, sender_id, subject, client_id, recipient_type,
-      newsletter_template_id: newsletter_template_id || null,
-      trending_post_ids, tag_ids,
-    }),
-  })
+      contact_id: null, // newsletter recipients may not be in email_contacts
+      ses_message_id: r.status === "fulfilled" ? r.value : null,
+      status: r.status === "fulfilled" ? "sent" : "failed",
+      ...(r.status === "fulfilled" ? { sent_at: new Date().toISOString() } : {}),
+    }))
+    await supabaseAdmin.from("email_sends").insert(rows)
 
-  if (!vpsRes.ok) {
-    const text = await vpsRes.text()
-    await supabaseAdmin.from("newsletter_sends").update({ status: "draft" }).eq("id", record.id)
-    return NextResponse.json({ error: `VPS error: ${text}` }, { status: 502 })
+    const batchSent = rows.filter(r => r.status === "sent").length
+    sent += batchSent
+    failed += rows.length - batchSent
+
+    const batchIndex = i / BATCH
+    const isLastBatch = i + BATCH >= recipients.length
+    if (!isLastBatch && batchIndex % 5 === 4) {
+      await supabaseAdmin
+        .from("newsletter_sends")
+        .update({ sent_count: sent, failed_count: failed })
+        .eq("id", record.id)
+    }
   }
 
-  return NextResponse.json({ ok: true, message: "Newsletter send started", id: record.id, total: recipients.length })
+  // ── Mark newsletter_sends as sent with final counts ──────────────────────────
+  await supabaseAdmin
+    .from("newsletter_sends")
+    .update({
+      status: test_email ? "test" : "sent",
+      sent_at: new Date().toISOString(),
+      sent_count: sent,
+      failed_count: failed,
+    })
+    .eq("id", record.id)
+
+  return NextResponse.json({
+    sent,
+    failed,
+    id: record.id,
+    total: recipients.length,
+  })
 }

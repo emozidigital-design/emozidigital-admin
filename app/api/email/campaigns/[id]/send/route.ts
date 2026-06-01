@@ -1,6 +1,11 @@
 import { NextRequest, NextResponse } from "next/server"
 import { supabaseAdmin } from "@/lib/supabase-server"
+import { sesClient, SES_CONFIGURATION_SET } from "@/lib/ses"
+import { SendEmailCommand } from "@aws-sdk/client-ses"
 import { requireAuth } from "@/lib/require-auth"
+import { filterEligibleContacts, type EligibleContact } from "@/lib/email-contacts"
+
+export const maxDuration = 300
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const unauth = await requireAuth()
@@ -8,9 +13,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   const campaignId = params.id
 
+  // Fetch campaign with related data
   const { data: campaign, error: cErr } = await supabaseAdmin
     .from("email_campaigns")
-    .select("id, status")
+    .select("*, email_senders(*), email_templates(*)")
     .eq("id", campaignId)
     .single()
 
@@ -19,22 +25,107 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     return NextResponse.json({ error: "campaign already sent" }, { status: 409 })
   }
 
-  const vpsUrl = process.env.VPS_SENDER_URL
-  const secret = process.env.INTERNAL_SECRET
-  if (!vpsUrl || !secret) {
-    return NextResponse.json({ error: "VPS_SENDER_URL or INTERNAL_SECRET not configured" }, { status: 500 })
+  let contacts: EligibleContact[] = []
+
+  if (Array.isArray(campaign.tag_ids) && campaign.tag_ids.length > 0) {
+    // Paginate in chunks of 1000 — Supabase PostgREST caps responses at 1000 rows by default
+    const PAGE = 1000
+    let page = 0
+    let allRows: Array<{ email_contacts: unknown }> = []
+    while (true) {
+      const { data, error: tcErr } = await supabaseAdmin
+        .from("email_contact_tags")
+        .select("email_contacts(id, email, name, agent_name, subscribed, bounced, complained)")
+        .in("tag_id", campaign.tag_ids)
+        .range(page * PAGE, (page + 1) * PAGE - 1)
+      if (tcErr) return NextResponse.json({ error: tcErr.message }, { status: 500 })
+      if (!data || data.length === 0) break
+      allRows = allRows.concat(data)
+      if (data.length < PAGE) break
+      page++
+    }
+    contacts = filterEligibleContacts(allRows)
   }
 
-  const vpsRes = await fetch(`${vpsUrl}/send-campaign`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json", "x-internal-secret": secret },
-    body: JSON.stringify({ campaignId }),
-  })
-
-  if (!vpsRes.ok) {
-    const text = await vpsRes.text()
-    return NextResponse.json({ error: `VPS error: ${text}` }, { status: 502 })
+  if (contacts.length === 0) {
+    return NextResponse.json({ error: "no eligible contacts for this campaign" }, { status: 400 })
   }
 
-  return NextResponse.json({ ok: true, message: "Send started" })
+  // Mark campaign as sending
+  await supabaseAdmin
+    .from("email_campaigns")
+    .update({ status: "sending" })
+    .eq("id", campaignId)
+
+  let sent = 0
+  let failed = 0
+  const BATCH = 10
+
+  for (let i = 0; i < contacts.length; i += BATCH) {
+    const batch = contacts.slice(i, i + BATCH)
+    const results = await Promise.allSettled(batch.map(async (contact) => {
+      const firstName = contact.name ?? "there"
+      const agentName = contact.agent_name ?? ""
+      const htmlBody = (campaign.email_templates.html_body as string)
+        .replace(/\{\{first_name\}\}/gi, firstName)
+        .replace(/\{\{name\}\}/gi, firstName)
+        .replace(/\{\{agent_name\}\}/gi, agentName)
+        .replace(/\{\{email\}\}/gi, contact.email)
+
+      const unsubLink = `${process.env.NEXTAUTH_URL}/api/email/unsubscribe?email=${encodeURIComponent(contact.email)}&client=${campaign.client_id}`
+      const finalHtml = htmlBody.includes("{{unsubscribe}}")
+        ? htmlBody.replace(/\{\{unsubscribe\}\}/gi, unsubLink)
+        : htmlBody + `<br/><br/><small><a href="${unsubLink}">Unsubscribe</a></small>`
+
+      const subject = campaign.subject
+        .replace(/\{\{first_name\}\}/gi, firstName)
+        .replace(/\{\{name\}\}/gi, firstName)
+        .replace(/\{\{agent_name\}\}/gi, agentName)
+
+      const cmd = new SendEmailCommand({
+        Source: `${campaign.email_senders.from_name} <${campaign.email_senders.from_email}>`,
+        Destination: { ToAddresses: [contact.email] },
+        Message: {
+          Subject: { Data: subject, Charset: "UTF-8" },
+          Body: { Html: { Data: finalHtml, Charset: "UTF-8" } },
+        },
+        ConfigurationSetName: SES_CONFIGURATION_SET,
+      })
+
+      const res = await sesClient.send(cmd)
+      return res.MessageId ?? null
+    }))
+
+    const rows = results.map((r, idx) => ({
+      campaign_id: campaignId,
+      contact_id: batch[idx].id,
+      ses_message_id: r.status === "fulfilled" ? r.value : null,
+      status: r.status === "fulfilled" ? "sent" : "failed",
+      ...(r.status === "fulfilled" ? { sent_at: new Date().toISOString() } : {}),
+    }))
+
+    await supabaseAdmin.from("email_sends").insert(rows)
+
+    const batchSent = rows.filter(r => r.status === "sent").length
+    sent += batchSent
+    failed += rows.length - batchSent
+
+    // Checkpoint every 5 batches (50 contacts) so a timeout leaves a partial count, not zero.
+    // The post-loop update handles the final value, so no checkpoint on the very last batch.
+    const batchIndex = i / BATCH
+    const isLastBatch = i + BATCH >= contacts.length
+    if (!isLastBatch && batchIndex % 5 === 4) {
+      await supabaseAdmin
+        .from("email_campaigns")
+        .update({ sent_count: sent })
+        .eq("id", campaignId)
+    }
+  }
+
+  await supabaseAdmin
+    .from("email_campaigns")
+    .update({ status: "sent", sent_at: new Date().toISOString(), sent_count: sent })
+    .eq("id", campaignId)
+
+  return NextResponse.json({ sent, failed })
 }
