@@ -1,9 +1,18 @@
 import { NextResponse } from 'next/server';
-import { supabase } from '@/lib/supabase';
+import { S3Client, PutObjectCommand } from '@aws-sdk/client-s3';
 import { nanoid } from 'nanoid';
 import sharp from 'sharp';
 
 export const dynamic = 'force-dynamic';
+
+const r2 = new S3Client({
+  region: 'auto',
+  endpoint: `https://${process.env.CF_ACCOUNT_ID}.r2.cloudflarestorage.com`,
+  credentials: {
+    accessKeyId: process.env.CF_R2_ACCESS_KEY_ID!,
+    secretAccessKey: process.env.CF_R2_SECRET_ACCESS_KEY!,
+  },
+});
 
 async function compressImage(buffer: Buffer, mimeType: string): Promise<{ buffer: Buffer; ext: string; mime: string }> {
   // AVIF/WebP are already efficient — just resize if oversized, keep format
@@ -36,31 +45,18 @@ export async function POST(request: Request) {
     const rawBuffer = Buffer.from(await file.arrayBuffer());
     const { buffer, ext, mime } = await compressImage(rawBuffer, file.type);
 
-    const fileName = `${nanoid()}.${ext}`;
-    const filePath = `blog-posts/${fileName}`;
+    const fileName = `blog-posts/${nanoid()}.${ext}`;
 
-    const { error } = await supabase.storage
-      .from('blog')
-      .upload(filePath, buffer, {
-        contentType: mime,
-        cacheControl: '31536000', // 1 year — images are immutable (new name = new file)
-        upsert: false,
-      });
+    await r2.send(new PutObjectCommand({
+      Bucket: process.env.CF_R2_BUCKET_NAME!,
+      Key: fileName,
+      Body: buffer,
+      ContentType: mime,
+      CacheControl: 'public, max-age=31536000, immutable',
+    }));
 
-    if (error) {
-      if (error.message.includes('bucket not found')) {
-        const { error: error2 } = await supabase.storage
-          .from('blog-posts')
-          .upload(filePath, buffer, { contentType: mime, cacheControl: '31536000', upsert: false });
-        if (error2) throw error2;
-        const { data: { publicUrl } } = supabase.storage.from('blog-posts').getPublicUrl(filePath);
-        return NextResponse.json({ url: publicUrl });
-      }
-      throw error;
-    }
-
-    const { data: { publicUrl } } = supabase.storage.from('blog').getPublicUrl(filePath);
-    return NextResponse.json({ url: publicUrl });
+    const url = `${process.env.CF_R2_PUBLIC_URL}/${fileName}`;
+    return NextResponse.json({ url });
 
   } catch (err) {
     console.error('Upload error:', err);

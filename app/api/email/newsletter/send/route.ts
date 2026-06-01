@@ -98,24 +98,45 @@ export async function POST(req: NextRequest) {
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     recipients = (data ?? []).filter(r => r.email)
   } else if (recipient_type === "list") {
-    // AgentBazar "All contacts" — fetch all subscribed contacts for this client
-    const PAGE = 1000
-    let page = 0
-    while (true) {
-      let query = supabaseAdmin
-        .from("email_contacts")
-        .select("email, name, subscribed, bounced, complained")
-        .eq("subscribed", true)
-        .eq("bounced", false)
-        .eq("complained", false)
-        .range(page * PAGE, (page + 1) * PAGE - 1)
-      if (client_id) query = (query as any).eq("client_id", client_id)
-      const { data, error } = await query
-      if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-      if (!data || data.length === 0) break
-      recipients = recipients.concat(data.map((c: any) => ({ email: c.email, name: c.name })))
-      if (data.length < PAGE) break
-      page++
+    // "All Contacts" — fetch all subscribed contacts for this client, scoped to tag_ids if provided
+    if (tag_ids.length > 0) {
+      // Tags were selected: only contacts in those tags
+      const PAGE = 1000
+      let page = 0
+      let allRows: Array<{ email_contacts: unknown }> = []
+      while (true) {
+        const { data, error } = await supabaseAdmin
+          .from("email_contact_tags")
+          .select("email_contacts(id, email, name, subscribed, bounced, complained)")
+          .in("tag_id", tag_ids)
+          .range(page * PAGE, (page + 1) * PAGE - 1)
+        if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+        if (!data || data.length === 0) break
+        allRows = allRows.concat(data)
+        if (data.length < PAGE) break
+        page++
+      }
+      recipients = filterEligibleContacts(allRows).map(({ email, name }) => ({ email, name }))
+    } else {
+      // No tags selected: fall back to all subscribed contacts for this client
+      const PAGE = 1000
+      let page = 0
+      while (true) {
+        let query = supabaseAdmin
+          .from("email_contacts")
+          .select("email, name")
+          .eq("subscribed", true)
+          .eq("bounced", false)
+          .eq("complained", false)
+          .range(page * PAGE, (page + 1) * PAGE - 1)
+        if (client_id) query = (query as any).eq("client_id", client_id)
+        const { data, error } = await query
+        if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+        if (!data || data.length === 0) break
+        recipients = recipients.concat(data.map((c: any) => ({ email: c.email, name: c.name })))
+        if (data.length < PAGE) break
+        page++
+      }
     }
   } else {
     if (tag_ids.length > 0) {
