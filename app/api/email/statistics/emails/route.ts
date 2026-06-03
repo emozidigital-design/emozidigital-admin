@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server"
 import { supabaseAdmin } from "@/lib/supabase-server"
 import { requireAuth } from "@/lib/require-auth"
 
-export const maxDuration = 30
+export const maxDuration = 60
 
 export async function GET(req: NextRequest) {
   const unauth = await requireAuth()
@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
     // ── 2. Fetch enough rows to fill this page from each table ────────────────
     // Strategy: fetch (offset + pageSize) rows from each, merge+sort, slice.
     // Capped at 500 to prevent runaway queries on deep page navigation.
-    const fetchLimit = Math.min(page * pageSize, 2000)
+    const fetchLimit = Math.min(page * pageSize, 500)
 
     let cq = supabaseAdmin
       .from("email_campaigns")
@@ -105,47 +105,10 @@ export async function GET(req: NextRequest) {
             spam: Number(r.spam), bounced: Number(r.bounced),
           })
         }
-        for (const id of campaignIds) {
-          if (!eventCounts.has(id)) eventCounts.set(id, { total: 0, opens: 0, clicks: 0, spam: 0, bounced: 0 })
-        }
-      } else {
-        // Fallback: raw sends + events for this page's campaigns only (max ~10 campaigns)
-        const { data: sendRows } = await supabaseAdmin
-          .from("email_sends")
-          .select("campaign_id, ses_message_id")
-          .in("campaign_id", campaignIds)
-          .limit(1000000)
-
-        const sends = sendRows ?? []
-        const msgToCampaign = new Map<string, string>()
-        const totals = new Map<string, number>()
-        for (const s of sends) {
-          if (s.ses_message_id) msgToCampaign.set(s.ses_message_id, s.campaign_id)
-          totals.set(s.campaign_id, (totals.get(s.campaign_id) ?? 0) + 1)
-        }
-        for (const id of campaignIds) {
-          eventCounts.set(id, { total: totals.get(id) ?? 0, opens: 0, clicks: 0, spam: 0, bounced: 0 })
-        }
-
-        const allMsgIds = sends.map(s => s.ses_message_id).filter(Boolean) as string[]
-        const BATCH = 5000
-        for (let i = 0; i < allMsgIds.length; i += BATCH) {
-          const { data: events } = await supabaseAdmin
-            .from("email_events")
-            .select("ses_message_id, event_type")
-            .in("ses_message_id", allMsgIds.slice(i, i + BATCH))
-            .limit(1000000)
-          for (const e of events ?? []) {
-            const cid = msgToCampaign.get(e.ses_message_id)
-            if (!cid) continue
-            const c = eventCounts.get(cid)
-            if (!c) continue
-            if (e.event_type === "open")           c.opens++
-            else if (e.event_type === "click")     c.clicks++
-            else if (e.event_type === "complaint") c.spam++
-            else if (e.event_type === "bounce")    c.bounced++
-          }
-        }
+      }
+      // Fill any missing ids with zeros (RPC missing or campaign had no sends)
+      for (const id of campaignIds) {
+        if (!eventCounts.has(id)) eventCounts.set(id, { total: 0, opens: 0, clicks: 0, spam: 0, bounced: 0 })
       }
     }
 
