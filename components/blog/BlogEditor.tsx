@@ -151,7 +151,7 @@ export default function BlogEditor({ initialData, isNew = false }: BlogEditorPro
     }
   }, []);
 
-  const { data: clientsData } = useSWR<{ clients: { id: string; name: string; industry: string }[] }>('/api/clients', fetcher)
+  const { data: clientsData, isLoading: clientsLoading } = useSWR<{ clients: { id: string; name: string; industry: string }[] }>('/api/clients', fetcher)
   const clients = clientsData?.clients ?? []
 
   // Resolve which external blog site is linked to the currently selected client (if any)
@@ -275,6 +275,12 @@ export default function BlogEditor({ initialData, isNew = false }: BlogEditorPro
         }
       } else if (!options.silent) {
         toast.success(options.publish ? "Post published successfully!" : "Draft saved successfully")
+        if (options.publish) {
+          toast("No external blog site linked — post saved to Emozi only. Select a client to sync to AgentBazar.", {
+            icon: "⚠️",
+            duration: 7000,
+          })
+        }
       }
     } catch (err: any) {
       console.error('Save Error:', err)
@@ -293,8 +299,10 @@ export default function BlogEditor({ initialData, isNew = false }: BlogEditorPro
     }
   }
 
-  // Auto-save: debounced 1.5s after last change
+  // Auto-save: debounced 1.5s after last change; wait for clients to load
+  // so clientBlogSite is resolved before the first sync fires
   useEffect(() => {
+    if (clientsLoading) return
     autoSaveTimer.current = setTimeout(() => {
       const currentPostStr = JSON.stringify(pickDbFields(post))
       if (currentPostStr !== lastSavedPostStr.current && post.title) {
@@ -305,7 +313,7 @@ export default function BlogEditor({ initialData, isNew = false }: BlogEditorPro
     return () => {
       if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current)
     }
-  }, [post])
+  }, [post, clientsLoading])
 
   const updatePost = (updates: Partial<BlogPost>) => {
     setPost(prev => ({ ...prev, ...updates }))
