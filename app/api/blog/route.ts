@@ -96,12 +96,13 @@ export async function PUT(request: Request) {
       const selectCols = [...blankStringFields, ...blankArrayFields].join(',')
       const { data: existing } = await supabase
         .from('blog_posts').select(selectCols).eq('id', id).single()
-      if (existing) {
+      const row = existing as Record<string, any> | null
+      if (row) {
         for (const f of blankStringFields) {
-          if ((updates[f] === '' || updates[f] === null) && existing[f]) delete updates[f]
+          if ((updates[f] === '' || updates[f] === null) && row[f]) delete updates[f]
         }
         for (const f of blankArrayFields) {
-          if (Array.isArray(updates[f]) && (updates[f] as any[]).length === 0 && Array.isArray(existing[f]) && existing[f].length > 0) {
+          if (Array.isArray(updates[f]) && (updates[f] as any[]).length === 0 && Array.isArray(row[f]) && row[f].length > 0) {
             delete updates[f]
           }
         }
