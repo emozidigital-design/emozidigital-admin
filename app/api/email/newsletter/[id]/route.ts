@@ -39,6 +39,13 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
 
   const { id } = params
 
+  const { error: sendsError } = await supabaseAdmin
+    .from("email_sends")
+    .delete()
+    .eq("newsletter_send_id", id)
+
+  if (sendsError) return NextResponse.json({ error: sendsError.message }, { status: 500 })
+
   const { error } = await supabaseAdmin
     .from("newsletter_sends")
     .delete()
