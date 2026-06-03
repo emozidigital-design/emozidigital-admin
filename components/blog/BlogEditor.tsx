@@ -227,14 +227,29 @@ export default function BlogEditor({ initialData, isNew = false }: BlogEditorPro
         isCreated.current = true
       }
 
-      setPost(prev => ({
-        ...prev,
-        ...(pickDbFields(savedPost)),
-        industry: prev.industry,
-        // Preserve the cover image if the saved record came back without one
-        // (can happen when the admin DB hasn't stored the URL yet)
-        cover_image_url: savedPost?.cover_image_url || prev.cover_image_url,
-      }));
+      setPost(prev => {
+        const dbFields = pickDbFields(savedPost)
+        return {
+          ...prev,
+          ...dbFields,
+          // Preserve local state for fields the DB may return as null/empty
+          // on first save or when a column hasn't been written yet
+          industry: prev.industry,
+          cover_image_url: savedPost?.cover_image_url || prev.cover_image_url,
+          seo_title: savedPost?.seo_title || prev.seo_title,
+          seo_description: savedPost?.seo_description || prev.seo_description,
+          focus_keyword: savedPost?.focus_keyword || prev.focus_keyword,
+          schema_faq: (Array.isArray(savedPost?.schema_faq) && savedPost.schema_faq.length > 0)
+            ? savedPost.schema_faq
+            : prev.schema_faq,
+          image_prompts: (Array.isArray(savedPost?.image_prompts) && savedPost.image_prompts.length > 0)
+            ? savedPost.image_prompts
+            : prev.image_prompts,
+          tags: (Array.isArray(savedPost?.tags) && savedPost.tags.length > 0)
+            ? savedPost.tags
+            : prev.tags,
+        }
+      });
       lastSavedPostStr.current = JSON.stringify(pickDbFields(savedPost ?? dataToSave))
 
       // 2. If a client blog site is mapped, always sync there (draft or published)

@@ -87,12 +87,24 @@ export async function PUT(request: Request) {
       return NextResponse.json({ error: "ID is required for updates" }, { status: 400 });
     }
 
-    // Prevent accidental blank content from overwriting real content
-    if (updates.content === '' || updates.content === null) {
+    // Prevent blank/empty values from overwriting real data in the DB
+    const blankStringFields = ['content', 'seo_title', 'seo_description', 'focus_keyword'] as const
+    const blankArrayFields = ['schema_faq', 'image_prompts', 'tags'] as const
+    const needsCheck = blankStringFields.some(f => updates[f] === '' || updates[f] === null)
+      || blankArrayFields.some(f => Array.isArray(updates[f]) && (updates[f] as any[]).length === 0)
+    if (needsCheck) {
+      const selectCols = [...blankStringFields, ...blankArrayFields].join(',')
       const { data: existing } = await supabase
-        .from('blog_posts').select('content').eq('id', id).single()
-      if (existing?.content) {
-        delete updates.content
+        .from('blog_posts').select(selectCols).eq('id', id).single()
+      if (existing) {
+        for (const f of blankStringFields) {
+          if ((updates[f] === '' || updates[f] === null) && existing[f]) delete updates[f]
+        }
+        for (const f of blankArrayFields) {
+          if (Array.isArray(updates[f]) && (updates[f] as any[]).length === 0 && Array.isArray(existing[f]) && existing[f].length > 0) {
+            delete updates[f]
+          }
+        }
       }
     }
 
