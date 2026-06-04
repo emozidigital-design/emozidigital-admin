@@ -5,6 +5,8 @@ import toast from "react-hot-toast"
 import { MoreVertical } from "lucide-react"
 import { useClient } from "../client-context"
 import EmailEditorModal from "@/components/email/EmailEditorModal"
+import FareGenerator from "@/components/email/FareGenerator"
+import FareGeneratorPreview from "@/components/email/FareGeneratorPreview"
 
 interface Template {
   id: string
@@ -22,13 +24,35 @@ export default function TemplatesPage() {
   const { clientId } = useClient()
   const [templates, setTemplates] = useState<Template[]>([])
   const [loading, setLoading] = useState(true)
+  // Simple preview modal (kept for non-fare templates fallback)
   const [preview, setPreview] = useState<Template | null>(null)
   const [editorOpen, setEditorOpen] = useState(false)
   const [editorTemplate, setEditorTemplate] = useState<Template | null>(null)
 
+  // Template opened via ⋮ Edit/Preview — uses FareGeneratorPreview full-screen
+  const [templatePreviewOpen, setTemplatePreviewOpen] = useState(false)
+  const [templatePreviewData, setTemplatePreviewData] = useState<Template | null>(null)
+
   // ⋮ dropdown
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const menuRef = useRef<HTMLDivElement>(null)
+
+  // Fare generator state
+  const [farePreviewOpen, setFarePreviewOpen] = useState(false)
+  const [fareGeneratedHtml, setFareGeneratedHtml] = useState("")
+  const [fareTemplateName, setFareTemplateName] = useState("")
+  const [fareSubject, setFareSubject] = useState("")
+  const [fareTagIds, setFareTagIds] = useState<string[]>([])
+  const [fareTagNames, setFareTagNames] = useState<string[]>([])
+  // Editor opened from preview — tracks which preview to return to after save
+  const [fareEditorOpen, setFareEditorOpen] = useState(false)
+  const [fareEditorHtml, setFareEditorHtml] = useState("")
+  const [fareEditorName, setFareEditorName] = useState("")
+  const [fareEditorSubject, setFareEditorSubject] = useState("")
+  // "fare" = return to fare generator preview, "template" = return to template preview
+  const [fareEditorReturnTo, setFareEditorReturnTo] = useState<"fare" | "template">("fare")
+  // The template ID being edited in the editor (for PATCH + return flow)
+  const [fareEditorTemplateId, setFareEditorTemplateId] = useState<string | undefined>(undefined)
 
   async function fetchTemplates() {
     setLoading(true)
@@ -80,13 +104,14 @@ export default function TemplatesPage() {
 
   const startEdit = (t: Template) => {
     setOpenMenuId(null)
-    setEditorTemplate(t)
-    setEditorOpen(true)
+    setTemplatePreviewData(t)
+    setTemplatePreviewOpen(true)
   }
 
   const startPreview = (t: Template) => {
     setOpenMenuId(null)
-    setPreview(t)
+    setTemplatePreviewData(t)
+    setTemplatePreviewOpen(true)
   }
 
   const handleEditorSaved = () => {
@@ -109,6 +134,101 @@ export default function TemplatesPage() {
           New template
         </button>
       </div>
+
+      {/* Fare Email Generator */}
+      <FareGenerator
+        clientId={clientId ?? ""}
+        onGenerated={(html, templateName, subject, tagIds, tagNames) => {
+          setFareGeneratedHtml(html)
+          setFareTemplateName(templateName)
+          setFareSubject(subject)
+          setFareTagIds(tagIds)
+          setFareTagNames(tagNames)
+          setFarePreviewOpen(true)
+        }}
+      />
+
+      {/* Fare Generator Preview — for newly generated templates */}
+      {farePreviewOpen && (
+        <FareGeneratorPreview
+          open={farePreviewOpen}
+          onClose={() => setFarePreviewOpen(false)}
+          html={fareGeneratedHtml}
+          templateName={fareTemplateName}
+          subject={fareSubject}
+          clientId={clientId ?? ""}
+          tagIds={fareTagIds}
+          tagNames={fareTagNames}
+          onSaved={() => fetchTemplates()}
+          onEditRequested={(html, name, subject) => {
+            setFarePreviewOpen(false)
+            setFareEditorHtml(html)
+            setFareEditorName(name)
+            setFareEditorSubject(subject)
+            setFareEditorReturnTo("fare")
+            setFareEditorTemplateId(undefined)
+            setFareEditorOpen(true)
+          }}
+        />
+      )}
+
+      {/* Full-screen preview — for existing templates opened via ⋮ Edit / Preview */}
+      {templatePreviewOpen && templatePreviewData && (
+        <FareGeneratorPreview
+          open={templatePreviewOpen}
+          onClose={() => { setTemplatePreviewOpen(false); setTemplatePreviewData(null) }}
+          html={templatePreviewData.html_body}
+          templateName={templatePreviewData.name}
+          subject={templatePreviewData.subject}
+          clientId={clientId ?? ""}
+          tagIds={[]}
+          tagNames={[]}
+          existingTemplateId={templatePreviewData.id}
+          onSaved={() => fetchTemplates()}
+          onEditRequested={(html, name, subject) => {
+            setTemplatePreviewOpen(false)
+            setFareEditorHtml(html)
+            setFareEditorName(name)
+            setFareEditorSubject(subject)
+            setFareEditorReturnTo("template")
+            setFareEditorTemplateId(templatePreviewData?.id)
+            setFareEditorOpen(true)
+          }}
+        />
+      )}
+
+      {/* Editor opened from preview — returns to the correct preview after saving */}
+      <EmailEditorModal
+        open={fareEditorOpen}
+        onClose={() => setFareEditorOpen(false)}
+        clientId={clientId ?? ""}
+        initialTemplate={{
+          id: fareEditorTemplateId,
+          name: fareEditorName,
+          subject: fareEditorSubject,
+          html_body: fareEditorHtml,
+          template_type: "campaign",
+        }}
+        onSaved={async (savedId: string) => {
+          // Fetch the updated template to get the latest HTML
+          const res = await fetch(`/api/email/templates/${savedId}`)
+          const updated = await res.json()
+          fetchTemplates()
+          setFareEditorOpen(false)
+          if (fareEditorReturnTo === "template") {
+            // Return to full-screen template preview with fresh data
+            setTemplatePreviewData(updated)
+            setTemplatePreviewOpen(true)
+          } else {
+            // Return to fare generator preview with fresh HTML
+            setFareGeneratedHtml(updated.html_body ?? fareEditorHtml)
+            setFareTemplateName(updated.name ?? fareEditorName)
+            setFareSubject(updated.subject ?? fareEditorSubject)
+            setFarePreviewOpen(true)
+          }
+        }}
+        defaultTemplateType="campaign"
+      />
 
       {/* Preview modal */}
       {preview && (

@@ -642,18 +642,43 @@ interface CampaignFormProps {
   campaignTemplates: TemplateOption[]
   loadingCampaignData: boolean
   closeOverlay: () => void
+  prefillTemplateId?: string
+  prefillTagIds?: string[]
+  prefillSubject?: string
 }
 
-function CampaignForm({ editItem, clientId, senders, allTags, campaignTemplates, loadingCampaignData, closeOverlay }: CampaignFormProps) {
+function CampaignForm({ editItem, clientId, senders, allTags, campaignTemplates, loadingCampaignData, closeOverlay, prefillTemplateId, prefillTagIds, prefillSubject }: CampaignFormProps) {
   const initC = editItem?.rawCampaign
   const [form, setForm] = useState({
     client_id: clientId ?? "",
     sender_id: initC?.sender_id ?? "",
-    template_id: initC?.template_id ?? "",
-    subject: initC?.subject ?? "",
+    template_id: initC?.template_id ?? prefillTemplateId ?? "",
+    subject: initC?.subject ?? prefillSubject ?? "",
     scheduled_at: initC?.scheduled_at ? initC.scheduled_at.slice(0, 16) : "",
   })
-  const [selectedTagIds, setSelectedTagIds] = useState<string[]>(initC?.tag_ids ?? [])
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>(
+    initC?.tag_ids ?? prefillTagIds ?? []
+  )
+
+  // Re-apply prefill once async data finishes loading
+  // (select options and tag pills aren't available until loadCampaignData resolves)
+  const prefillApplied = useRef(false)
+  useEffect(() => {
+    if (loadingCampaignData || prefillApplied.current || initC) return
+    if (!prefillTemplateId && !prefillTagIds?.length && !prefillSubject) return
+    prefillApplied.current = true
+    if (prefillTemplateId) {
+      setForm(f => ({
+        ...f,
+        template_id: prefillTemplateId,
+        subject: prefillSubject || f.subject,
+      }))
+    }
+    if (prefillTagIds?.length) {
+      setSelectedTagIds(prefillTagIds)
+    }
+  }, [loadingCampaignData, prefillTemplateId, prefillTagIds, prefillSubject, initC, allTags])
+
   const [saving, setSaving] = useState(false)
   const [sending, setSending] = useState(false)
   const [sendingTest, setSendingTest] = useState(false)
@@ -917,6 +942,13 @@ export default function NewslettersPage() {
   const [dupTarget, setDupTarget] = useState<UnifiedEmail | null>(null)
   const [duping, setDuping] = useState(false)
 
+  // ── Fare generator pre-fill (via URL params from templates page) ─────────────
+  const [prefillCampaign, setPrefillCampaign] = useState<{
+    templateId: string
+    tagIds: string[]
+    subject: string | null
+  } | null>(null)
+
   // ─── Shared data (for newsletter wizard + campaign form) ────────────────────
   const [allTags, setAllTags]   = useState<Tag[]>([])
   const [senders, setSenders]   = useState<Sender[]>([])
@@ -947,6 +979,25 @@ export default function NewslettersPage() {
     document.addEventListener("mousedown", handler)
     return () => document.removeEventListener("mousedown", handler)
   }, [openMenuId])
+
+  // ─── URL param pre-fill from Fare Generator ──────────────────────────────────
+
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const mode = params.get("mode")
+    if (mode === "campaign") {
+      const templateId = params.get("template_id")
+      const tagIds = params.getAll("tag_id")
+      const subject = params.get("subject")
+      if (templateId) {
+        setPrefillCampaign({ templateId, tagIds, subject })
+        setCreateMode("campaign")
+        loadCampaignData()
+        window.history.replaceState({}, "", window.location.pathname)
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   // ─── Fetch list ─────────────────────────────────────────────────────────────
 
@@ -1123,6 +1174,7 @@ export default function NewslettersPage() {
   const closeOverlay = () => {
     setCreateMode(null)
     setEditItem(null)
+    setPrefillCampaign(null)
     refreshList()
   }
 
@@ -1312,6 +1364,9 @@ export default function NewslettersPage() {
       campaignTemplates={campaignTemplates}
       loadingCampaignData={loadingCampaignData}
       closeOverlay={closeOverlay}
+      prefillTemplateId={prefillCampaign?.templateId}
+      prefillTagIds={prefillCampaign?.tagIds}
+      prefillSubject={prefillCampaign?.subject ?? undefined}
     />
   )
 
