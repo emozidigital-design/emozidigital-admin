@@ -29,7 +29,7 @@ export async function POST(req: NextRequest) {
   const apiUrl = `https://admin.agentbazar.in/adminservice.api?tokenid=${tokenId}`
 
   const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), 30_000)
+  const timeout = setTimeout(() => controller.abort(), 55_000)
 
   // The API expects form-encoded body with a single "requestdata" field containing JSON
   const requestdata = JSON.stringify({

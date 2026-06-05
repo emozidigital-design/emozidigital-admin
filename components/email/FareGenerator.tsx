@@ -395,7 +395,7 @@ export default function FareGenerator({ clientId, onGenerated }: FareGeneratorPr
             />
           </div>
 
-          <div className="flex items-end">
+          <div className="flex items-end flex-col gap-1">
             <button
               onClick={handleGenerate}
               disabled={!canGenerate}
@@ -409,8 +409,13 @@ export default function FareGenerator({ clientId, onGenerated }: FareGeneratorPr
               {generating && (
                 <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
               )}
-              Generate
+              {generating ? "Fetching fares…" : "Generate"}
             </button>
+            {generating && (
+              <p className="text-[10px] text-white/40 text-center w-full">
+                Live fares may take up to 60s
+              </p>
+            )}
           </div>
 
         </div>
