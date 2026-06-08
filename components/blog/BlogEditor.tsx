@@ -80,10 +80,16 @@ const INDUSTRY_CATEGORIES: Record<string, string[]> = {
   "Media & Entertainment": ["News Portal", "Production House", "Music Label", "Influencer Brand", "Podcast", "OTT Media", "Event Entertainment", "Gaming"],
   "Other": ["Multi-Service Business", "Holding Company", "Local Services", "Miscellaneous Brand", "Startup Venture"],
 };
-// Emozi Digital (own) uses "Marketing and Tech" which exposes every category
-INDUSTRY_CATEGORIES["Marketing and Tech"] = Object.entries(INDUSTRY_CATEGORIES)
-  .filter(([k]) => k !== "Marketing and Tech")
-  .flatMap(([, v]) => v);
+// Emozi Digital (own) uses a fixed set of service categories
+INDUSTRY_CATEGORIES["Marketing and Tech"] = [
+  "SEO & Content",
+  "CRM",
+  "Performance Marketing",
+  "Media Buying",
+  "Meta & Google",
+  "Website Designing",
+  "AI Automation & Workflows",
+];
 
 const INDUSTRIES = Object.keys(INDUSTRY_CATEGORIES);
 
