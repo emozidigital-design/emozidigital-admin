@@ -7,6 +7,7 @@ import Link from "next/link"
 import { exportToCSV } from "@/lib/exportCSV"
 import { useClientUpdate } from "@/lib/useClientUpdate"
 import OnboardingViewer from "./_components/OnboardingViewer"
+import BlogSitesTab from "./_components/BlogSitesTab"
 
 const fetcher = (url: string) => fetch(url).then(r => { if (!r.ok) throw new Error(`${r.status}`); return r.json() })
 
@@ -2155,7 +2156,7 @@ function EmptyState({ icon, message }: { icon: string; message: string }) {
 // ─── Page ────────────────────────────────────────────────────────────────────
 
 const TABS = [
-  "Overview", "Brand Kit", "Social Accounts", "Onboarding", "Content Calendar", "Legal", "Internal Notes", "Access & Credentials", "Package & Project", "Content Generator", "Context Pack"
+  "Overview", "Brand Kit", "Social Accounts", "Onboarding", "Content Calendar", "Legal", "Internal Notes", "Access & Credentials", "Package & Project", "Content Generator", "Context Pack", "Blog Sites"
 ]
 
 export default function ClientDetailPage({ params }: { params: { id: string } }) {
@@ -2378,6 +2379,7 @@ export default function ClientDetailPage({ params }: { params: { id: string } })
         {activeTab === 8 && <PackageTab client={client} />}
         {activeTab === 9  && <ContentGeneratorTab client={client} />}
         {activeTab === 10 && <ContextPackTab client={client} />}
+        {activeTab === 11 && <BlogSitesTab client={client} />}
       </div>
     </div>
   )

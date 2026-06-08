@@ -21,6 +21,7 @@ import toast from "react-hot-toast"
 import { FAQBuilder } from "./FAQBuilder"
 import { GooglePreview } from "./GooglePreview"
 import { AIGeneratePanel, type GeneratedBlogData } from "./AIGeneratePanel"
+import type { BlogSitePublic } from "@/lib/blog-sites"
 
 // Dynamically import MD editor to avoid SSR issues
 const MDEditor = dynamic(
@@ -86,24 +87,6 @@ INDUSTRY_CATEGORIES["Marketing and Tech"] = Object.entries(INDUSTRY_CATEGORIES)
 
 const INDUSTRIES = Object.keys(INDUSTRY_CATEGORIES);
 
-/**
- * CLIENT BLOG SITE MAPPING
- * Maps client name substrings (case-insensitive) to their external blog configuration.
- * To add a new client: add an entry below with a unique substring of their legal name.
- * Step-by-step guide for new clients:
- *   1. Add their Supabase credentials to .env.local (e.g. NEWCLIENT_SUPABASE_URL, NEWCLIENT_SUPABASE_SERVICE_ROLE_KEY)
- *   2. Create lib/supabase-newclient.ts (copy supabase-agentbazar.ts pattern)
- *   3. Create app/api/blog/newclient/route.ts (copy agentbazar route.ts pattern)
- *   4. Add an entry here: { nameMatch: "client legal name substring", apiPath: "/api/blog/newclient", siteUrl: "https://blog.newclient.com", name: "Client Blog Name" }
- */
-const CLIENT_BLOG_SITES: { nameMatch: string; apiPath: string; siteUrl: string; name: string }[] = [
-  {
-    nameMatch: "tripforu",
-    apiPath: "/api/blog/agentbazar",
-    siteUrl: "https://blog.agentbazar.in",
-    name: "Agent Bazar Blog",
-  },
-];
 
 const fetcher = (url: string) => fetch(url).then(r => r.json())
 
@@ -154,12 +137,10 @@ export default function BlogEditor({ initialData, isNew = false }: BlogEditorPro
   const { data: clientsData, isLoading: clientsLoading } = useSWR<{ clients: { id: string; name: string; industry: string }[] }>('/api/clients', fetcher)
   const clients = clientsData?.clients ?? []
 
-  // Resolve which external blog site is linked to the currently selected client (if any)
-  const selectedClient = clients.find(c => c.id === post.client_id) ?? null
-  const selectedClientName = selectedClient?.name ?? ""
-  const clientBlogSite = CLIENT_BLOG_SITES.find(
-    s => selectedClientName.toLowerCase().includes(s.nameMatch.toLowerCase())
-  ) ?? null
+  // Fetch blog sites for the selected client (or "own" for Emozi Digital)
+  const blogSitesKey = clientsLoading ? null : `/api/blog/sites?client_id=${post.client_id ?? "own"}`
+  const { data: blogSitesData, isLoading: blogSitesLoading } = useSWR<{ sites: BlogSitePublic[] }>(blogSitesKey, fetcher)
+  const clientBlogSites = blogSitesData?.sites ?? []
 
   const [isSaving, setIsSaving] = useState(false)
   const [customCategories, setCustomCategories] = useState<Record<string, string[]>>({})
@@ -252,31 +233,33 @@ export default function BlogEditor({ initialData, isNew = false }: BlogEditorPro
       });
       lastSavedPostStr.current = JSON.stringify(pickDbFields(savedPost ?? dataToSave))
 
-      // 2. If a client blog site is mapped, always sync there (draft or published)
-      if (clientBlogSite) {
-        try {
-          const extRes = await fetch(clientBlogSite.apiPath, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(dataToSave),
-          })
-          if (!extRes.ok) {
-            const extErr = await extRes.json()
-            if (!options.silent) {
-              toast.error(`Saved internally but failed to sync to ${clientBlogSite.name}: ${extErr.error}`, { duration: 6000 })
+      // 2. Sync to all configured blog sites for this client
+      if (clientBlogSites.length > 0) {
+        const results = await Promise.allSettled(
+          clientBlogSites.map(site =>
+            fetch('/api/blog/sync', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ postData: dataToSave, clientId: post.client_id ?? "own", siteId: site.id }),
+            }).then(r => r.json().then((d: any) => ({ site, ok: r.ok, data: d })))
+          )
+        )
+        if (!options.silent) {
+          results.forEach(r => {
+            if (r.status === 'fulfilled' && !r.value.ok) {
+              toast.error(`Saved internally but failed to sync to ${r.value.site.name}: ${r.value.data.error}`, { duration: 6000 })
             }
-          } else if (!options.silent) {
-            toast.success(options.publish ? `Published to Emozi & ${clientBlogSite.name}!` : "Draft saved to both blogs")
-          }
-        } catch (extErr: any) {
-          if (!options.silent) {
-            toast.error(`Saved internally but failed to reach ${clientBlogSite.name}: ${extErr.message}`)
+          })
+          const allOk = results.every(r => r.status === 'fulfilled' && (r.value as any).ok)
+          if (allOk) {
+            const names = clientBlogSites.map(s => s.name).join(' & ')
+            toast.success(options.publish ? `Published to Emozi & ${names}!` : `Draft synced to ${names}`)
           }
         }
       } else if (!options.silent) {
         toast.success(options.publish ? "Post published successfully!" : "Draft saved successfully")
         if (options.publish) {
-          toast("No external blog site linked — post saved to Emozi only. Select a client to sync to AgentBazar.", {
+          toast("No blog sites configured — post saved to Emozi only. Add a blog site under the client's Blog Sites tab.", {
             icon: "⚠️",
             duration: 7000,
           })
@@ -299,10 +282,10 @@ export default function BlogEditor({ initialData, isNew = false }: BlogEditorPro
     }
   }
 
-  // Auto-save: debounced 1.5s after last change; wait for clients to load
-  // so clientBlogSite is resolved before the first sync fires
+  // Auto-save: debounced 1.5s after last change; wait for clients and blog sites to load
+  // so clientBlogSites is resolved before the first sync fires
   useEffect(() => {
-    if (clientsLoading) return
+    if (clientsLoading || blogSitesLoading) return
     autoSaveTimer.current = setTimeout(() => {
       const currentPostStr = JSON.stringify(pickDbFields(post))
       if (currentPostStr !== lastSavedPostStr.current && post.title) {
@@ -313,7 +296,7 @@ export default function BlogEditor({ initialData, isNew = false }: BlogEditorPro
     return () => {
       if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current)
     }
-  }, [post, clientsLoading])
+  }, [post, clientsLoading, blogSitesLoading])
 
   const updatePost = (updates: Partial<BlogPost>) => {
     setPost(prev => ({ ...prev, ...updates }))
@@ -487,16 +470,16 @@ export default function BlogEditor({ initialData, isNew = false }: BlogEditorPro
               <Globe className="w-4 h-4" />
               {post.status === 'published' ? 'Update Post' : 'Publish Now'}
             </button>
-            {clientBlogSite && (
+            {clientBlogSites.length > 0 && (
               <span className="text-[9px] text-[#70BF4B]/70 font-mono mt-1">
-                → {clientBlogSite.name}
+                → {clientBlogSites.length === 1 ? clientBlogSites[0].name : `${clientBlogSites.length} sites`}
               </span>
             )}
           </div>
           
           {post.status === 'published' && (
             <a
-              href={clientBlogSite ? `${clientBlogSite.siteUrl}/${post.slug}` : `https://emozidigital.com/blog/${post.slug}`}
+              href={clientBlogSites[0] ? `${clientBlogSites[0].site_url}/${post.slug}` : `https://emozidigital.com/blog/${post.slug}`}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center gap-2 text-[#70BF4B] hover:text-[#5faa3e] text-xs font-bold px-4 py-2.5 rounded-xl border border-[#70BF4B]/20 bg-[#70BF4B]/5 transition-all"
