@@ -144,7 +144,6 @@ export async function POST(req: NextRequest) {
             content: `Here is the source content to process into a complete blog post package:\n\n---\n${sourceContent}\n---`,
           },
         ],
-        response_format: { type: 'json_object' },
         max_tokens: 8000,
       }),
       signal: AbortSignal.timeout(90000),
@@ -162,9 +161,10 @@ export async function POST(req: NextRequest) {
 
     let result: any
     try {
-      result = JSON.parse(raw)
+      const cleaned = raw.replace(/^```(?:json)?\s*/i, '').replace(/\s*```\s*$/i, '').trim()
+      result = JSON.parse(cleaned)
     } catch {
-      throw new Error('OpenAI returned malformed JSON. Please try again.')
+      throw new Error('OpenRouter returned malformed JSON. Please try again.')
     }
 
     if (!result.title || !result.content) {
