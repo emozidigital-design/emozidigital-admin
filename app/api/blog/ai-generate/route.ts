@@ -3,7 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 120
 
-const OPENAI_API_KEY = process.env.OPENAI_API?.trim()
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY?.trim()
 
 function extractTextFromHtml(html: string): string {
   return html
@@ -96,8 +96,8 @@ Return exactly this JSON structure (all fields required):
 }`
 
 export async function POST(req: NextRequest) {
-  if (!OPENAI_API_KEY) {
-    return NextResponse.json({ error: 'OpenAI API key not configured (OPENAI_API)' }, { status: 500 })
+  if (!OPENROUTER_API_KEY) {
+    return NextResponse.json({ error: 'OpenRouter API key not configured (OPENROUTER_API_KEY)' }, { status: 500 })
   }
 
   try {
@@ -127,14 +127,16 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const openAiRes = await fetch('https://api.openai.com/v1/chat/completions', {
+    const openAiRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${OPENAI_API_KEY}`,
+        Authorization: `Bearer ${OPENROUTER_API_KEY}`,
         'Content-Type': 'application/json',
+        'HTTP-Referer': 'https://admin.emozidigital.com',
+        'X-Title': 'Emozi Digital Admin',
       },
       body: JSON.stringify({
-        model: 'gpt-5.4-mini',
+        model: 'moonshotai/kimi-k2',
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
           {
@@ -143,14 +145,14 @@ export async function POST(req: NextRequest) {
           },
         ],
         response_format: { type: 'json_object' },
-        max_completion_tokens: 8000,
+        max_tokens: 8000,
       }),
       signal: AbortSignal.timeout(90000),
     })
 
     if (!openAiRes.ok) {
       const errText = await openAiRes.text()
-      throw new Error(`OpenAI API error ${openAiRes.status}: ${errText.substring(0, 300)}`)
+      throw new Error(`OpenRouter API error ${openAiRes.status}: ${errText.substring(0, 300)}`)
     }
 
     const aiData = await openAiRes.json()
