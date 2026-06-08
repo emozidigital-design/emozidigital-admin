@@ -22,3 +22,9 @@ export interface BlogSitePublic {
   type: BlogSiteType
   configured: boolean
 }
+
+// Per-client AI blog generation config — stored in section_l.blog_prompt / section_l.blog_model
+export interface BlogPromptConfig {
+  blog_prompt?: string
+  blog_model?: string
+}

@@ -501,7 +501,7 @@ export default function BlogEditor({ initialData, isNew = false }: BlogEditorPro
         {/* Left Panel: Editor */}
         <div className="flex-1 overflow-y-auto p-6 md:p-10 space-y-10 custom-scrollbar">
           {/* AI Content Generator */}
-          <AIGeneratePanel onApply={handleAIApply} defaultExpanded={isNew} />
+          <AIGeneratePanel onApply={handleAIApply} defaultExpanded={isNew} clientId={post.client_id ?? null} />
 
           {/* Title Section */}
           <div className="space-y-4">

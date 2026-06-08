@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { supabase } from '@/lib/supabase'
 
 export const dynamic = 'force-dynamic'
 export const maxDuration = 120
@@ -40,9 +41,7 @@ async function fetchUrlContent(url: string): Promise<string> {
   return text
 }
 
-const SYSTEM_PROMPT = `You are a professional creative content blog writer specializing in the B2B travel and aviation industry, creating SEO-optimized content for AgentBazar.in — tailored for B2B travel agents, consolidators, corporate travel planners, and airline professionals.
-
-Your task: analyze the provided source content and generate a high-quality blog post. You MUST respond with a valid JSON object ONLY — no markdown fences, no extra text, no preamble.
+const DEFAULT_SYSTEM_PROMPT = `You are a professional creative content blog writer. Your task: analyze the provided source content and generate a high-quality, SEO-optimized blog post. You MUST respond with a valid JSON object ONLY — no markdown fences, no extra text, no preamble.
 
 === PART 1 — BLOG REWRITE ===
 
@@ -50,28 +49,26 @@ Your task: analyze the provided source content and generate a high-quality blog 
 - Rewrite in a completely original, human-like tone. Keep core ideas but modify sentence structure, vocabulary, and flow for originality and engagement.
 - The result must be free from plagiarism and AI detection flags.
 - Format with clear ** at the start and end of headings and subheadings in Markdown.
-- Have 3-4 bullet points starting with - to support main points 
+- Have 3-4 bullet points starting with - to support main points.
 - Keep paragraph lengths short (2–4 lines max) for mobile readability.
-- End with a "**CONCLUSION**" or "**KEY TAKEAWAY**" section relevant to B2B travel professionals.
-- Insert exactly ONE call-to-action at the bottom: "Want more travel updates like this? Follow our updates at blog.agentbazar.in and transform how you support your clients at every stage of travel."
+- End with a "**CONCLUSION**" or "**KEY TAKEAWAY**" section.
 
 === PART 2 — SEO OPTIMIZATION ===
 
-1. SEO Title — max 60 characters, includes primary keyword, compelling and click-worthy. Do not exceed 60 characters.
+1. SEO Title — max 60 characters, includes primary keyword, compelling and click-worthy.
 2. Meta Description — 140–160 characters, includes primary keyword, concise summary with a value hook.
-3. SEO Keywords — 3–6 high-intent keyword phrases, comma-separated, optimized for B2B travel industry.
-4. Author — always exactly "Agent Bazar Editorial Team".
-5. Excerpt — SEO-optimized short description of the post, under 255 characters, includes keyword variations naturally.
+3. SEO Keywords — 3–6 high-intent keyword phrases, comma-separated.
+4. Excerpt — SEO-optimized short description of the post, under 255 characters.
 
-=== PART 3 - IMAGE CAPTION GENERATION ===
+=== PART 3 — IMAGE PROMPTS ===
 
-Create 3 advanced, realistic image generation prompts relevant for the above blog post, specifically designed for B2B travel industry. These prompts will generate eye-catching, realistic, and relevant visuals  Note - create an tool image exact size 1200 px * 800 px
+Create 3 advanced, realistic image generation prompts relevant for the blog post. Size: 1200px × 800px.
 
-=== PART 4 - FAQ'S GENERATION ===
+=== PART 4 — FAQs ===
 
-Create 5 frequently asked questions (FAQs) relevant for the above blog post, specifically designed for B2B travel industry. Add those FAQs to the FAQ builder section in JSON response.
+Create 5 frequently asked questions (FAQs) relevant for the blog post.
 
-== REQUIRED JSON RESPONSE FORMAT ===
+=== REQUIRED JSON RESPONSE FORMAT ===
 Return exactly this JSON structure (all fields required):
 {
   "title": "Blog post title",
@@ -82,9 +79,9 @@ Return exactly this JSON structure (all fields required):
   "seo_description": "140-160 chars meta description",
   "focus_keyword": "primary keyword phrase",
   "tags": ["keyword1", "keyword2", "keyword3"],
-  "author": "Agent Bazar Editorial Team",
-  "category": "One of: Aviation, Visa Updates, Travel Tips, Industry News, Industry Trends, Travel Tools, Cruise, Top Sectors, New Launches, Events & Expo",
-  "industry": "Aviation",
+  "author": "Editorial Team",
+  "category": "Relevant category for the topic",
+  "industry": "Relevant industry",
   "image_prompts": ["detailed image generation prompt 1", "detailed image generation prompt 2", "detailed image generation prompt 3"],
   "schema_faq": [
     { "question": "FAQ question 1?", "answer": "Detailed answer 1." },
@@ -94,6 +91,29 @@ Return exactly this JSON structure (all fields required):
     { "question": "FAQ question 5?", "answer": "Detailed answer 5." }
   ]
 }`
+
+async function resolveClientPrompt(clientId: string): Promise<{ prompt: string; model: string }> {
+  const defaultModel = 'openai/gpt-oss-20b'
+
+  if (clientId === 'own') {
+    return {
+      prompt: process.env.EMOZI_BLOG_PROMPT || DEFAULT_SYSTEM_PROMPT,
+      model: process.env.EMOZI_BLOG_MODEL || defaultModel,
+    }
+  }
+
+  const { data } = await supabase
+    .from('clients')
+    .select('section_l')
+    .eq('id', clientId)
+    .single()
+
+  const sL = (data?.section_l as any) ?? {}
+  return {
+    prompt: sL.blog_prompt || DEFAULT_SYSTEM_PROMPT,
+    model: sL.blog_model || defaultModel,
+  }
+}
 
 export async function POST(req: NextRequest) {
   if (!OPENROUTER_API_KEY) {
@@ -105,6 +125,7 @@ export async function POST(req: NextRequest) {
       type: 'url' | 'text'
       url?: string
       content?: string
+      client_id?: string
     }
 
     let sourceContent = ''
@@ -127,6 +148,10 @@ export async function POST(req: NextRequest) {
       )
     }
 
+    const { prompt: systemPrompt, model } = body.client_id
+      ? await resolveClientPrompt(body.client_id)
+      : { prompt: DEFAULT_SYSTEM_PROMPT, model: 'openai/gpt-oss-20b' }
+
     const openAiRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -136,9 +161,9 @@ export async function POST(req: NextRequest) {
         'X-Title': 'Emozi Digital Admin',
       },
       body: JSON.stringify({
-        model: 'openai/gpt-oss-20b',
+        model,
         messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'system', content: systemPrompt },
           {
             role: 'user',
             content: `Here is the source content to process into a complete blog post package:\n\n---\n${sourceContent}\n---`,

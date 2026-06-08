@@ -3,7 +3,17 @@
 import { useState } from "react"
 import { useClientUpdate } from "@/lib/useClientUpdate"
 import type { BlogSite, BlogSiteType } from "@/lib/blog-sites"
-import { Globe, Pencil, Trash2, Plus, Eye, EyeOff, X, Check } from "lucide-react"
+import { Globe, Pencil, Trash2, Plus, Eye, EyeOff, X, Check, Bot } from "lucide-react"
+
+const OPENROUTER_MODELS = [
+  { value: "openai/gpt-oss-20b", label: "GPT OSS 20B (Default)" },
+  { value: "openai/gpt-4o", label: "GPT-4o" },
+  { value: "openai/gpt-4o-mini", label: "GPT-4o Mini" },
+  { value: "anthropic/claude-sonnet-4-5", label: "Claude Sonnet 4.5" },
+  { value: "anthropic/claude-haiku-4-5", label: "Claude Haiku 4.5" },
+  { value: "google/gemini-2.0-flash-001", label: "Gemini 2.0 Flash" },
+  { value: "meta-llama/llama-3.3-70b-instruct", label: "Llama 3.3 70B" },
+]
 
 type SupabaseClient = {
   id: string
@@ -293,6 +303,19 @@ export default function BlogSitesTab({ client }: { client: SupabaseClient }) {
   )
   const [showModal, setShowModal] = useState(false)
   const [editingSite, setEditingSite] = useState<BlogSite | null>(null)
+  const [blogPrompt, setBlogPrompt] = useState<string>(
+    ((client.section_l as any)?.blog_prompt ?? '') as string
+  )
+  const [blogModel, setBlogModel] = useState<string>(
+    ((client.section_l as any)?.blog_model ?? '') as string
+  )
+  const [promptSaving, setPromptSaving] = useState(false)
+
+  function savePrompt() {
+    setPromptSaving(true)
+    update('section_l', { blog_prompt: blogPrompt, blog_model: blogModel })
+    setTimeout(() => setPromptSaving(false), 1500)
+  }
 
   function persist(updated: BlogSite[]) {
     setSites(updated)
@@ -392,6 +415,62 @@ export default function BlogSitesTab({ client }: { client: SupabaseClient }) {
           <li><strong>Webhook:</strong> Post data is POSTed as JSON to your endpoint with an optional Bearer token.</li>
           <li>Blog posts sync automatically on every save in the Blog Editor.</li>
         </ul>
+      </div>
+
+      {/* Blog Prompt Section */}
+      <div className="bg-white border border-zinc-200 rounded-xl overflow-hidden shadow-sm">
+        <div className="px-5 py-3 border-b border-zinc-100 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-1 h-4 rounded-full bg-[#D0F255]" />
+            <Bot className="w-4 h-4 text-zinc-500" />
+            <h3 className="text-zinc-900 text-sm font-semibold">Blog AI Prompt</h3>
+          </div>
+          <div className="flex items-center gap-3">
+            {saving && <span className="text-xs text-zinc-400">Saving…</span>}
+            {saved && <span className="text-xs text-[#70BF4B]">Saved</span>}
+          </div>
+        </div>
+
+        <div className="p-5 space-y-4">
+          <div>
+            <label className="block text-xs text-zinc-500 mb-1.5">LLM Model</label>
+            <select
+              value={blogModel}
+              onChange={e => setBlogModel(e.target.value)}
+              className="w-full bg-zinc-50 border border-zinc-200 rounded-lg px-3 py-2 text-sm text-zinc-900 outline-none focus:border-[#003434] transition-colors"
+            >
+              <option value="">Default (GPT OSS 20B)</option>
+              {OPENROUTER_MODELS.map(m => (
+                <option key={m.value} value={m.value}>{m.label}</option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="block text-xs text-zinc-500 mb-1.5">System Prompt</label>
+            <textarea
+              value={blogPrompt}
+              onChange={e => setBlogPrompt(e.target.value)}
+              placeholder="Enter a custom AI system prompt for this client's blog generation. Leave empty to use the generic default prompt."
+              rows={10}
+              className="w-full bg-zinc-50 border border-zinc-200 rounded-lg px-3 py-2 text-sm text-zinc-900 outline-none focus:border-[#003434] transition-colors resize-y font-mono"
+            />
+            <p className="text-[10px] text-zinc-400 mt-1">
+              Leave empty to use the generic default prompt. The prompt should instruct the AI and end with the required JSON response format.
+            </p>
+          </div>
+
+          <div className="flex justify-end">
+            <button
+              onClick={savePrompt}
+              disabled={promptSaving}
+              className="flex items-center gap-2 bg-[#003434] hover:bg-[#004444] disabled:opacity-50 text-white text-sm font-semibold px-4 py-2 rounded-xl transition-colors"
+            >
+              <Check className="w-4 h-4" />
+              {promptSaving ? 'Saving…' : 'Save Prompt'}
+            </button>
+          </div>
+        </div>
       </div>
 
       {showModal && (

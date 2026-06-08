@@ -33,6 +33,7 @@ export type GeneratedBlogData = {
 type Props = {
   onApply: (data: GeneratedBlogData) => void
   defaultExpanded?: boolean
+  clientId?: string | null
 }
 
 type InputMode = "url" | "text"
@@ -49,7 +50,7 @@ const STEPS: Step[] = [
   { label: "Generating social media copy...", done: false },
 ]
 
-export function AIGeneratePanel({ onApply, defaultExpanded = false }: Props) {
+export function AIGeneratePanel({ onApply, defaultExpanded = false, clientId }: Props) {
   const [isExpanded, setIsExpanded] = useState(defaultExpanded)
   const [inputMode, setInputMode] = useState<InputMode>("url")
   const [urlInput, setUrlInput] = useState("")
@@ -79,10 +80,11 @@ export function AIGeneratePanel({ onApply, defaultExpanded = false }: Props) {
     const t3 = setTimeout(() => markStep(2), 18000)
 
     try {
-      const body =
+      const body: Record<string, string> =
         inputMode === "url"
           ? { type: "url", url: input }
           : { type: "text", content: input }
+      if (clientId) body.client_id = clientId
 
       const res = await fetch("/api/blog/ai-generate", {
         method: "POST",
@@ -167,7 +169,7 @@ export function AIGeneratePanel({ onApply, defaultExpanded = false }: Props) {
           <div>
             <h3 className="text-white font-bold text-sm">AI Content Generator</h3>
             <p className="text-[#70BF4B]/40 text-[9px] uppercase tracking-widest font-bold mt-0.5">
-              AgentBazar PROMPT_AB
+              {clientId ? "Client Prompt" : "Default Prompt"}
             </p>
           </div>
         </div>
