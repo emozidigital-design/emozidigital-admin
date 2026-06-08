@@ -136,7 +136,7 @@ export async function POST(req: NextRequest) {
         'X-Title': 'Emozi Digital Admin',
       },
       body: JSON.stringify({
-        model: 'moonshotai/kimi-k2',
+        model: 'openai/gpt-oss-20b',
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },
           {
