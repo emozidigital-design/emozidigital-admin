@@ -1089,6 +1089,27 @@ export default function EmailEditorModal({
         </button>
       </div>
 
+      {/* Variable chips */}
+      <div className="flex items-center gap-1.5 px-4 py-1.5 bg-zinc-50 border-b border-zinc-200 flex-wrap">
+        <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider shrink-0">Variables:</span>
+        {[
+          { key: "{{name}}", desc: "Recipient name" },
+          { key: "{{agent_name}}", desc: "Agent name" },
+          { key: "{{email}}", desc: "Recipient email" },
+          { key: "{{unsubscribe}}", desc: "Unsubscribe link" },
+        ].map(v => (
+          <button
+            key={v.key}
+            title={v.desc}
+            onClick={() => navigator.clipboard.writeText(v.key)}
+            className="text-[10px] font-mono bg-white border border-zinc-200 hover:border-[#003434] hover:text-[#003434] text-zinc-600 px-1.5 py-0.5 rounded transition-colors"
+          >
+            {v.key}
+          </button>
+        ))}
+        <span className="text-[10px] text-zinc-300 ml-1">click to copy</span>
+      </div>
+
       {/* ── Body ── */}
       <div className="flex flex-1 overflow-hidden">
 
