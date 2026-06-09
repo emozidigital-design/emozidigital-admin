@@ -877,6 +877,7 @@ export default function EmailEditorModal({
   const [templateType, setTemplateType] = useState<"campaign" | "newsletter">(defaultTemplateType)
   const [saving, setSaving] = useState(false)
   const [dragOverCanvas, setDragOverCanvas] = useState(false)
+  const [showAgentBazarHeader, setShowAgentBazarHeader] = useState(true)
 
   // For HTML mode: live preview pane
   const [showHtmlPreview, setShowHtmlPreview] = useState(true)
@@ -907,6 +908,7 @@ export default function EmailEditorModal({
     }
     setSelectedId(null)
     setSavedTemplateId(null)
+    setShowAgentBazarHeader(true)
   }, [open, initialTemplate, defaultTemplateType])
 
   const addBlock = useCallback((block: EmailBlock) => {
@@ -961,7 +963,7 @@ export default function EmailEditorModal({
   }
 
   function handleSwitchToHtml() {
-    const header = isAgentBazar ? AGENTBAZAR_HEADER_HTML : undefined
+    const header = isAgentBazar && showAgentBazarHeader ? AGENTBAZAR_HEADER_HTML : undefined
     const html = blocksToHtml(blocks, header) + `\n<!-- blocks-json:${JSON.stringify(blocks)} -->`
     setHtmlSource(html)
     setMode("html")
@@ -992,7 +994,7 @@ export default function EmailEditorModal({
     if (!name.trim()) { toast.error("Template name is required"); return }
     if (!subject.trim()) { toast.error("Subject line is required"); return }
     setSaving(true)
-    const header = isAgentBazar ? AGENTBAZAR_HEADER_HTML : undefined
+    const header = isAgentBazar && showAgentBazarHeader ? AGENTBAZAR_HEADER_HTML : undefined
     const html =
       mode === "html"
         ? htmlSource
@@ -1148,22 +1150,40 @@ export default function EmailEditorModal({
         ) : (
           /* Visual mode canvas */
           <div className="flex-1 overflow-y-auto p-6 bg-zinc-100">
-            {/* AgentBazar fixed header preview (non-editable) */}
+            {/* AgentBazar header preview (toggleable) */}
             {isAgentBazar && (
-              <div className="w-[600px] mx-auto mb-0 select-none pointer-events-none">
-                <div className="relative">
-                  <div style={{ background: "#001D4A", height: 10 }} />
-                  <div style={{ background: "#ffffff", padding: "10px 24px", textAlign: "center" }}>
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src="https://blog.agentbazar.in/new-logo.jpg" alt="AgentBazar" style={{ height: 52, display: "inline-block" }}
-                      onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none" }}
-                    />
+              <div className="w-[600px] mx-auto mb-0">
+                {showAgentBazarHeader ? (
+                  <div className="relative select-none pointer-events-none">
+                    <div style={{ background: "#001D4A", height: 10 }} />
+                    <div style={{ background: "#ffffff", padding: "10px 24px", textAlign: "center" }}>
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src="https://blog.agentbazar.in/new-logo.jpg" alt="AgentBazar" style={{ height: 52, display: "inline-block" }}
+                        onError={e => { (e.currentTarget as HTMLImageElement).style.display = "none" }}
+                      />
+                    </div>
+                    <div style={{ background: "#F47920", height: 10 }} />
+                    <div className="pointer-events-auto absolute inset-0 flex items-center justify-end pr-2 pt-1">
+                      <button
+                        onClick={() => setShowAgentBazarHeader(false)}
+                        className="text-[9px] font-bold bg-[#F47920] hover:bg-red-600 text-white px-1.5 py-0.5 rounded flex items-center gap-1 transition-colors"
+                        title="Remove header"
+                      >
+                        HEADER ✕
+                      </button>
+                    </div>
                   </div>
-                  <div style={{ background: "#F47920", height: 10 }} />
-                  <div className="absolute inset-0 flex items-center justify-end pr-2 pt-1">
-                    <span className="text-[9px] font-bold bg-[#F47920] text-white px-1.5 py-0.5 rounded select-none">FIXED HEADER</span>
+                ) : (
+                  <div className="flex items-center justify-center py-2 border-2 border-dashed border-zinc-300 rounded text-zinc-400 text-xs gap-2">
+                    <span>Header removed</span>
+                    <button
+                      onClick={() => setShowAgentBazarHeader(true)}
+                      className="text-[10px] font-semibold bg-zinc-200 hover:bg-zinc-300 text-zinc-600 px-2 py-0.5 rounded transition-colors"
+                    >
+                      + Add header
+                    </button>
                   </div>
-                </div>
+                )}
               </div>
             )}
 
