@@ -93,7 +93,7 @@ Return exactly this JSON structure (all fields required):
 }`
 
 async function resolveClientPrompt(clientId: string): Promise<{ prompt: string; model: string }> {
-  const defaultModel = 'openai/gpt-oss-20b'
+  const defaultModel = 'openai/gpt-5.4-mini'
 
   if (clientId === 'own') {
     return {

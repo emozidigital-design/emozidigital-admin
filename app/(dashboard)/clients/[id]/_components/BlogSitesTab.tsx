@@ -6,13 +6,44 @@ import type { BlogSite, BlogSiteType } from "@/lib/blog-sites"
 import { Globe, Pencil, Trash2, Plus, Eye, EyeOff, X, Check, Bot } from "lucide-react"
 
 const OPENROUTER_MODELS = [
-  { value: "openai/gpt-oss-20b", label: "GPT OSS 20B (Default)" },
+  // OpenAI
+  { value: "openai/gpt-5.4-mini", label: "GPT-5.4 Mini" },
+  { value: "openai/gpt-5.4", label: "GPT-5.4" },
+  { value: "openai/gpt-5.4-pro", label: "GPT-5.4 Pro" },
+  { value: "openai/gpt-5-mini", label: "GPT-5 Mini" },
+  { value: "openai/gpt-5", label: "GPT-5" },
+  { value: "openai/gpt-4.1", label: "GPT-4.1" },
+  { value: "openai/gpt-4.1-mini", label: "GPT-4.1 Mini" },
+  { value: "openai/gpt-4.1-nano", label: "GPT-4.1 Nano" },
   { value: "openai/gpt-4o", label: "GPT-4o" },
   { value: "openai/gpt-4o-mini", label: "GPT-4o Mini" },
-  { value: "anthropic/claude-sonnet-4-5", label: "Claude Sonnet 4.5" },
-  { value: "anthropic/claude-haiku-4-5", label: "Claude Haiku 4.5" },
-  { value: "google/gemini-2.0-flash-001", label: "Gemini 2.0 Flash" },
+  { value: "openai/gpt-oss-20b", label: "GPT OSS 20B" },
+  { value: "openai/gpt-oss-120b", label: "GPT OSS 120B" },
+  { value: "openai/o4-mini", label: "o4 Mini" },
+  { value: "openai/o3-mini", label: "o3 Mini" },
+  // Anthropic
+  { value: "anthropic/claude-sonnet-4.6", label: "Claude Sonnet 4.6" },
+  { value: "anthropic/claude-sonnet-4.5", label: "Claude Sonnet 4.5" },
+  { value: "anthropic/claude-haiku-4.5", label: "Claude Haiku 4.5" },
+  { value: "anthropic/claude-opus-4", label: "Claude Opus 4" },
+  // Google
+  { value: "google/gemini-2.5-flash", label: "Gemini 2.5 Flash" },
+  { value: "google/gemini-2.5-flash-lite", label: "Gemini 2.5 Flash Lite" },
+  { value: "google/gemini-2.5-pro", label: "Gemini 2.5 Pro" },
+  // DeepSeek
+  { value: "deepseek/deepseek-chat-v3.1", label: "DeepSeek V3.1" },
+  { value: "deepseek/deepseek-r1-0528", label: "DeepSeek R1 0528" },
+  // Qwen
+  { value: "qwen/qwen3-235b-a22b", label: "Qwen3 235B A22B" },
+  { value: "qwen/qwen3-32b", label: "Qwen3 32B" },
+  // MoonshotAI
+  { value: "moonshotai/kimi-k2", label: "Kimi K2" },
+  // Meta
+  { value: "meta-llama/llama-4-maverick", label: "Llama 4 Maverick" },
   { value: "meta-llama/llama-3.3-70b-instruct", label: "Llama 3.3 70B" },
+  // Mistral
+  { value: "mistralai/mistral-large-2512", label: "Mistral Large 3" },
+  { value: "mistralai/mistral-small-3.2-24b-instruct", label: "Mistral Small 3.2" },
 ]
 
 type SupabaseClient = {
@@ -439,7 +470,7 @@ export default function BlogSitesTab({ client }: { client: SupabaseClient }) {
               onChange={e => setBlogModel(e.target.value)}
               className="w-full bg-zinc-50 border border-zinc-200 rounded-lg px-3 py-2 text-sm text-zinc-900 outline-none focus:border-[#003434] transition-colors"
             >
-              <option value="">Default (GPT OSS 20B)</option>
+              <option value="">Default (GPT-5.4 Mini)</option>
               {OPENROUTER_MODELS.map(m => (
                 <option key={m.value} value={m.value}>{m.label}</option>
               ))}
