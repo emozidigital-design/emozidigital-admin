@@ -150,7 +150,7 @@ export async function POST(req: NextRequest) {
 
     const { prompt: systemPrompt, model } = body.client_id
       ? await resolveClientPrompt(body.client_id)
-      : { prompt: DEFAULT_SYSTEM_PROMPT, model: 'openai/gpt-oss-20b' }
+      : { prompt: DEFAULT_SYSTEM_PROMPT, model: 'openai/gpt-5.4-mini' }
 
     const openAiRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
       method: 'POST',
