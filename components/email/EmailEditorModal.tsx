@@ -1095,6 +1095,7 @@ export default function EmailEditorModal({
         {[
           { key: "{{name}}", desc: "Recipient name" },
           { key: "{{agent_name}}", desc: "Agent name" },
+          { key: "{{agent_id}}", desc: "Agent ID" },
           { key: "{{email}}", desc: "Recipient email" },
           { key: "{{unsubscribe}}", desc: "Unsubscribe link" },
         ].map(v => (

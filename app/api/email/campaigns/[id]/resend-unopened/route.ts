@@ -23,7 +23,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   // Single query: eligible (subscribed, not bounced, not complained) contacts who never opened.
   // Replaces the old two-step: RPC(email+opened) → re-query email_contacts by email.
-  type EligibleContact = { id: string; email: string; name: string | null; agent_name: string | null }
+  type EligibleContact = { id: string; email: string; name: string | null; agent_name: string | null; agent_id: string | null }
   const eligibleContacts: EligibleContact[] = []
   const PAGE = 1000
   let page = 0
@@ -89,10 +89,12 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     const results = await Promise.allSettled(batch.map(async (contact) => {
       const firstName = contact.name ?? "there"
       const agentName = contact.agent_name ?? ""
+      const agentId = contact.agent_id ?? ""
       const htmlBody = (campaign.email_templates.html_body as string)
         .replace(/\{\{first_name\}\}/gi, firstName)
         .replace(/\{\{name\}\}/gi, firstName)
         .replace(/\{\{agent_name\}\}/gi, agentName)
+        .replace(/\{\{agent_id\}\}/gi, agentId)
         .replace(/\{\{email\}\}/gi, contact.email)
 
       const unsubLink = `${process.env.NEXTAUTH_URL}/api/email/unsubscribe?email=${encodeURIComponent(contact.email)}&client=${campaign.client_id}`
@@ -104,6 +106,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         .replace(/\{\{first_name\}\}/gi, firstName)
         .replace(/\{\{name\}\}/gi, firstName)
         .replace(/\{\{agent_name\}\}/gi, agentName)
+        .replace(/\{\{agent_id\}\}/gi, agentId)
 
       const cmd = new SendEmailCommand({
         Source: `${campaign.email_senders.from_name} <${campaign.email_senders.from_email}>`,

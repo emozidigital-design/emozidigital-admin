@@ -35,7 +35,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     while (true) {
       const { data, error: tcErr } = await supabaseAdmin
         .from("email_contact_tags")
-        .select("email_contacts(id, email, name, agent_name, subscribed, bounced, complained)")
+        .select("email_contacts(id, email, name, agent_name, agent_id, subscribed, bounced, complained)")
         .in("tag_id", campaign.tag_ids)
         .range(page * PAGE, (page + 1) * PAGE - 1)
       if (tcErr) return NextResponse.json({ error: tcErr.message }, { status: 500 })
@@ -66,10 +66,12 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     const results = await Promise.allSettled(batch.map(async (contact) => {
       const firstName = contact.name ?? "there"
       const agentName = contact.agent_name ?? ""
+      const agentId = contact.agent_id ?? ""
       const htmlBody = (campaign.email_templates.html_body as string)
         .replace(/\{\{first_name\}\}/gi, firstName)
         .replace(/\{\{name\}\}/gi, firstName)
         .replace(/\{\{agent_name\}\}/gi, agentName)
+        .replace(/\{\{agent_id\}\}/gi, agentId)
         .replace(/\{\{email\}\}/gi, contact.email)
 
       const unsubLink = `${process.env.NEXTAUTH_URL}/api/email/unsubscribe?email=${encodeURIComponent(contact.email)}&client=${campaign.client_id}`
@@ -81,6 +83,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         .replace(/\{\{first_name\}\}/gi, firstName)
         .replace(/\{\{name\}\}/gi, firstName)
         .replace(/\{\{agent_name\}\}/gi, agentName)
+        .replace(/\{\{agent_id\}\}/gi, agentId)
 
       const cmd = new SendEmailCommand({
         Source: `${campaign.email_senders.from_name} <${campaign.email_senders.from_email}>`,
