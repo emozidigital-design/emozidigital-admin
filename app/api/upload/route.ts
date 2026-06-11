@@ -1,8 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { supabaseAdmin } from '@/lib/supabase-server';
+import { v2 as cloudinary } from 'cloudinary';
 import { requireAuth } from '@/lib/require-auth';
 
 export const dynamic = 'force-dynamic';
+
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
 
 export async function POST(req: NextRequest) {
   const unauth = await requireAuth();
@@ -12,19 +18,19 @@ export async function POST(req: NextRequest) {
   const file = formData.get('file') as File | null;
   if (!file) return NextResponse.json({ error: 'No file provided' }, { status: 400 });
 
-  const ext = file.name.split('.').pop()?.toLowerCase() ?? 'jpg';
-  const fileName = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
-  const filePath = `blog-images/${fileName}`;
-
   const buffer = Buffer.from(await file.arrayBuffer());
 
-  const { error } = await supabaseAdmin.storage
-    .from('blog')
-    .upload(filePath, buffer, { contentType: file.type, upsert: false });
+  try {
+    const result = await new Promise<{ secure_url: string }>((resolve, reject) => {
+      cloudinary.uploader.upload_stream(
+        { folder: 'blog-images', resource_type: 'image' },
+        (error, res) => (error ? reject(error) : resolve(res as { secure_url: string }))
+      ).end(buffer);
+    });
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-
-  const { data: { publicUrl } } = supabaseAdmin.storage.from('blog').getPublicUrl(filePath);
-
-  return NextResponse.json({ url: publicUrl });
+    return NextResponse.json({ url: result.secure_url });
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    return NextResponse.json({ error: message }, { status: 500 });
+  }
 }
