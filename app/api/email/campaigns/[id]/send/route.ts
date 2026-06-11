@@ -35,7 +35,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     while (true) {
       const { data, error: tcErr } = await supabaseAdmin
         .from("email_contact_tags")
-        .select("email_contacts(id, email, name, agent_name, agent_id, subscribed, bounced, complained)")
+        .select("email_contacts(id, email, name, user_name, agent_name, agent_id, subscribed, bounced, complained)")
         .in("tag_id", campaign.tag_ids)
         .range(page * PAGE, (page + 1) * PAGE - 1)
       if (tcErr) return NextResponse.json({ error: tcErr.message }, { status: 500 })
@@ -65,11 +65,13 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     const batch = contacts.slice(i, i + BATCH)
     const results = await Promise.allSettled(batch.map(async (contact) => {
       const firstName = contact.name ?? "there"
+      const userId = contact.user_name ?? ""
       const agentName = contact.agent_name ?? ""
       const agentId = contact.agent_id ?? ""
       const htmlBody = (campaign.email_templates.html_body as string)
         .replace(/\{\{first_name\}\}/gi, firstName)
         .replace(/\{\{name\}\}/gi, firstName)
+        .replace(/\{\{user_id\}\}/gi, userId)
         .replace(/\{\{agent_name\}\}/gi, agentName)
         .replace(/\{\{agent_id\}\}/gi, agentId)
         .replace(/\{\{email\}\}/gi, contact.email)
@@ -82,6 +84,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       const subject = campaign.subject
         .replace(/\{\{first_name\}\}/gi, firstName)
         .replace(/\{\{name\}\}/gi, firstName)
+        .replace(/\{\{user_id\}\}/gi, userId)
         .replace(/\{\{agent_name\}\}/gi, agentName)
         .replace(/\{\{agent_id\}\}/gi, agentId)
 

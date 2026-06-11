@@ -88,7 +88,7 @@ export async function POST(req: NextRequest) {
   }
 
   // ── Resolve recipients ───────────────────────────────────────────────────────
-  type Recipient = { email: string; name: string | null }
+  type Recipient = { email: string; name: string | null; user_name: string | null }
   let recipients: Recipient[] = []
 
   if (recipient_type === "leads") {
@@ -96,7 +96,7 @@ export async function POST(req: NextRequest) {
     if (client_id) query = query.eq("client_id", client_id)
     const { data, error } = await query
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-    recipients = (data ?? []).filter(r => r.email)
+    recipients = (data ?? []).filter(r => r.email).map((r: any) => ({ email: r.email, name: r.name, user_name: null }))
   } else if (recipient_type === "list") {
     // "All Contacts" — fetch all subscribed contacts for this client, scoped to tag_ids if provided
     if (tag_ids.length > 0) {
@@ -107,7 +107,7 @@ export async function POST(req: NextRequest) {
       while (true) {
         const { data, error } = await supabaseAdmin
           .from("email_contact_tags")
-          .select("email_contacts(id, email, name, subscribed, bounced, complained)")
+          .select("email_contacts(id, email, name, user_name, subscribed, bounced, complained)")
           .in("tag_id", tag_ids)
           .range(page * PAGE, (page + 1) * PAGE - 1)
         if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -116,7 +116,7 @@ export async function POST(req: NextRequest) {
         if (data.length < PAGE) break
         page++
       }
-      recipients = filterEligibleContacts(allRows).map(({ email, name }) => ({ email, name }))
+      recipients = filterEligibleContacts(allRows).map(({ email, name, user_name }) => ({ email, name, user_name: user_name ?? null }))
     } else {
       // No tags selected: fall back to all subscribed contacts for this client
       const PAGE = 1000
@@ -124,7 +124,7 @@ export async function POST(req: NextRequest) {
       while (true) {
         let query = supabaseAdmin
           .from("email_contacts")
-          .select("email, name")
+          .select("email, name, user_name")
           .eq("subscribed", true)
           .eq("bounced", false)
           .eq("complained", false)
@@ -133,7 +133,7 @@ export async function POST(req: NextRequest) {
         const { data, error } = await query
         if (error) return NextResponse.json({ error: error.message }, { status: 500 })
         if (!data || data.length === 0) break
-        recipients = recipients.concat(data.map((c: any) => ({ email: c.email, name: c.name })))
+        recipients = recipients.concat(data.map((c: any) => ({ email: c.email, name: c.name, user_name: c.user_name ?? null })))
         if (data.length < PAGE) break
         page++
       }
@@ -146,7 +146,7 @@ export async function POST(req: NextRequest) {
       while (true) {
         const { data, error } = await supabaseAdmin
           .from("email_contact_tags")
-          .select("email_contacts(id, email, name, subscribed, bounced, complained)")
+          .select("email_contacts(id, email, name, user_name, subscribed, bounced, complained)")
           .in("tag_id", tag_ids)
           .range(page * PAGE, (page + 1) * PAGE - 1)
         if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -155,7 +155,7 @@ export async function POST(req: NextRequest) {
         if (data.length < PAGE) break
         page++
       }
-      recipients = filterEligibleContacts(allRows).map(({ email, name }) => ({ email, name }))
+      recipients = filterEligibleContacts(allRows).map(({ email, name, user_name }) => ({ email, name, user_name: user_name ?? null }))
     }
   }
 
@@ -166,7 +166,7 @@ export async function POST(req: NextRequest) {
 
   // Test mode overrides recipients
   if (test_email) {
-    recipients = [{ email: test_email, name: "Admin (Test)" }]
+    recipients = [{ email: test_email, name: "Admin (Test)", user_name: null }]
   } else if (recipients.length === 0) {
     return NextResponse.json({ error: "No eligible recipients found" }, { status: 400 })
   }
@@ -209,6 +209,7 @@ export async function POST(req: NextRequest) {
       const html = buildNewsletterHtml({
         recipientName: contact.name,
         recipientEmail: contact.email,
+        recipientUserId: contact.user_name,
         post,
         trendingPosts,
         ctaUrl,

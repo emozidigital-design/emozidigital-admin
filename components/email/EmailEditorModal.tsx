@@ -1094,6 +1094,7 @@ export default function EmailEditorModal({
         <span className="text-[10px] font-semibold text-zinc-400 uppercase tracking-wider shrink-0">Variables:</span>
         {[
           { key: "{{name}}", desc: "Recipient name" },
+          { key: "{{user_id}}", desc: "User name (from contact profile)" },
           { key: "{{agent_name}}", desc: "Agent name" },
           { key: "{{agent_id}}", desc: "Agent ID" },
           { key: "{{email}}", desc: "Recipient email" },

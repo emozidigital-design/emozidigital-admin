@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
 
   const templateType = searchParams.get("template_type")
 
-  let query = supabaseAdmin.from("email_templates").select("*").order("created_at", { ascending: false })
+  let query = supabaseAdmin.from("email_templates").select("*").order("updated_at", { ascending: false })
   if (clientId) query = query.eq("client_id", clientId)
   if (templateType) query = query.eq("template_type", templateType)
 

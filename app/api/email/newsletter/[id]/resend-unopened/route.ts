@@ -51,11 +51,11 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     .map(c => c.email)
 
   // Fetch contact eligibility for unopened contacts
-  const eligibleMap = new Map<string, { id: string; email: string; name: string | null }>()
+  const eligibleMap = new Map<string, { id: string; email: string; name: string | null; user_name: string | null }>()
   for (let i = 0; i < unopenedEmails.length; i += 1000) {
     const { data: contacts } = await supabaseAdmin
       .from("email_contacts")
-      .select("id, email, name, subscribed, bounced, complained")
+      .select("id, email, name, user_name, subscribed, bounced, complained")
       .in("email", unopenedEmails.slice(i, i + 1000))
       .eq("subscribed", true)
       .eq("bounced", false)
@@ -151,6 +151,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       const html = buildNewsletterHtml({
         recipientName: contact.name,
         recipientEmail: contact.email,
+        recipientUserId: contact.user_name,
         post,
         trendingPosts,
         ctaUrl,

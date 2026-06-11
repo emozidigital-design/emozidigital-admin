@@ -24,6 +24,7 @@ interface TrendingPost {
 interface BuildParams {
   recipientName: string | null
   recipientEmail: string
+  recipientUserId: string | null
   post: Post
   trendingPosts: TrendingPost[]
   ctaUrl: string
@@ -43,7 +44,7 @@ function substituteTemplateVars(
   params: BuildParams,
 ): string {
   const {
-    recipientName, recipientEmail, post, trendingPosts,
+    recipientName, recipientEmail, recipientUserId, post, trendingPosts,
     ctaUrl, unsubBaseUrl, clientId,
   } = params
 
@@ -57,6 +58,7 @@ function substituteTemplateVars(
   return html
     .replace(/\{\{first_name\}\}/gi,        recipientName ?? "there")
     .replace(/\{\{name\}\}/gi,              recipientName ?? "there")
+    .replace(/\{\{user_id\}\}/gi,           recipientUserId ?? "")
     .replace(/\{\{email\}\}/gi,             recipientEmail)
     .replace(/\{\{hero_title\}\}/gi,        post.title)
     .replace(/\{\{hero_excerpt\}\}/gi,      post.excerpt ?? "")

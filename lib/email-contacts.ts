@@ -2,6 +2,7 @@ export type EligibleContact = {
   id: string
   email: string
   name: string | null
+  user_name: string | null
   agent_name: string | null
   agent_id: string | null
 }

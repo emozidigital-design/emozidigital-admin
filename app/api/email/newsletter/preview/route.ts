@@ -54,6 +54,7 @@ export async function POST(req: NextRequest) {
   const html = buildNewsletterHtml({
     recipientName: "Preview",
     recipientEmail: "preview@example.com",
+    recipientUserId: null,
     post,
     trendingPosts,
     ctaUrl,
