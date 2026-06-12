@@ -2,6 +2,15 @@ import { NextRequest, NextResponse } from "next/server"
 import { supabaseAdmin } from "@/lib/supabase-server"
 import { requireAuth } from "@/lib/require-auth"
 
+// All scalar contact columns that can be merged
+const MERGEABLE_FIELDS = [
+  "name", "first_name", "last_name", "phone", "alternate_phone", "company",
+  "street_address", "street_number", "neighborhood", "postal_code", "city",
+  "state_province", "country", "tax_number", "language",
+  "user_name", "user_type", "agent_name", "agent_id", "agent_registered_date",
+  "agent_pancard_no", "agent_gst_number",
+]
+
 export async function POST(req: NextRequest) {
   const unauth = await requireAuth()
   if (unauth) return unauth
@@ -17,6 +26,8 @@ export async function POST(req: NextRequest) {
   }
 
   const skipExisting = formData.get("skip_existing") === "true"
+  // merge_existing: fill in empty fields on existing contacts with data from CSV
+  const mergeExisting = formData.get("merge_existing") === "true"
   const columnMapRaw = formData.get("column_map") as string | null
   const columnMap: Record<number, string> = columnMapRaw ? JSON.parse(columnMapRaw) : {}
   const hasColumnMap = Object.keys(columnMap).length > 0
@@ -74,75 +85,147 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "no valid email addresses found" }, { status: 400 })
   }
 
-  // Deduplicate by email — keep last occurrence; prevents "ON CONFLICT DO UPDATE cannot affect a row a second time"
+  // Deduplicate by email — keep last occurrence
   const dedupedMap = new Map<string, Record<string, unknown>>()
   for (const c of contacts) {
     dedupedMap.set((c.email as string).toLowerCase(), c as Record<string, unknown>)
   }
   const dedupedContacts = Array.from(dedupedMap.values())
 
-  // If skip_existing is set, filter out emails that already exist in the DB
-  let finalContacts = dedupedContacts
-  let skipped = 0
-  if (skipExisting) {
-    const existingEmails = new Set<string>()
-    const CHUNK = 500
-    for (let i = 0; i < dedupedContacts.length; i += CHUNK) {
-      const chunk = dedupedContacts.slice(i, i + CHUNK).map(c => (c.email as string).toLowerCase())
-      const { data: existing } = await supabaseAdmin
+  // Separate new vs existing contacts — match by email OR agent_id
+  const existingEmailSet = new Set<string>()
+  const CHUNK = 500
+  for (let i = 0; i < dedupedContacts.length; i += CHUNK) {
+    const chunk = dedupedContacts.slice(i, i + CHUNK)
+    const emailChunk = chunk.map(c => (c.email as string).toLowerCase())
+    const { data: existingByEmail } = await supabaseAdmin
+      .from("email_contacts")
+      .select("email")
+      .eq("client_id", clientId)
+      .in("email", emailChunk)
+    ;(existingByEmail ?? []).forEach(r => existingEmailSet.add(r.email.toLowerCase()))
+
+    // Also check by agent_id if any rows have one
+    const agentIds = chunk.map(c => c.agent_id as string | null).filter(Boolean) as string[]
+    if (agentIds.length > 0) {
+      const { data: existingByAgent } = await supabaseAdmin
         .from("email_contacts")
-        .select("email")
+        .select("email, agent_id")
+        .eq("client_id", clientId)
+        .in("agent_id", agentIds)
+      ;(existingByAgent ?? []).forEach(r => existingEmailSet.add(r.email.toLowerCase()))
+    }
+  }
+
+  const newContacts = dedupedContacts.filter(c => !existingEmailSet.has((c.email as string).toLowerCase()))
+  const duplicateContacts = dedupedContacts.filter(c => existingEmailSet.has((c.email as string).toLowerCase()))
+  const skipped = duplicateContacts.length
+  let merged = 0
+
+  // ── Merge duplicates: fill only null/empty fields on existing records ──
+  if (mergeExisting && duplicateContacts.length > 0) {
+    // Fetch existing records in chunks
+    const existingRecords: Record<string, unknown>[] = []
+    for (let i = 0; i < duplicateContacts.length; i += CHUNK) {
+      const chunk = duplicateContacts.slice(i, i + CHUNK).map(c => (c.email as string).toLowerCase())
+      const { data } = await supabaseAdmin
+        .from("email_contacts")
+        .select("*")
         .eq("client_id", clientId)
         .in("email", chunk)
-      ;(existing ?? []).forEach(r => existingEmails.add(r.email.toLowerCase()))
+      existingRecords.push(...(data ?? []))
     }
-    finalContacts = dedupedContacts.filter(c => !existingEmails.has((c.email as string).toLowerCase()))
-    skipped = dedupedContacts.length - finalContacts.length
+
+    const existingByEmail = new Map<string, Record<string, unknown>>()
+    for (const r of existingRecords) {
+      existingByEmail.set((r.email as string).toLowerCase(), r)
+    }
+
+    // Build update payloads: only fields that are null/empty in existing but present in CSV row
+    const updates: { id: string; patch: Record<string, unknown> }[] = []
+    for (const csvRow of duplicateContacts) {
+      const email = (csvRow.email as string).toLowerCase()
+      const existing = existingByEmail.get(email)
+      if (!existing) continue
+
+      const patch: Record<string, unknown> = {}
+      for (const field of MERGEABLE_FIELDS) {
+        const csvVal = csvRow[field]
+        const existingVal = existing[field]
+        // Only overwrite if existing is null/empty and CSV has a non-empty value
+        if (csvVal != null && csvVal !== "" && (existingVal == null || existingVal === "")) {
+          patch[field] = csvVal
+        }
+      }
+
+      if (Object.keys(patch).length > 0) {
+        updates.push({ id: existing.id as string, patch })
+      }
+    }
+
+    // Apply updates in small batches
+    for (const { id, patch } of updates) {
+      await supabaseAdmin.from("email_contacts").update(patch).eq("id", id)
+    }
+    merged = updates.length
   }
 
-  if (finalContacts.length === 0) {
-    await supabaseAdmin.from("email_import_logs").insert({
-      client_id: clientId,
-      file_name: file.name,
-      delimiter,
-      total_rows: totalRows,
-      imported: 0,
-      invalid,
-      tag_ids: tagIds,
-      status: "completed",
-    })
-    return NextResponse.json({ imported: 0, invalid, skipped })
+  // ── Import only new contacts (or all if not skipping) ──
+  const finalContacts = skipExisting || mergeExisting ? newContacts : dedupedContacts
+
+  let imported = 0
+  if (finalContacts.length > 0) {
+    const { data: upserted, error } = await supabaseAdmin
+      .from("email_contacts")
+      .upsert(finalContacts, { onConflict: "client_id,email" })
+      .select("id")
+
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+    imported = upserted?.length ?? 0
+
+    // Assign tags to newly imported contacts
+    if (tagIds.length && upserted?.length) {
+      const tagRows = upserted.flatMap((r: { id: string }) =>
+        tagIds.map(tid => ({ contact_id: r.id, tag_id: tid }))
+      )
+      await supabaseAdmin
+        .from("email_contact_tags")
+        .upsert(tagRows, { onConflict: "contact_id,tag_id" })
+    }
   }
 
-  // Upsert and get back all IDs in one shot — avoids email case-mismatch on lookup
-  const { data: upserted, error } = await supabaseAdmin
-    .from("email_contacts")
-    .upsert(finalContacts, { onConflict: "client_id,email" })
-    .select("id")
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-
-  // If tags were provided, assign all of them to all imported contacts
-  if (tagIds.length && upserted?.length) {
-    const tagRows = upserted.flatMap((r: { id: string }) =>
-      tagIds.map(tid => ({ contact_id: r.id, tag_id: tid }))
-    )
-    await supabaseAdmin
-      .from("email_contact_tags")
-      .upsert(tagRows, { onConflict: "contact_id,tag_id" })
+  // Assign tags to merged duplicates too (if tags were selected)
+  if (mergeExisting && tagIds.length && duplicateContacts.length > 0) {
+    const dupEmails = duplicateContacts.map(c => (c.email as string).toLowerCase())
+    for (let i = 0; i < dupEmails.length; i += CHUNK) {
+      const chunk = dupEmails.slice(i, i + CHUNK)
+      const { data: existingRows } = await supabaseAdmin
+        .from("email_contacts")
+        .select("id")
+        .eq("client_id", clientId)
+        .in("email", chunk)
+      if (existingRows?.length) {
+        const tagRows = existingRows.flatMap((r: { id: string }) =>
+          tagIds.map(tid => ({ contact_id: r.id, tag_id: tid }))
+        )
+        await supabaseAdmin
+          .from("email_contact_tags")
+          .upsert(tagRows, { onConflict: "contact_id,tag_id" })
+      }
+    }
   }
 
-  // Write import log
   await supabaseAdmin.from("email_import_logs").insert({
     client_id: clientId,
     file_name: file.name,
     delimiter,
     total_rows: totalRows,
-    imported: finalContacts.length,
+    imported,
     invalid,
     tag_ids: tagIds,
     status: "completed",
   })
 
-  return NextResponse.json({ imported: finalContacts.length, invalid, skipped })
+  return NextResponse.json({ imported, invalid, skipped, merged })
 }

@@ -30,6 +30,22 @@ interface ImportLog {
 }
 interface CustomField { key: string; label: string; value: string }
 type View = "list" | "create" | "import"
+
+interface ValidationIssue {
+  row: number
+  field: string
+  value: string
+  issue: string
+  severity: "error" | "warning"
+}
+interface ValidationResult {
+  score: number
+  totalRows: number
+  issueCount: number
+  issues: ValidationIssue[]
+  summary: string
+  suggestions: string[]
+}
 type DialogState = {
   title: string; message: string; confirmLabel?: string; danger?: boolean; onConfirm: () => void
 } | null
@@ -620,8 +636,8 @@ const CONTACT_FIELD_OPTIONS: { value: string; label: string }[] = [
   { value: "phone", label: "Phone number" },
   { value: "alternate_phone", label: "Alternate phone" },
   { value: "company", label: "Company" },
-  { value: "street_address", label: "Street address" },
-  { value: "street_number", label: "Street number" },
+  { value: "street_address", label: "Address line 1" },
+  { value: "street_number", label: "Address line 2" },
   { value: "neighborhood", label: "Neighborhood" },
   { value: "postal_code", label: "Postal code" },
   { value: "city", label: "City" },
@@ -779,12 +795,12 @@ function ColumnMappingStep({ csvPreview, columnMap, onMapChange, csvEditMode, cs
             {importBusy ? (
               <>
                 <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                Importing…
+                Validating…
               </>
             ) : (
               <>
-                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
-                Import
+                <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                Validate &amp; Import
               </>
             )}
           </button>
@@ -1008,8 +1024,8 @@ function ContactDrawer({ contact, allTags, onClose, onSave, onDelete, onResetBou
           <section>
             <p className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider mb-3">Address</p>
             <div className="grid grid-cols-2 gap-3">
-              {inp("Street address", "street_address")}
-              {inp("Street number", "street_number")}
+              {inp("Address line 1", "street_address")}
+              {inp("Address line 2", "street_number")}
               {inp("Neighborhood", "neighborhood")}
               {inp("Postal code", "postal_code")}
               {inp("City", "city")}
@@ -1102,12 +1118,13 @@ function ContactDrawer({ contact, allTags, onClose, onSave, onDelete, onResetBou
 
 // ─── Duplicate contact dialog ─────────────────────────────────────────────────
 
-function DuplicateDialog({ type, existingCount, newCount, onSkip, onCancel, onAddToTag, addToTagBusy, hasImportTags }: {
+function DuplicateDialog({ type, existingCount, newCount, onSkip, onCancel, onAddToTag, onMerge, addToTagBusy, hasImportTags }: {
   type: "create" | "import"
   existingCount: number
   newCount: number
   onSkip: () => void
   onCancel: () => void
+  onMerge?: () => void
   onAddToTag?: () => void
   addToTagBusy?: boolean
   hasImportTags?: boolean
@@ -1116,7 +1133,7 @@ function DuplicateDialog({ type, existingCount, newCount, onSkip, onCancel, onAd
   return (
     <div className="fixed inset-0 z-[100] flex items-center justify-center p-4">
       <div className="absolute inset-0 bg-black/30 backdrop-blur-sm" onClick={onCancel} />
-      <div className="relative bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6 border border-zinc-100">
+      <div className="relative bg-white rounded-2xl shadow-2xl max-w-md w-full p-6 border border-zinc-100">
         <div className="flex items-start gap-3 mb-5">
           <div className="w-9 h-9 rounded-full flex items-center justify-center shrink-0 bg-amber-100">
             <svg className="w-4 h-4 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1129,10 +1146,15 @@ function DuplicateDialog({ type, existingCount, newCount, onSkip, onCancel, onAd
             </h3>
             <p className="text-xs text-zinc-500 mt-1 leading-relaxed">
               {isCreate
-                ? "This email address is already in your contacts list."
+                ? "This Agent ID / email address is already in your contacts list."
                 : `${existingCount} contact${existingCount !== 1 ? "s" : ""} in this file already exist${existingCount === 1 ? "s" : ""} in your list.${newCount > 0 ? ` ${newCount} new contact${newCount !== 1 ? "s" : ""} will be added.` : " There are no new contacts to add."}`
               }
             </p>
+            {!isCreate && (
+              <p className="text-xs text-zinc-400 mt-2 leading-relaxed">
+                <span className="font-medium text-zinc-500">Merge missing fields</span> will fill empty fields on existing contacts with data from this file — existing data is never overwritten.
+              </p>
+            )}
           </div>
         </div>
         <div className="flex justify-end gap-2 flex-wrap">
@@ -1151,12 +1173,28 @@ function DuplicateDialog({ type, existingCount, newCount, onSkip, onCancel, onAd
               {addToTagBusy ? "Adding…" : `Add tag to ${existingCount} existing`}
             </button>
           )}
+          {!isCreate && onMerge && (
+            <button
+              className="text-sm px-4 py-2 rounded-lg border border-blue-600 text-blue-700 hover:bg-blue-50 transition-colors"
+              onClick={onMerge}
+            >
+              Merge missing fields
+            </button>
+          )}
           {(!isCreate && newCount > 0) && (
             <button
               className="text-sm px-4 py-2 rounded-lg bg-[#003434] text-white hover:bg-[#004848] transition-colors"
               onClick={onSkip}
             >
               Skip existing · add {newCount} new
+            </button>
+          )}
+          {(!isCreate && newCount === 0) && (
+            <button
+              className="text-sm px-4 py-2 rounded-lg bg-zinc-800 text-white hover:bg-zinc-900 transition-colors"
+              onClick={onCancel}
+            >
+              Done
             </button>
           )}
         </div>
@@ -1201,6 +1239,7 @@ export default function ContactsPage() {
     newCount: number
     existingEmails: string[]
     onSkip: () => void
+    onMerge?: () => void
   } | null>(null)
   const [addToTagBusy, setAddToTagBusy] = useState(false)
 
@@ -1225,11 +1264,16 @@ export default function ContactsPage() {
   const fileRef = useRef<HTMLInputElement>(null)
 
   // ── Column mapping state ──
-  const [importStep, setImportStep] = useState<"upload" | "map">("upload")
+  const [importStep, setImportStep] = useState<"upload" | "map" | "validate">("upload")
   const [csvPreview, setCsvPreview] = useState<{ headers: string[]; rows: string[][] } | null>(null)
   const [columnMap, setColumnMap] = useState<Record<number, string>>({})
   const [csvEditMode, setCsvEditMode] = useState(false)
   const [csvEditRows, setCsvEditRows] = useState<string[][]>([])
+
+  // ── AI validation state ──
+  const [validationResult, setValidationResult] = useState<ValidationResult | null>(null)
+  const [validationBusy, setValidationBusy] = useState(false)
+  const [validationError, setValidationError] = useState<string | null>(null)
 
   // ── Load saved filters from localStorage ──
   useEffect(() => {
@@ -1552,7 +1596,7 @@ export default function ContactsPage() {
   }
 
   // ── Actual import call (called after duplicate check is resolved) ──
-  const doImport = async (skipExisting: boolean) => {
+  const doImport = async (skipExisting: boolean, mergeExisting = false) => {
     if (!importFile || !clientId) return
     setImportBusy(true)
     try {
@@ -1562,12 +1606,14 @@ export default function ContactsPage() {
       fd.append("delimiter", importDelimiter)
       fd.append("column_map", JSON.stringify(columnMap))
       fd.append("skip_existing", skipExisting ? "true" : "false")
+      fd.append("merge_existing", mergeExisting ? "true" : "false")
       importTagIds.forEach(id => fd.append("tag_id", id))
       const res = await fetch("/api/email/contacts/import", { method: "POST", body: fd })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
       const parts = [`Imported ${data.imported} contact${data.imported !== 1 ? "s" : ""}`]
-      if (data.skipped) parts.push(`${data.skipped} existing skipped`)
+      if (data.merged) parts.push(`${data.merged} existing updated`)
+      if (data.skipped && !mergeExisting) parts.push(`${data.skipped} existing skipped`)
       if (data.invalid) parts.push(`${data.invalid} invalid skipped`)
       toast.success(parts.join(" · "))
       setImportFile(null)
@@ -1577,6 +1623,8 @@ export default function ContactsPage() {
       setCsvPreview(null)
       setColumnMap({})
       setCsvEditMode(false)
+      setValidationResult(null)
+      setValidationError(null)
       loadImportLogs()
       load()
       setView("list")
@@ -1584,44 +1632,94 @@ export default function ContactsPage() {
     finally { setImportBusy(false) }
   }
 
-  // ── Mapped import handler (map step → duplicate check → actual import) ──
+  // ── Mapped import handler (map step → AI validate → duplicate check → actual import) ──
   const handleMappedImport = async () => {
     if (!importFile || !clientId) return
     const hasEmail = Object.values(columnMap).includes("email")
     if (!hasEmail) { toast.error("Please map a column to Email before importing"); return }
 
-    // Parse all emails from the full CSV to check for duplicates
+    // Build sample rows for AI validation (up to 30 rows)
+    const text = await importFile.text()
+    const lines = text.split("\n").map(l => l.trim()).filter(Boolean)
+    const dataLines = lines.slice(1, 31)
+    const sampleRows = dataLines.map((line, idx) => {
+      const cols = line.split(importDelimiter).map(c => c.replace(/^"|"$/g, "").trim())
+      const fields: Record<string, string> = {}
+      for (const [colIdxStr, fieldKey] of Object.entries(columnMap)) {
+        if (fieldKey) fields[fieldKey] = cols[Number(colIdxStr)] ?? ""
+      }
+      return { rowIndex: idx, fields }
+    })
+
+    setValidationBusy(true)
+    setValidationResult(null)
+    setValidationError(null)
+    setImportStep("validate")
+
+    try {
+      const res = await fetch("/api/email/contacts/ai-validate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rows: sampleRows }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      setValidationResult(data as ValidationResult)
+    } catch (err: unknown) {
+      setValidationError(err instanceof Error ? err.message : "AI validation failed")
+    } finally {
+      setValidationBusy(false)
+    }
+  }
+
+  // ── Proceed with import after validation (runs duplicate check then imports) ──
+  const proceedWithImport = async () => {
+    if (!importFile || !clientId) return
+
     const text = await importFile.text()
     const lines = text.split("\n").map(l => l.trim()).filter(Boolean)
     const headers = lines[0].split(importDelimiter).map(h => h.replace(/^"|"$/g, "").trim())
     const emailColIdx = Object.entries(columnMap).find(([, v]) => v === "email")?.[0]
+    const agentIdColIdx = Object.entries(columnMap).find(([, v]) => v === "agent_id")?.[0]
     const emailIdx = emailColIdx !== undefined ? Number(emailColIdx) : headers.findIndex(h => h.toLowerCase() === "email")
-    const allEmails = lines.slice(1)
+    const agentIdIdx = agentIdColIdx !== undefined ? Number(agentIdColIdx) : -1
+
+    const dataLines = lines.slice(1)
+    const allEmails = dataLines
       .map(l => l.split(importDelimiter).map(c => c.replace(/^"|"$/g, "").trim())[emailIdx]?.toLowerCase().trim())
-      .filter(e => e && e.includes("@"))
+      .filter((e): e is string => Boolean(e && e.includes("@")))
     const uniqueEmails = Array.from(new Set(allEmails))
 
-    // Check for existing contacts in batches of 500
+    const allAgentIds = agentIdIdx >= 0
+      ? Array.from(new Set(dataLines
+          .map(l => l.split(importDelimiter).map(c => c.replace(/^"|"$/g, "").trim())[agentIdIdx]?.trim())
+          .filter((id): id is string => Boolean(id))))
+      : []
+
     const existingEmails: string[] = []
     const CHUNK = 500
-    for (let i = 0; i < uniqueEmails.length; i += CHUNK) {
-      const chunk = uniqueEmails.slice(i, i + CHUNK)
+    for (let i = 0; i < Math.max(uniqueEmails.length, allAgentIds.length); i += CHUNK) {
+      const emailChunk = uniqueEmails.slice(i, i + CHUNK)
+      const agentChunk = allAgentIds.slice(i, i + CHUNK)
       const res = await fetch("/api/email/contacts/check-duplicates", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ client_id: clientId, emails: chunk }),
+        body: JSON.stringify({ client_id: clientId, emails: emailChunk, agent_ids: agentChunk }),
       })
       const data = await res.json()
       existingEmails.push(...(data.existing ?? []))
     }
 
-    if (existingEmails.length > 0) {
+    const uniqueExisting = Array.from(new Set(existingEmails))
+
+    if (uniqueExisting.length > 0) {
       setDupDialog({
         type: "import",
-        existingCount: existingEmails.length,
-        newCount: uniqueEmails.length - existingEmails.length,
-        existingEmails,
+        existingCount: uniqueExisting.length,
+        newCount: uniqueEmails.length - uniqueExisting.length,
+        existingEmails: uniqueExisting,
         onSkip: () => { setDupDialog(null); doImport(true) },
+        onMerge: () => { setDupDialog(null); doImport(true, true) },
       })
       return
     }
@@ -1766,8 +1864,8 @@ export default function ContactsPage() {
                   {inp("Email", "email", { type: "email", placeholder: "email@example.com", required: true, colSpan: true })}
                   {inp("First name", "firstName")}
                   {inp("Last name", "lastName")}
-                  {inp("Street address", "streetAddress")}
-                  {inp("Street number", "streetNumber")}
+                  {inp("Address line 1", "streetAddress")}
+                  {inp("Address line 2", "streetNumber")}
                   {inp("Neighborhood", "neighborhood")}
                   {inp("Postal code", "postalCode")}
                   {inp("City", "city")}
@@ -1890,6 +1988,8 @@ export default function ContactsPage() {
       setCsvPreview(null)
       setColumnMap({})
       setCsvEditMode(false)
+      setValidationResult(null)
+      setValidationError(null)
     }
 
     return (
@@ -1915,6 +2015,143 @@ export default function ContactsPage() {
             onImport={handleMappedImport}
             importBusy={importBusy}
           />
+        )}
+
+        {/* AI Validation step */}
+        {importStep === "validate" && (
+          <div className="w-full space-y-4">
+            <div className="flex items-center justify-between">
+              <h2 className="text-base font-semibold text-zinc-800">Data Quality Check</h2>
+              <button type="button" onClick={() => setImportStep("map")} className="text-sm text-zinc-500 hover:text-zinc-800 transition-colors">
+                ← Back to mapping
+              </button>
+            </div>
+
+            {/* Loading state */}
+            {validationBusy && (
+              <div className="bg-white border border-zinc-200 rounded-xl p-8 flex flex-col items-center gap-3 text-center">
+                <div className="w-8 h-8 border-2 border-zinc-200 border-t-[#003434] rounded-full animate-spin" />
+                <p className="text-sm font-medium text-zinc-700">AI is reviewing your data…</p>
+                <p className="text-xs text-zinc-400">Checking up to 30 sample rows for quality issues</p>
+              </div>
+            )}
+
+            {/* Error state */}
+            {validationError && !validationBusy && (
+              <div className="bg-red-50 border border-red-200 rounded-xl p-5">
+                <p className="text-sm font-medium text-red-700 mb-1">Validation failed</p>
+                <p className="text-xs text-red-500">{validationError}</p>
+                <div className="flex gap-2 mt-4">
+                  <button onClick={() => setImportStep("map")} className="text-sm px-4 py-2 rounded-lg border border-zinc-200 text-zinc-700 hover:bg-zinc-50 transition-colors">Back</button>
+                  <button onClick={proceedWithImport} className="text-sm px-4 py-2 rounded-lg bg-[#003434] text-white hover:bg-[#004444] transition-colors">Import anyway</button>
+                </div>
+              </div>
+            )}
+
+            {/* Results */}
+            {validationResult && !validationBusy && (
+              <div className="space-y-4">
+                {/* Score card */}
+                <div className={`rounded-xl border p-5 ${validationResult.score >= 80 ? "bg-green-50 border-green-200" : validationResult.score >= 50 ? "bg-amber-50 border-amber-200" : "bg-red-50 border-red-200"}`}>
+                  <div className="flex items-center gap-4">
+                    <div className={`w-14 h-14 rounded-full flex items-center justify-center text-lg font-bold shrink-0 ${validationResult.score >= 80 ? "bg-green-100 text-green-700" : validationResult.score >= 50 ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-700"}`}>
+                      {validationResult.score}
+                    </div>
+                    <div>
+                      <p className={`text-sm font-semibold ${validationResult.score >= 80 ? "text-green-800" : validationResult.score >= 50 ? "text-amber-800" : "text-red-800"}`}>
+                        {validationResult.score >= 80 ? "Good quality" : validationResult.score >= 50 ? "Some issues found" : "Significant issues found"}
+                        <span className="font-normal text-xs ml-2 opacity-70">out of 100</span>
+                      </p>
+                      <p className={`text-xs mt-0.5 leading-relaxed ${validationResult.score >= 80 ? "text-green-700" : validationResult.score >= 50 ? "text-amber-700" : "text-red-700"}`}>
+                        {validationResult.summary}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="mt-3 flex gap-4 text-xs">
+                    <span className={`${validationResult.score >= 80 ? "text-green-600" : validationResult.score >= 50 ? "text-amber-600" : "text-red-600"}`}>{validationResult.totalRows} rows checked</span>
+                    <span className={`${validationResult.issueCount === 0 ? "text-green-600" : "text-red-600"}`}>{validationResult.issueCount} issue{validationResult.issueCount !== 1 ? "s" : ""} found</span>
+                  </div>
+                </div>
+
+                {/* Suggestions */}
+                {validationResult.suggestions.length > 0 && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                    <p className="text-xs font-semibold text-blue-800 mb-2">Suggestions</p>
+                    <ul className="space-y-1">
+                      {validationResult.suggestions.map((s, i) => (
+                        <li key={i} className="flex items-start gap-2 text-xs text-blue-700">
+                          <svg className="w-3.5 h-3.5 mt-0.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4" /></svg>
+                          {s}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
+
+                {/* Issue table */}
+                {validationResult.issues.length > 0 && (
+                  <div className="bg-white border border-zinc-200 rounded-xl overflow-hidden">
+                    <div className="px-4 py-3 border-b border-zinc-100 bg-zinc-50/50">
+                      <p className="text-xs font-semibold text-zinc-700">Issues ({validationResult.issues.length})</p>
+                    </div>
+                    <div className="overflow-x-auto max-h-64">
+                      <table className="w-full text-xs">
+                        <thead>
+                          <tr className="border-b border-zinc-100 bg-white">
+                            <th className="px-4 py-2.5 text-left font-medium text-zinc-500 w-12">Row</th>
+                            <th className="px-4 py-2.5 text-left font-medium text-zinc-500 w-28">Field</th>
+                            <th className="px-4 py-2.5 text-left font-medium text-zinc-500 w-32">Value</th>
+                            <th className="px-4 py-2.5 text-left font-medium text-zinc-500">Issue</th>
+                            <th className="px-4 py-2.5 text-left font-medium text-zinc-500 w-20">Severity</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {validationResult.issues.map((issue, i) => (
+                            <tr key={i} className="border-b border-zinc-50 hover:bg-zinc-50/50">
+                              <td className="px-4 py-2.5 text-zinc-500">{issue.row}</td>
+                              <td className="px-4 py-2.5 text-zinc-700 font-medium">{issue.field}</td>
+                              <td className="px-4 py-2.5 text-zinc-500 max-w-[120px] truncate">{issue.value || <span className="italic text-zinc-300">empty</span>}</td>
+                              <td className="px-4 py-2.5 text-zinc-600">{issue.issue}</td>
+                              <td className="px-4 py-2.5">
+                                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium ${issue.severity === "error" ? "bg-red-100 text-red-700" : "bg-amber-100 text-amber-700"}`}>
+                                  {issue.severity}
+                                </span>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+
+                {/* Action buttons */}
+                <div className="flex items-center justify-between pt-1">
+                  <button type="button" onClick={() => setImportStep("map")} className="text-sm px-4 py-2 rounded-lg border border-zinc-200 text-zinc-600 hover:bg-zinc-50 transition-colors">
+                    ← Fix in mapping
+                  </button>
+                  <button
+                    type="button"
+                    onClick={proceedWithImport}
+                    disabled={importBusy}
+                    className="inline-flex items-center gap-2 bg-[#003434] text-white text-sm px-5 py-2 rounded-lg hover:bg-[#004444] disabled:opacity-40 transition-colors"
+                  >
+                    {importBusy ? (
+                      <>
+                        <div className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        Importing…
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+                        {validationResult.score < 50 ? "Import anyway" : "Proceed with import"}
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         )}
 
         {/* Upload step */}
