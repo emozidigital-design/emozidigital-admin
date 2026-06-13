@@ -23,6 +23,9 @@ export default function SendersPage() {
   const [adding, setAdding] = useState(false)
   const [form, setForm] = useState({ client_id: "", from_email: "", from_name: "" })
   const [newSender, setNewSender] = useState<Sender | null>(null)
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editName, setEditName] = useState("")
+  const [saving, setSaving] = useState(false)
 
   useEffect(() => {
     if (clientId) setForm(f => ({ ...f, client_id: clientId }))
@@ -70,9 +73,38 @@ export default function SendersPage() {
   const handleDelete = async (id: string, email: string) => {
     if (!confirm(`Delete sender ${email}?`)) return
     const res = await fetch(`/api/email/senders/${id}`, { method: "DELETE" })
-    if (!res.ok) { toast.error("Failed to delete"); return }
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      toast.error(data.error ?? "Failed to delete")
+      return
+    }
     setSenders(prev => prev.filter(s => s.id !== id))
     toast.success("Sender deleted")
+  }
+
+  const startEdit = (s: Sender) => {
+    setEditingId(s.id)
+    setEditName(s.from_name)
+  }
+
+  const handleRename = async (id: string) => {
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/email/senders/${id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ from_name: editName }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      setSenders(prev => prev.map(s => s.id === id ? { ...s, from_name: editName } : s))
+      setEditingId(null)
+      toast.success("Display name updated")
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : "Error updating")
+    } finally {
+      setSaving(false)
+    }
   }
 
   return (
@@ -143,11 +175,38 @@ export default function SendersPage() {
         <div className="space-y-2">
           {senders.map(s => (
             <div key={s.id} className="bg-white border border-zinc-200 rounded-xl px-4 py-3 flex items-center justify-between gap-4">
-              <div>
-                <p className="text-sm font-medium text-zinc-800">{s.from_name} &lt;{s.from_email}&gt;</p>
-                <p className="text-xs text-zinc-400">{s.domain}</p>
+              <div className="flex-1 min-w-0">
+                {editingId === s.id ? (
+                  <div className="flex items-center gap-2">
+                    <input
+                      className="border border-zinc-300 rounded-lg px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-[#003434]/20 w-56"
+                      value={editName}
+                      onChange={e => setEditName(e.target.value)}
+                      onKeyDown={e => { if (e.key === "Enter") handleRename(s.id); if (e.key === "Escape") setEditingId(null) }}
+                      autoFocus
+                    />
+                    <button
+                      onClick={() => handleRename(s.id)}
+                      disabled={saving}
+                      className="text-xs bg-[#003434] text-white px-2.5 py-1 rounded-lg hover:bg-[#004444] disabled:opacity-50"
+                    >
+                      {saving ? "Saving…" : "Save"}
+                    </button>
+                    <button
+                      onClick={() => setEditingId(null)}
+                      className="text-xs text-zinc-400 hover:text-zinc-600"
+                    >
+                      Cancel
+                    </button>
+                  </div>
+                ) : (
+                  <p className="text-sm font-medium text-zinc-800">
+                    {s.from_name} &lt;{s.from_email}&gt;
+                  </p>
+                )}
+                <p className="text-xs text-zinc-400 mt-0.5">{s.domain}</p>
               </div>
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-3 shrink-0">
                 <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
                   s.dkim_status === "verified" ? "bg-emerald-50 text-emerald-700 border border-emerald-200"
                   : s.dkim_status === "failed" ? "bg-red-50 text-red-700 border border-red-200"
@@ -158,6 +217,12 @@ export default function SendersPage() {
                   className="text-xs text-zinc-500 hover:text-zinc-800 underline underline-offset-2"
                 >
                   Check status
+                </button>
+                <button
+                  onClick={() => startEdit(s)}
+                  className="text-xs text-zinc-500 hover:text-zinc-800 underline underline-offset-2"
+                >
+                  Rename
                 </button>
                 <button
                   onClick={() => handleDelete(s.id, s.from_email)}
