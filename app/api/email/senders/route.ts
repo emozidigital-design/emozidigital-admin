@@ -34,19 +34,30 @@ export async function POST(req: NextRequest) {
   const domain = from_email.split("@")[1]
   if (!domain) return NextResponse.json({ error: "invalid email" }, { status: 400 })
 
-  // Request DKIM tokens from SES
+  // If the domain already has a verified sender, skip DKIM re-registration
+  const { data: existing } = await supabaseAdmin
+    .from("email_senders")
+    .select("id")
+    .eq("client_id", client_id)
+    .eq("domain", domain)
+    .eq("dkim_status", "verified")
+    .limit(1)
+    .maybeSingle()
+
   let dkimTokens: string[] = []
-  try {
-    const cmd = new VerifyDomainDkimCommand({ Domain: domain })
-    const res = await sesClient.send(cmd)
-    dkimTokens = res.DkimTokens ?? []
-  } catch (e) {
-    console.error("SES DKIM error", e)
+  if (!existing) {
+    try {
+      const cmd = new VerifyDomainDkimCommand({ Domain: domain })
+      const res = await sesClient.send(cmd)
+      dkimTokens = res.DkimTokens ?? []
+    } catch (e) {
+      console.error("SES DKIM error", e)
+    }
   }
 
   const { data, error } = await supabaseAdmin
     .from("email_senders")
-    .insert({ client_id, from_email, from_name, domain, dkim_status: "pending" })
+    .insert({ client_id, from_email, from_name, domain, dkim_status: existing ? "verified" : "pending" })
     .select()
     .single()
 
