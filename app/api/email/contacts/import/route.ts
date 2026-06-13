@@ -56,11 +56,13 @@ export async function POST(req: NextRequest) {
   const nameIdx = hasColumnMap ? -1 : headers.indexOf("name")
 
   let invalid = 0
-  const contacts = lines.slice(1).flatMap(line => {
+  const invalidRows: { row: number; raw: string; reason: string }[] = []
+  const contacts = lines.slice(1).flatMap((line, lineIdx) => {
     const cols = line.split(delimiter).map(c => c.replace(/^"|"$/g, "").trim())
     const email = cols[emailIdx]?.toLowerCase().trim()
     if (!email || !email.includes("@")) {
       invalid++
+      invalidRows.push({ row: lineIdx + 2, raw: line, reason: !email ? "Missing email" : "Invalid email format" })
       return []
     }
     if (hasColumnMap) {
@@ -82,6 +84,11 @@ export async function POST(req: NextRequest) {
   const totalRows = lines.length - 1
 
   if (contacts.length === 0) {
+    await supabaseAdmin.from("email_import_logs").insert({
+      client_id: clientId, file_name: file.name, delimiter,
+      total_rows: totalRows, imported: 0, invalid, tag_ids: tagIds,
+      status: "completed", invalid_rows: invalidRows,
+    })
     return NextResponse.json({ error: "no valid email addresses found" }, { status: 400 })
   }
 
@@ -225,6 +232,7 @@ export async function POST(req: NextRequest) {
     invalid,
     tag_ids: tagIds,
     status: "completed",
+    invalid_rows: invalidRows,
   })
 
   return NextResponse.json({ imported, invalid, skipped, merged })

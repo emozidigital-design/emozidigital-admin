@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
 
   const { data, error } = await supabaseAdmin
     .from("email_import_logs")
-    .select("id, file_name, delimiter, total_rows, imported, invalid, status, created_at")
+    .select("id, file_name, delimiter, total_rows, imported, invalid, status, created_at, invalid_rows")
     .eq("client_id", clientId)
     .order("created_at", { ascending: false })
     .limit(20)

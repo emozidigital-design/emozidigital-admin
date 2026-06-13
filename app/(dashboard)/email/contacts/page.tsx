@@ -27,6 +27,7 @@ interface ImportLog {
   id: string; file_name: string | null; delimiter: string
   total_rows: number; imported: number; invalid: number
   status: string; created_at: string
+  invalid_rows?: { row: number; raw: string; reason: string }[]
 }
 interface CustomField { key: string; label: string; value: string }
 type View = "list" | "create" | "import"
@@ -2318,7 +2319,28 @@ export default function ContactsPage() {
                     </td>
                     <td className="px-5 py-3.5 text-xs">
                       {log.invalid > 0
-                        ? <span className="text-[#003434] hover:underline cursor-pointer">Download {log.invalid} invalid rows</span>
+                        ? (
+                          <span
+                            className="text-[#003434] hover:underline cursor-pointer"
+                            onClick={() => {
+                              const rows = log.invalid_rows ?? []
+                              const delimiter = log.delimiter || ","
+                              const header = `Row${delimiter}Email/Raw${delimiter}Reason`
+                              const csvContent = [header, ...rows.map(r =>
+                                `${r.row}${delimiter}"${r.raw.replace(/"/g, '""')}"${delimiter}"${r.reason}"`
+                              )].join("\n")
+                              const blob = new Blob([csvContent], { type: "text/csv" })
+                              const url = URL.createObjectURL(blob)
+                              const a = document.createElement("a")
+                              a.href = url
+                              a.download = `invalid-rows-${new Date(log.created_at).toISOString().slice(0, 10)}.csv`
+                              a.click()
+                              URL.revokeObjectURL(url)
+                            }}
+                          >
+                            Download {log.invalid} invalid rows
+                          </span>
+                        )
                         : <span className="text-zinc-400">—</span>
                       }
                     </td>
