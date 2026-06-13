@@ -59,7 +59,6 @@ interface SidebarFilters {
   firstName: string
   lastName: string
   phone: string
-  company: string
   city: string
   stateProvince: string
   country: string
@@ -73,7 +72,7 @@ interface SavedFilter { id: string; label: string; filters: SidebarFilters }
 
 const DEFAULT_FILTERS: SidebarFilters = {
   emailSearch: "", tagIds: [], dateFrom: "", dateTo: "", status: "all",
-  firstName: "", lastName: "", phone: "", company: "", city: "",
+  firstName: "", lastName: "", phone: "", city: "",
   stateProvince: "", country: "", agentId: "", userType: "",
   agentName: "", userName: "", language: "",
 }
@@ -348,36 +347,15 @@ function SidebarFilters({ filters, allTags, onChange, savedFilters, onSave, onLo
   onReset: () => void
 }) {
   const [tab, setTab] = useState<"filter" | "saved">("filter")
-  // Local pending state — only pushed to parent on Apply
   const [pending, setPending] = useState<SidebarFilters>(filters)
-  type Section = "email" | "firstName" | "lastName" | "phone" | "company" | "city" | "stateProvince" | "country" | "agentId" | "userType" | "agentName" | "userName" | "language" | "tag" | "date" | "status"
+  type Section = "email" | "firstName" | "lastName" | "phone" | "city" | "stateProvince" | "country" | "agentId" | "userType" | "agentName" | "userName" | "language" | "tag" | "date" | "status"
   const [expanded, setExpanded] = useState<Partial<Record<Section, boolean>>>({ email: true })
   const tog = (s: Section) => setExpanded(p => ({ ...p, [s]: !p[s] }))
 
-  const Hdr = ({ label, section }: { label: string; section: Section }) => (
-    <button
-      className={`w-full flex items-center justify-between px-4 py-2.5 text-sm text-zinc-700 hover:bg-zinc-50 transition-colors ${expanded[section] ? "border-l-2 border-[#003434] bg-[#003434]/5" : ""}`}
-      onClick={() => tog(section)}
-    >
-      <span className="font-medium text-sm">{label}</span>
-      <svg className={`w-3.5 h-3.5 text-zinc-400 transition-transform ${expanded[section] ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-    </button>
-  )
-
-  const TextFilter = ({ section, placeholder, field }: { section: Section; placeholder: string; field: keyof SidebarFilters }) => (
-    <div>
-      <Hdr label={placeholder} section={section} />
-      {expanded[section] && (
-        <div className="px-4 pb-2.5 pt-1">
-          <input
-            className="w-full border border-zinc-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#003434]/20"
-            placeholder={`Search ${placeholder.toLowerCase()}…`}
-            value={pending[field] as string}
-            onChange={e => setPending(p => ({ ...p, [field]: e.target.value }))}
-          />
-        </div>
-      )}
-    </div>
+  const hdrClass = (s: Section) =>
+    `w-full flex items-center justify-between px-4 py-2.5 text-sm text-zinc-700 hover:bg-zinc-50 transition-colors ${expanded[s] ? "border-l-2 border-[#003434] bg-[#003434]/5" : ""}`
+  const chevron = (s: Section) => (
+    <svg className={`w-3.5 h-3.5 text-zinc-400 transition-transform ${expanded[s] ? "rotate-180" : ""}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
   )
 
   return (
@@ -394,17 +372,40 @@ function SidebarFilters({ filters, allTags, onChange, savedFilters, onSave, onLo
 
       {tab === "filter" && (
         <div className="flex-1 divide-y divide-zinc-100 max-h-[70vh] overflow-y-auto">
-          <TextFilter section="email" placeholder="Email" field="emailSearch" />
-          <TextFilter section="firstName" placeholder="First name" field="firstName" />
-          <TextFilter section="lastName" placeholder="Last name" field="lastName" />
-          <TextFilter section="phone" placeholder="Phone number" field="phone" />
-          <TextFilter section="company" placeholder="Company name" field="company" />
-          <TextFilter section="city" placeholder="City" field="city" />
-          <TextFilter section="stateProvince" placeholder="State / Province" field="stateProvince" />
+          {/* Email */}
+          <div>
+            <button className={hdrClass("email")} onClick={() => tog("email")}><span className="font-medium text-sm">Email</span>{chevron("email")}</button>
+            {expanded.email && <div className="px-4 pb-2.5 pt-1"><input className="w-full border border-zinc-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#003434]/20" placeholder="Search email…" value={pending.emailSearch} onChange={e => setPending(p => ({ ...p, emailSearch: e.target.value }))} /></div>}
+          </div>
+          {/* First name */}
+          <div>
+            <button className={hdrClass("firstName")} onClick={() => tog("firstName")}><span className="font-medium text-sm">First name</span>{chevron("firstName")}</button>
+            {expanded.firstName && <div className="px-4 pb-2.5 pt-1"><input className="w-full border border-zinc-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#003434]/20" placeholder="Search first name…" value={pending.firstName} onChange={e => setPending(p => ({ ...p, firstName: e.target.value }))} /></div>}
+          </div>
+          {/* Last name */}
+          <div>
+            <button className={hdrClass("lastName")} onClick={() => tog("lastName")}><span className="font-medium text-sm">Last name</span>{chevron("lastName")}</button>
+            {expanded.lastName && <div className="px-4 pb-2.5 pt-1"><input className="w-full border border-zinc-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#003434]/20" placeholder="Search last name…" value={pending.lastName} onChange={e => setPending(p => ({ ...p, lastName: e.target.value }))} /></div>}
+          </div>
+          {/* Phone */}
+          <div>
+            <button className={hdrClass("phone")} onClick={() => tog("phone")}><span className="font-medium text-sm">Phone number</span>{chevron("phone")}</button>
+            {expanded.phone && <div className="px-4 pb-2.5 pt-1"><input className="w-full border border-zinc-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#003434]/20" placeholder="Search phone number…" value={pending.phone} onChange={e => setPending(p => ({ ...p, phone: e.target.value }))} /></div>}
+          </div>
+          {/* City */}
+          <div>
+            <button className={hdrClass("city")} onClick={() => tog("city")}><span className="font-medium text-sm">City</span>{chevron("city")}</button>
+            {expanded.city && <div className="px-4 pb-2.5 pt-1"><input className="w-full border border-zinc-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#003434]/20" placeholder="Search city…" value={pending.city} onChange={e => setPending(p => ({ ...p, city: e.target.value }))} /></div>}
+          </div>
+          {/* State / Province */}
+          <div>
+            <button className={hdrClass("stateProvince")} onClick={() => tog("stateProvince")}><span className="font-medium text-sm">State / Province</span>{chevron("stateProvince")}</button>
+            {expanded.stateProvince && <div className="px-4 pb-2.5 pt-1"><input className="w-full border border-zinc-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#003434]/20" placeholder="Search state / province…" value={pending.stateProvince} onChange={e => setPending(p => ({ ...p, stateProvince: e.target.value }))} /></div>}
+          </div>
 
           {/* Country */}
           <div>
-            <Hdr label="Country" section="country" />
+            <button className={hdrClass("country")} onClick={() => tog("country")}><span className="font-medium text-sm">Country</span>{chevron("country")}</button>
             {expanded.country && (
               <div className="px-4 pb-2.5 pt-1">
                 <select
@@ -421,14 +422,30 @@ function SidebarFilters({ filters, allTags, onChange, savedFilters, onSave, onLo
             )}
           </div>
 
-          <TextFilter section="agentId" placeholder="Agent Id" field="agentId" />
-          <TextFilter section="userType" placeholder="User Type" field="userType" />
-          <TextFilter section="agentName" placeholder="Agent Name" field="agentName" />
-          <TextFilter section="userName" placeholder="User Name" field="userName" />
+          {/* Agent Id */}
+          <div>
+            <button className={hdrClass("agentId")} onClick={() => tog("agentId")}><span className="font-medium text-sm">Agent Id</span>{chevron("agentId")}</button>
+            {expanded.agentId && <div className="px-4 pb-2.5 pt-1"><input className="w-full border border-zinc-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#003434]/20" placeholder="Search agent id…" value={pending.agentId} onChange={e => setPending(p => ({ ...p, agentId: e.target.value }))} /></div>}
+          </div>
+          {/* User Type */}
+          <div>
+            <button className={hdrClass("userType")} onClick={() => tog("userType")}><span className="font-medium text-sm">User Type</span>{chevron("userType")}</button>
+            {expanded.userType && <div className="px-4 pb-2.5 pt-1"><input className="w-full border border-zinc-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#003434]/20" placeholder="Search user type…" value={pending.userType} onChange={e => setPending(p => ({ ...p, userType: e.target.value }))} /></div>}
+          </div>
+          {/* Agent Name */}
+          <div>
+            <button className={hdrClass("agentName")} onClick={() => tog("agentName")}><span className="font-medium text-sm">Agent Name</span>{chevron("agentName")}</button>
+            {expanded.agentName && <div className="px-4 pb-2.5 pt-1"><input className="w-full border border-zinc-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#003434]/20" placeholder="Search agent name…" value={pending.agentName} onChange={e => setPending(p => ({ ...p, agentName: e.target.value }))} /></div>}
+          </div>
+          {/* User Name */}
+          <div>
+            <button className={hdrClass("userName")} onClick={() => tog("userName")}><span className="font-medium text-sm">User Name</span>{chevron("userName")}</button>
+            {expanded.userName && <div className="px-4 pb-2.5 pt-1"><input className="w-full border border-zinc-200 rounded-lg px-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-[#003434]/20" placeholder="Search user name…" value={pending.userName} onChange={e => setPending(p => ({ ...p, userName: e.target.value }))} /></div>}
+          </div>
 
           {/* Language */}
           <div>
-            <Hdr label="Language" section="language" />
+            <button className={hdrClass("language")} onClick={() => tog("language")}><span className="font-medium text-sm">Language</span>{chevron("language")}</button>
             {expanded.language && (
               <div className="px-4 pb-2.5 pt-1">
                 <select
@@ -447,7 +464,7 @@ function SidebarFilters({ filters, allTags, onChange, savedFilters, onSave, onLo
 
           {/* Tag */}
           <div>
-            <Hdr label="Tag" section="tag" />
+            <button className={hdrClass("tag")} onClick={() => tog("tag")}><span className="font-medium text-sm">Tag</span>{chevron("tag")}</button>
             {expanded.tag && (
               <div className="px-4 pb-2.5 pt-1 max-h-40 overflow-y-auto space-y-1">
                 {allTags.length === 0 && <p className="text-xs text-zinc-400">No tags yet</p>}
@@ -473,7 +490,7 @@ function SidebarFilters({ filters, allTags, onChange, savedFilters, onSave, onLo
 
           {/* Date added */}
           <div>
-            <Hdr label="Date added" section="date" />
+            <button className={hdrClass("date")} onClick={() => tog("date")}><span className="font-medium text-sm">Date added</span>{chevron("date")}</button>
             {expanded.date && (
               <div className="px-4 pb-2.5 pt-1 space-y-2">
                 <div>
@@ -490,7 +507,7 @@ function SidebarFilters({ filters, allTags, onChange, savedFilters, onSave, onLo
 
           {/* Contact state */}
           <div>
-            <Hdr label="Contact state" section="status" />
+            <button className={hdrClass("status")} onClick={() => tog("status")}><span className="font-medium text-sm">Contact state</span>{chevron("status")}</button>
             {expanded.status && (
               <div className="px-4 pb-2.5 pt-1 space-y-1.5">
                 {(["all", "subscribed", "unsubscribed", "bounced", "complained"] as const).map(s => (
@@ -636,15 +653,12 @@ const CONTACT_FIELD_OPTIONS: { value: string; label: string }[] = [
   { value: "last_name", label: "Last name" },
   { value: "phone", label: "Phone number" },
   { value: "alternate_phone", label: "Alternate phone" },
-  { value: "company", label: "Company" },
   { value: "street_address", label: "Address line 1" },
   { value: "street_number", label: "Address line 2" },
-  { value: "neighborhood", label: "Neighborhood" },
   { value: "postal_code", label: "Postal code" },
   { value: "city", label: "City" },
   { value: "state_province", label: "State / Province" },
   { value: "country", label: "Country" },
-  { value: "tax_number", label: "Tax number" },
   { value: "language", label: "Language" },
   { value: "user_name", label: "User name" },
   { value: "user_type", label: "User type" },
@@ -661,15 +675,12 @@ const FIELD_ALIASES: Record<string, string> = {
   lastname: "last_name", last: "last_name",
   phone: "phone", phonenumber: "phone", mobile: "phone",
   alternatephone: "alternate_phone", altphone: "alternate_phone",
-  company: "company", organization: "company",
   streetaddress: "street_address", address: "street_address",
   streetnumber: "street_number",
-  neighborhood: "neighborhood",
   postalcode: "postal_code", zip: "postal_code", zipcode: "postal_code",
   city: "city",
   stateprovince: "state_province", state: "state_province", province: "state_province",
   country: "country",
-  taxnumber: "tax_number", vat: "tax_number",
   language: "language",
   username: "user_name",
   usertype: "user_type",
@@ -928,15 +939,12 @@ function ContactDrawer({ contact, allTags, onClose, onSave, onDelete, onResetBou
     last_name: contact.last_name ?? "",
     phone: contact.phone ?? "",
     alternate_phone: contact.alternate_phone ?? "",
-    company: contact.company ?? "",
     street_address: contact.street_address ?? "",
     street_number: contact.street_number ?? "",
-    neighborhood: contact.neighborhood ?? "",
     postal_code: contact.postal_code ?? "",
     city: contact.city ?? "",
     state_province: contact.state_province ?? "",
     country: contact.country ?? "",
-    tax_number: contact.tax_number ?? "",
     language: contact.language ?? "English",
     user_name: contact.user_name ?? "",
     user_type: contact.user_type ?? "",
@@ -1016,8 +1024,6 @@ function ContactDrawer({ contact, allTags, onClose, onSave, onDelete, onResetBou
               {inp("Last name", "last_name")}
               {inp("Phone number", "phone", "tel")}
               {inp("Alternate phone", "alternate_phone", "tel")}
-              {inp("Company", "company")}
-              {inp("Tax number", "tax_number")}
             </div>
           </section>
 
@@ -1027,7 +1033,6 @@ function ContactDrawer({ contact, allTags, onClose, onSave, onDelete, onResetBou
             <div className="grid grid-cols-2 gap-3">
               {inp("Address line 1", "street_address")}
               {inp("Address line 2", "street_number")}
-              {inp("Neighborhood", "neighborhood")}
               {inp("Postal code", "postal_code")}
               {inp("City", "city")}
               {inp("State / Province", "state_province")}
@@ -1247,8 +1252,8 @@ export default function ContactsPage() {
   // ── Create view state ──
   const [createForm, setCreateForm] = useState({
     email: "", firstName: "", lastName: "", phone: "", alternatePhone: "",
-    company: "", streetAddress: "", streetNumber: "", neighborhood: "",
-    postalCode: "", city: "", stateProvince: "", country: "", taxNumber: "",
+    streetAddress: "", streetNumber: "",
+    postalCode: "", city: "", stateProvince: "", country: "",
     language: "English", userName: "", userType: "", agentName: "", agentId: "",
     agentRegisteredDate: "", agentPancardNo: "", agentGstNumber: "",
     tagIds: [] as string[], customFields: [] as CustomField[],
@@ -1332,7 +1337,6 @@ export default function ContactsPage() {
       if (!m(c.first_name, sf.firstName)) return false
       if (!m(c.last_name, sf.lastName)) return false
       if (!m(c.phone, sf.phone)) return false
-      if (!m(c.company, sf.company)) return false
       if (!m(c.city, sf.city)) return false
       if (!m(c.state_province, sf.stateProvince)) return false
       if (!m(c.country, sf.country)) return false
@@ -1534,15 +1538,12 @@ export default function ContactsPage() {
         last_name: createForm.lastName || null,
         phone: createForm.phone || null,
         alternate_phone: createForm.alternatePhone || null,
-        company: createForm.company || null,
         street_address: createForm.streetAddress || null,
         street_number: createForm.streetNumber || null,
-        neighborhood: createForm.neighborhood || null,
         postal_code: createForm.postalCode || null,
         city: createForm.city || null,
         state_province: createForm.stateProvince || null,
         country: createForm.country || null,
-        tax_number: createForm.taxNumber || null,
         language: createForm.language || "English",
         user_name: createForm.userName || null,
         user_type: createForm.userType || null,
@@ -1568,8 +1569,8 @@ export default function ContactsPage() {
       setContacts(prev => [newContact, ...prev])
       setCreateForm({
         email: "", firstName: "", lastName: "", phone: "", alternatePhone: "",
-        company: "", streetAddress: "", streetNumber: "", neighborhood: "",
-        postalCode: "", city: "", stateProvince: "", country: "", taxNumber: "",
+        streetAddress: "", streetNumber: "",
+        postalCode: "", city: "", stateProvince: "", country: "",
         language: "English", userName: "", userType: "", agentName: "", agentId: "",
         agentRegisteredDate: "", agentPancardNo: "", agentGstNumber: "",
         tagIds: [], customFields: [],
@@ -1865,9 +1866,10 @@ export default function ContactsPage() {
                   {inp("Email", "email", { type: "email", placeholder: "email@example.com", required: true, colSpan: true })}
                   {inp("First name", "firstName")}
                   {inp("Last name", "lastName")}
+                  {inp("Phone number", "phone", { type: "tel", placeholder: "+91 98765 43210" })}
+                  {inp("Alternate Mobile No", "alternatePhone", { type: "tel" })}
                   {inp("Address line 1", "streetAddress")}
                   {inp("Address line 2", "streetNumber")}
-                  {inp("Neighborhood", "neighborhood")}
                   {inp("Postal code", "postalCode")}
                   {inp("City", "city")}
                   {inp("State / Province", "stateProvince")}
@@ -1884,17 +1886,13 @@ export default function ContactsPage() {
                       ))}
                     </select>
                   </div>
-                  {inp("Phone number", "phone", { type: "tel", placeholder: "+91 98765 43210" })}
-                  {inp("Company name", "company")}
-                  {inp("Tax number", "taxNumber")}
-                  {inp("Alternate Mobile No", "alternatePhone", { type: "tel" })}
-                  {inp("Agent Pancard No", "agentPancardNo")}
-                  {inp("Agent GST Number", "agentGstNumber")}
                   {inp("Agent Id", "agentId")}
-                  {inp("Agent Registered Date", "agentRegisteredDate", { type: "date" })}
                   {inp("User Type", "userType")}
                   {inp("Agent Name", "agentName")}
                   {inp("User Name", "userName")}
+                  {inp("Agent Registered Date", "agentRegisteredDate", { type: "date" })}
+                  {inp("Agent Pancard No", "agentPancardNo")}
+                  {inp("Agent GST Number", "agentGstNumber")}
                   <div>
                     <label className="text-sm font-medium text-zinc-700 block mb-1.5">Language <span className="text-red-400">*</span></label>
                     <select
