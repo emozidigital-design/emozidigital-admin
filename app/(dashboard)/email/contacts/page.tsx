@@ -673,11 +673,14 @@ const FIELD_ALIASES: Record<string, string> = {
   email: "email", emailaddress: "email",
   firstname: "first_name", first: "first_name",
   lastname: "last_name", last: "last_name",
-  phone: "phone", phonenumber: "phone", mobile: "phone",
+  phone: "phone", phonenumber: "phone", mobile: "phone", mobileno: "phone",
   alternatephone: "alternate_phone", altphone: "alternate_phone",
+  alternatemobileno: "alternate_phone", alternatephoneno: "alternate_phone", alternateno: "alternate_phone",
   streetaddress: "street_address", address: "street_address",
+  address1: "street_address", addressline1: "street_address", addressl1: "street_address",
   streetnumber: "street_number",
-  postalcode: "postal_code", zip: "postal_code", zipcode: "postal_code",
+  address2: "street_number", addressline2: "street_number", addressl2: "street_number",
+  postalcode: "postal_code", zip: "postal_code", zipcode: "postal_code", pincode: "postal_code", pin: "postal_code",
   city: "city",
   stateprovince: "state_province", state: "state_province", province: "state_province",
   country: "country",
@@ -687,7 +690,7 @@ const FIELD_ALIASES: Record<string, string> = {
   agentname: "agent_name",
   agentid: "agent_id",
   agentregistereddate: "agent_registered_date",
-  agentpancardno: "agent_pancard_no", pancard: "agent_pancard_no",
+  agentpancardno: "agent_pancard_no", pancard: "agent_pancard_no", agentpancard: "agent_pancard_no",
   agentgstnumber: "agent_gst_number", gst: "agent_gst_number",
 }
 
@@ -1124,13 +1127,14 @@ function ContactDrawer({ contact, allTags, onClose, onSave, onDelete, onResetBou
 
 // ─── Duplicate contact dialog ─────────────────────────────────────────────────
 
-function DuplicateDialog({ type, existingCount, newCount, onSkip, onCancel, onAddToTag, onMerge, addToTagBusy, hasImportTags }: {
+function DuplicateDialog({ type, existingCount, newCount, onSkip, onCancel, onAddToTag, onMerge, onOverride, addToTagBusy, hasImportTags }: {
   type: "create" | "import"
   existingCount: number
   newCount: number
   onSkip: () => void
   onCancel: () => void
   onMerge?: () => void
+  onOverride?: () => void
   onAddToTag?: () => void
   addToTagBusy?: boolean
   hasImportTags?: boolean
@@ -1157,9 +1161,10 @@ function DuplicateDialog({ type, existingCount, newCount, onSkip, onCancel, onAd
               }
             </p>
             {!isCreate && (
-              <p className="text-xs text-zinc-400 mt-2 leading-relaxed">
-                <span className="font-medium text-zinc-500">Merge missing fields</span> will fill empty fields on existing contacts with data from this file — existing data is never overwritten.
-              </p>
+              <div className="text-xs text-zinc-400 mt-2 space-y-1 leading-relaxed">
+                <p><span className="font-medium text-zinc-500">Merge missing fields</span> — fills only empty fields; existing data is kept.</p>
+                <p><span className="font-medium text-orange-600">Override existing</span> — replaces all fields with CSV data; existing data will be overwritten.</p>
+              </div>
             )}
           </div>
         </div>
@@ -1185,6 +1190,14 @@ function DuplicateDialog({ type, existingCount, newCount, onSkip, onCancel, onAd
               onClick={onMerge}
             >
               Merge missing fields
+            </button>
+          )}
+          {!isCreate && onOverride && (
+            <button
+              className="text-sm px-4 py-2 rounded-lg border border-orange-500 text-orange-600 hover:bg-orange-50 transition-colors"
+              onClick={onOverride}
+            >
+              Override existing
             </button>
           )}
           {(!isCreate && newCount > 0) && (
@@ -1246,6 +1259,7 @@ export default function ContactsPage() {
     existingEmails: string[]
     onSkip: () => void
     onMerge?: () => void
+    onOverride?: () => void
   } | null>(null)
   const [addToTagBusy, setAddToTagBusy] = useState(false)
 
@@ -1598,7 +1612,7 @@ export default function ContactsPage() {
   }
 
   // ── Actual import call (called after duplicate check is resolved) ──
-  const doImport = async (skipExisting: boolean, mergeExisting = false) => {
+  const doImport = async (skipExisting: boolean, mergeExisting = false, overrideExisting = false) => {
     if (!importFile || !clientId) return
     setImportBusy(true)
     try {
@@ -1609,13 +1623,15 @@ export default function ContactsPage() {
       fd.append("column_map", JSON.stringify(columnMap))
       fd.append("skip_existing", skipExisting ? "true" : "false")
       fd.append("merge_existing", mergeExisting ? "true" : "false")
+      fd.append("override_existing", overrideExisting ? "true" : "false")
       importTagIds.forEach(id => fd.append("tag_id", id))
       const res = await fetch("/api/email/contacts/import", { method: "POST", body: fd })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
       const parts = [`Imported ${data.imported} contact${data.imported !== 1 ? "s" : ""}`]
       if (data.merged) parts.push(`${data.merged} existing updated`)
-      if (data.skipped && !mergeExisting) parts.push(`${data.skipped} existing skipped`)
+      if (data.overridden) parts.push(`${data.overridden} existing overridden`)
+      if (data.skipped && !mergeExisting && !overrideExisting) parts.push(`${data.skipped} existing skipped`)
       if (data.invalid) parts.push(`${data.invalid} invalid skipped`)
       toast.success(parts.join(" · "))
       setImportFile(null)
@@ -1722,6 +1738,7 @@ export default function ContactsPage() {
         existingEmails: uniqueExisting,
         onSkip: () => { setDupDialog(null); doImport(true) },
         onMerge: () => { setDupDialog(null); doImport(true, true) },
+        onOverride: () => { setDupDialog(null); doImport(true, false, true) },
       })
       return
     }
