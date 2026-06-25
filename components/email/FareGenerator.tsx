@@ -61,6 +61,7 @@ export default function FareGenerator({ clientId, onGenerated }: FareGeneratorPr
   const [tagModalOpen, setTagModalOpen] = useState(false)
   const [tagDropOpen, setTagDropOpen]   = useState(false)
   const tagDropRef                      = useRef<HTMLDivElement>(null)
+  const tagButtonRef                    = useRef<HTMLButtonElement>(null)
 
   const [generating, setGenerating] = useState(false)
 
@@ -84,7 +85,10 @@ export default function FareGenerator({ clientId, onGenerated }: FareGeneratorPr
   useEffect(() => {
     if (!tagDropOpen) return
     const handler = (e: MouseEvent) => {
-      if (tagDropRef.current && !tagDropRef.current.contains(e.target as Node)) {
+      if (
+        tagDropRef.current && !tagDropRef.current.contains(e.target as Node) &&
+        tagButtonRef.current && !tagButtonRef.current.contains(e.target as Node)
+      ) {
         setTagDropOpen(false)
       }
     }
@@ -192,6 +196,7 @@ export default function FareGenerator({ clientId, onGenerated }: FareGeneratorPr
                 placeholder="Example: GAU-MAA,MAA-GAU,CCU-MAA,…"
               />
               <button
+                ref={tagButtonRef}
                 type="button"
                 onClick={() => setTagDropOpen(o => !o)}
                 className={`absolute right-1.5 top-1/2 -translate-y-1/2 flex items-center gap-1 px-3 py-1 text-xs font-semibold rounded-md border transition-colors whitespace-nowrap ${
