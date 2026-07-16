@@ -8,6 +8,7 @@ import { useClient } from "../client-context"
 interface EmailTag { id: string; name: string; contact_count?: number }
 interface ContactRow {
   id: string; first_name?: string; last_name?: string; email: string; phone?: string
+  agent_name?: string | null; agent_registered_date?: string | null
 }
 
 type DialogState = { title: string; message: string; onConfirm: () => void } | null
@@ -68,7 +69,7 @@ function ContactTable({
     ? contacts.filter(c => {
         const q = search.toLowerCase()
         const name = `${c.first_name ?? ""} ${c.last_name ?? ""}`.toLowerCase()
-        return name.includes(q) || c.email.toLowerCase().includes(q) || (c.phone ?? "").includes(q)
+        return name.includes(q) || c.email.toLowerCase().includes(q) || (c.phone ?? "").includes(q) || (c.agent_name ?? "").toLowerCase().includes(q)
       })
     : contacts
 
@@ -128,8 +129,10 @@ function ContactTable({
       }
       const rows = allRows.map(c => ({
         Name: [c.first_name, c.last_name].filter(Boolean).join(" ") || "",
+        Agency: c.agent_name || "",
         Email: c.email,
         Phone: c.phone || "",
+        "Registered Date": c.agent_registered_date || "",
       }))
       const ws = XLSX.utils.json_to_sheet(rows)
       const wb = XLSX.utils.book_new()
@@ -239,7 +242,7 @@ function ContactTable({
       ) : (
         <>
           {/* Table header */}
-          <div className="grid grid-cols-[32px_28px_1fr_1fr_1fr_64px] gap-0 px-2 py-1.5 bg-zinc-50 rounded-lg mb-1">
+          <div className="grid grid-cols-[32px_28px_1fr_1fr_1.2fr_0.8fr_88px_60px] gap-0 px-2 py-1.5 bg-zinc-50 rounded-lg mb-1">
             <div className="flex items-center">
               <input
                 type="checkbox"
@@ -251,8 +254,10 @@ function ContactTable({
             </div>
             <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">#</span>
             <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Name</span>
+            <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Agency</span>
             <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Email</span>
             <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Phone</span>
+            <span className="text-[10px] font-bold text-zinc-400 uppercase tracking-widest">Registered</span>
             <span />
           </div>
 
@@ -265,7 +270,7 @@ function ContactTable({
                 <div
                   key={c.id}
                   onClick={() => toggleOne(c.id)}
-                  className={`grid grid-cols-[32px_28px_1fr_1fr_1fr_64px] gap-0 px-2 py-2 items-center cursor-pointer transition-colors
+                  className={`grid grid-cols-[32px_28px_1fr_1fr_1.2fr_0.8fr_88px_60px] gap-0 px-2 py-2 items-center cursor-pointer transition-colors
                     ${isSelected ? "bg-[#003434]/5 hover:bg-[#003434]/8" : idx % 2 === 0 ? "bg-white hover:bg-zinc-50" : "bg-zinc-50/50 hover:bg-zinc-100/50"}`}
                 >
                   <div className="flex items-center" onClick={e => e.stopPropagation()}>
@@ -282,9 +287,15 @@ function ContactTable({
                       <span className="text-zinc-400 italic font-normal">—</span>
                     )}
                   </span>
+                  <span className="text-xs text-zinc-600 truncate pr-2" title={c.agent_name ?? undefined}>
+                    {c.agent_name || <span className="text-zinc-300">—</span>}
+                  </span>
                   <span className="text-xs text-zinc-600 truncate pr-2">{c.email}</span>
                   <span className="text-xs text-zinc-500 truncate pr-2">
                     {c.phone || <span className="text-zinc-300">—</span>}
+                  </span>
+                  <span className="text-[11px] text-zinc-500 truncate pr-2 tabular-nums" title={c.agent_registered_date ?? undefined}>
+                    {c.agent_registered_date || <span className="text-zinc-300">—</span>}
                   </span>
                   <div className="flex justify-end" onClick={e => e.stopPropagation()}>
                     <button

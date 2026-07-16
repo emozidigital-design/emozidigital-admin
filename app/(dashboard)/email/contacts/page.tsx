@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { createPortal } from "react-dom"
 import toast from "react-hot-toast"
 import { useClient } from "../client-context"
+import { parseCsv } from "@/lib/csv"
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -1070,7 +1071,7 @@ function ContactDrawer({ contact, allTags, onClose, onSave, onDelete, onResetBou
             <div className="grid grid-cols-2 gap-3">
               {inp("Agent name", "agent_name")}
               {inp("Agent ID", "agent_id")}
-              {inp("Agent registered date", "agent_registered_date", "date")}
+              {inp("Agent registered date", "agent_registered_date")}
               {inp("Agent PAN card no.", "agent_pancard_no")}
               <div className="col-span-2">{inp("Agent GST number", "agent_gst_number")}</div>
             </div>
@@ -1598,10 +1599,10 @@ export default function ContactsPage() {
   const handleImport = async () => {
     if (!importFile) { toast.error("Select a CSV file"); return }
     const text = await importFile.text()
-    const lines = text.split("\n").map(l => l.trim()).filter(Boolean)
-    if (lines.length < 2) { toast.error("CSV must have a header row + at least one data row"); return }
-    const headers = lines[0].split(importDelimiter).map(h => h.replace(/^"|"$/g, "").trim())
-    const dataRows = lines.slice(1, 5).map(l => l.split(importDelimiter).map(c => c.replace(/^"|"$/g, "").trim()))
+    const parsed = parseCsv(text, importDelimiter)
+    if (parsed.length < 2) { toast.error("CSV must have a header row + at least one data row"); return }
+    const headers = parsed[0]
+    const dataRows = parsed.slice(1, 5)
     const auto: Record<number, string> = {}
     headers.forEach((h, i) => { const k = autoDetectField(h); if (k) auto[i] = k })
     setCsvPreview({ headers, rows: dataRows })
@@ -1658,10 +1659,8 @@ export default function ContactsPage() {
 
     // Build sample rows for AI validation (up to 30 rows)
     const text = await importFile.text()
-    const lines = text.split("\n").map(l => l.trim()).filter(Boolean)
-    const dataLines = lines.slice(1, 31)
-    const sampleRows = dataLines.map((line, idx) => {
-      const cols = line.split(importDelimiter).map(c => c.replace(/^"|"$/g, "").trim())
+    const parsed = parseCsv(text, importDelimiter)
+    const sampleRows = parsed.slice(1, 31).map((cols, idx) => {
       const fields: Record<string, string> = {}
       for (const [colIdxStr, fieldKey] of Object.entries(columnMap)) {
         if (fieldKey) fields[fieldKey] = cols[Number(colIdxStr)] ?? ""
@@ -1695,22 +1694,22 @@ export default function ContactsPage() {
     if (!importFile || !clientId) return
 
     const text = await importFile.text()
-    const lines = text.split("\n").map(l => l.trim()).filter(Boolean)
-    const headers = lines[0].split(importDelimiter).map(h => h.replace(/^"|"$/g, "").trim())
+    const parsed = parseCsv(text, importDelimiter)
+    const headers = parsed[0] ?? []
     const emailColIdx = Object.entries(columnMap).find(([, v]) => v === "email")?.[0]
     const agentIdColIdx = Object.entries(columnMap).find(([, v]) => v === "agent_id")?.[0]
     const emailIdx = emailColIdx !== undefined ? Number(emailColIdx) : headers.findIndex(h => h.toLowerCase() === "email")
     const agentIdIdx = agentIdColIdx !== undefined ? Number(agentIdColIdx) : -1
 
-    const dataLines = lines.slice(1)
-    const allEmails = dataLines
-      .map(l => l.split(importDelimiter).map(c => c.replace(/^"|"$/g, "").trim())[emailIdx]?.toLowerCase().trim())
+    const dataRows = parsed.slice(1)
+    const allEmails = dataRows
+      .map(cols => cols[emailIdx]?.toLowerCase().trim())
       .filter((e): e is string => Boolean(e && e.includes("@")))
     const uniqueEmails = Array.from(new Set(allEmails))
 
     const allAgentIds = agentIdIdx >= 0
-      ? Array.from(new Set(dataLines
-          .map(l => l.split(importDelimiter).map(c => c.replace(/^"|"$/g, "").trim())[agentIdIdx]?.trim())
+      ? Array.from(new Set(dataRows
+          .map(cols => cols[agentIdIdx]?.trim())
           .filter((id): id is string => Boolean(id))))
       : []
 
@@ -1907,7 +1906,7 @@ export default function ContactsPage() {
                   {inp("User Type", "userType")}
                   {inp("Agent Name", "agentName")}
                   {inp("User Name", "userName")}
-                  {inp("Agent Registered Date", "agentRegisteredDate", { type: "date" })}
+                  {inp("Agent Registered Date", "agentRegisteredDate", { placeholder: "Filled from import" })}
                   {inp("Agent Pancard No", "agentPancardNo")}
                   {inp("Agent GST Number", "agentGstNumber")}
                   <div>

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { supabaseAdmin } from "@/lib/supabase-server"
 import { requireAuth } from "@/lib/require-auth"
+import { parseCsv } from "@/lib/csv"
 
 // All scalar contact columns that can be merged
 const MERGEABLE_FIELDS = [
@@ -33,13 +34,13 @@ export async function POST(req: NextRequest) {
   const hasColumnMap = Object.keys(columnMap).length > 0
 
   const text = await file.text()
-  const lines = text.split("\n").map(l => l.trim()).filter(Boolean)
+  const rows = parseCsv(text, delimiter)
 
-  if (lines.length < 2) {
+  if (rows.length < 2) {
     return NextResponse.json({ error: "CSV must have header row + at least one data row" }, { status: 400 })
   }
 
-  const headers = lines[0].split(delimiter).map(h => h.replace(/^"|"$/g, "").trim().toLowerCase())
+  const headers = rows[0].map(h => h.toLowerCase())
 
   let emailIdx: number
   if (hasColumnMap) {
@@ -57,12 +58,11 @@ export async function POST(req: NextRequest) {
 
   let invalid = 0
   const invalidRows: { row: number; raw: string; reason: string }[] = []
-  const contacts = lines.slice(1).flatMap((line, lineIdx) => {
-    const cols = line.split(delimiter).map(c => c.replace(/^"|"$/g, "").trim())
+  const contacts = rows.slice(1).flatMap((cols, lineIdx) => {
     const email = cols[emailIdx]?.toLowerCase().trim()
     if (!email || !email.includes("@")) {
       invalid++
-      invalidRows.push({ row: lineIdx + 2, raw: line, reason: !email ? "Missing email" : "Invalid email format" })
+      invalidRows.push({ row: lineIdx + 2, raw: cols.join(delimiter), reason: !email ? "Missing email" : "Invalid email format" })
       return []
     }
     if (hasColumnMap) {
@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
     return [{ client_id: clientId, email, name: nameIdx !== -1 ? cols[nameIdx] : null, metadata: {} }]
   })
 
-  const totalRows = lines.length - 1
+  const totalRows = rows.length - 1
 
   if (contacts.length === 0) {
     await supabaseAdmin.from("email_import_logs").insert({

@@ -32,7 +32,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   // Step 2: fetch full contact details, then re-sort to match tag-join order
   const { data: contacts, error: contactError } = await supabaseAdmin
     .from("email_contacts")
-    .select("id, first_name, last_name, email, phone")
+    .select("id, first_name, last_name, email, phone, agent_name, agent_registered_date")
     .in("id", contactIds)
 
   if (contactError) return NextResponse.json({ error: contactError.message }, { status: 500 })
