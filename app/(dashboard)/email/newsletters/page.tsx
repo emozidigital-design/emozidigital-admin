@@ -938,6 +938,12 @@ export default function NewslettersPage() {
   const [deleteTarget, setDeleteTarget] = useState<UnifiedEmail | null>(null)
   const [deleting, setDeleting] = useState(false)
 
+  // ── Bulk select mode ────────────────────────────────────────────────────────
+  const [selectMode, setSelectMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkDeleteOpen, setBulkDeleteOpen] = useState(false)
+  const [bulkDeleting, setBulkDeleting] = useState(false)
+
   // ── Confirm duplicate ───────────────────────────────────────────────────────
   const [dupTarget, setDupTarget] = useState<UnifiedEmail | null>(null)
   const [duping, setDuping] = useState(false)
@@ -1308,6 +1314,53 @@ export default function NewslettersPage() {
     }
   }
 
+  // ─── Bulk select ─────────────────────────────────────────────────────────────
+
+  const toggleSelectMode = () => {
+    setSelectMode(v => !v)
+    setSelectedIds(new Set())
+  }
+
+  const toggleSelectItem = (item: UnifiedEmail) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      const key = `${item.type}:${item.id}`
+      if (next.has(key)) next.delete(key)
+      else next.add(key)
+      return next
+    })
+  }
+
+  const toggleSelectAll = () => {
+    setSelectedIds(prev => {
+      if (prev.size === filtered.length) return new Set()
+      return new Set(filtered.map(i => `${i.type}:${i.id}`))
+    })
+  }
+
+  const handleBulkDelete = async () => {
+    setBulkDeleting(true)
+    try {
+      const targets = Array.from(selectedIds).map(key => {
+        const [type, id] = key.split(":")
+        return { type, id }
+      })
+      const results = await Promise.allSettled(
+        targets.map(t => fetch(t.type === "campaign" ? `/api/email/campaigns/${t.id}` : `/api/email/newsletter/${t.id}`, { method: "DELETE" }))
+      )
+      const failed = results.filter(r => r.status === "rejected" || (r.status === "fulfilled" && !r.value.ok)).length
+      const succeeded = targets.length - failed
+      if (succeeded > 0) toast.success(`Deleted ${succeeded} item${succeeded !== 1 ? "s" : ""}`)
+      if (failed > 0) toast.error(`Failed to delete ${failed} item${failed !== 1 ? "s" : ""}`)
+      setBulkDeleteOpen(false)
+      setSelectMode(false)
+      setSelectedIds(new Set())
+      refreshList()
+    } finally {
+      setBulkDeleting(false)
+    }
+  }
+
   // ─── Derived ─────────────────────────────────────────────────────────────────
 
   const filtered = items.filter(item => {
@@ -1392,31 +1445,65 @@ export default function NewslettersPage() {
           </div>
         </div>
 
-        {/* Create dropdown */}
-        <div className="relative" ref={createDropRef}>
+        <div className="flex items-center gap-2">
+          {/* Select toggle */}
           <button
-            onClick={() => setCreateOpen(o => !o)}
-            className="flex items-center gap-2 bg-[#003434] text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-[#003434]/90 transition-colors"
+            onClick={toggleSelectMode}
+            className={`flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-xl border transition-colors ${selectMode ? "bg-[#003434] text-white border-[#003434]" : "bg-white text-zinc-600 border-zinc-200 hover:border-[#003434]/40 hover:text-[#003434]"}`}
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-            Create
-            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+            {selectMode ? "Cancel" : "Select"}
           </button>
-          {createOpen && (
-            <div className="absolute right-0 top-full mt-1.5 w-48 bg-white border border-zinc-200 rounded-xl shadow-lg overflow-hidden z-20">
-              <button onClick={openNewNewsletter} className="w-full flex items-center gap-3 px-4 py-3 text-sm text-zinc-700 hover:bg-zinc-50 transition-colors">
-                <span className="w-5 h-5 rounded bg-violet-50 flex items-center justify-center text-[10px] font-bold text-violet-600">NL</span>
-                New Newsletter
-              </button>
-              <div className="border-t border-zinc-100" />
-              <button onClick={openNewCampaign} className="w-full flex items-center gap-3 px-4 py-3 text-sm text-zinc-700 hover:bg-zinc-50 transition-colors">
-                <span className="w-5 h-5 rounded bg-sky-50 flex items-center justify-center text-[10px] font-bold text-sky-600">C</span>
-                New Campaign
-              </button>
-            </div>
-          )}
+
+          {/* Create dropdown */}
+          <div className="relative" ref={createDropRef}>
+            <button
+              onClick={() => setCreateOpen(o => !o)}
+              className="flex items-center gap-2 bg-[#003434] text-white text-sm font-medium px-4 py-2 rounded-xl hover:bg-[#003434]/90 transition-colors"
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+              Create
+              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+            </button>
+            {createOpen && (
+              <div className="absolute right-0 top-full mt-1.5 w-48 bg-white border border-zinc-200 rounded-xl shadow-lg overflow-hidden z-20">
+                <button onClick={openNewNewsletter} className="w-full flex items-center gap-3 px-4 py-3 text-sm text-zinc-700 hover:bg-zinc-50 transition-colors">
+                  <span className="w-5 h-5 rounded bg-violet-50 flex items-center justify-center text-[10px] font-bold text-violet-600">NL</span>
+                  New Newsletter
+                </button>
+                <div className="border-t border-zinc-100" />
+                <button onClick={openNewCampaign} className="w-full flex items-center gap-3 px-4 py-3 text-sm text-zinc-700 hover:bg-zinc-50 transition-colors">
+                  <span className="w-5 h-5 rounded bg-sky-50 flex items-center justify-center text-[10px] font-bold text-sky-600">C</span>
+                  New Campaign
+                </button>
+              </div>
+            )}
+          </div>
         </div>
       </div>
+
+      {/* Bulk select action bar */}
+      {selectMode && (
+        <div className="flex items-center justify-between gap-3 mb-4 px-4 py-2.5 bg-[#003434]/5 border border-[#003434]/15 rounded-xl">
+          <label className="flex items-center gap-2 text-sm text-zinc-700 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={filtered.length > 0 && selectedIds.size === filtered.length}
+              onChange={toggleSelectAll}
+              className="w-3.5 h-3.5 rounded border-zinc-300 accent-[#003434] cursor-pointer"
+            />
+            {selectedIds.size > 0 ? `${selectedIds.size} selected` : "Select all"}
+          </label>
+          <button
+            onClick={() => setBulkDeleteOpen(true)}
+            disabled={selectedIds.size === 0}
+            className="flex items-center gap-1.5 bg-red-600 text-white text-xs font-semibold px-3 py-1.5 rounded-lg hover:bg-red-700 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          >
+            <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+            Delete selected
+          </button>
+        </div>
+      )}
 
       {/* Filters */}
       <div className="flex flex-col sm:flex-row gap-3 mb-4">
@@ -1447,7 +1534,8 @@ export default function NewslettersPage() {
       ) : (
         <div className="bg-white border border-zinc-200 rounded-2xl overflow-visible">
           {/* Table header */}
-          <div className="hidden sm:grid grid-cols-[1fr_160px_80px_100px_100px_90px_150px_40px] gap-2 px-5 py-3 border-b border-[#002828] bg-[#003434] rounded-t-2xl">
+          <div className={`hidden sm:grid gap-2 px-5 py-3 border-b border-[#002828] bg-[#003434] rounded-t-2xl ${selectMode ? "grid-cols-[28px_1fr_160px_80px_100px_100px_90px_150px_40px]" : "grid-cols-[1fr_160px_80px_100px_100px_90px_150px_40px]"}`}>
+            {selectMode && <span />}
             <p className="text-xs font-semibold text-white uppercase tracking-wide">Newsletter subject</p>
             <p className="text-xs font-semibold text-white uppercase tracking-wide">Selected tags</p>
             <p className="text-xs font-semibold text-white uppercase tracking-wide text-right">Emails sent</p>
@@ -1462,19 +1550,40 @@ export default function NewslettersPage() {
             const { cfg, dateStr } = formatDate(item)
             const rowBg = idx % 2 === 0 ? "bg-white" : "bg-[#003434]/[0.025]"
             const { text: displaySubject, isDup } = getDisplaySubject(item.subject)
+            const isSelected = selectedIds.has(`${item.type}:${item.id}`)
 
             return (
               <div
                 key={item.id}
-                className={`grid grid-cols-1 sm:grid-cols-[1fr_160px_80px_100px_100px_90px_150px_40px] gap-1 sm:gap-2 px-5 py-3.5 border-b border-zinc-100 last:border-b-0 last:rounded-b-2xl hover:bg-[#003434]/[0.04] transition-colors ${rowBg}`}
+                className={`grid grid-cols-1 gap-1 sm:gap-2 px-5 py-3.5 border-b border-zinc-100 last:border-b-0 last:rounded-b-2xl hover:bg-[#003434]/[0.04] transition-colors ${selectMode ? "sm:grid-cols-[28px_1fr_160px_80px_100px_100px_90px_150px_40px]" : "sm:grid-cols-[1fr_160px_80px_100px_100px_90px_150px_40px]"} ${isSelected ? "bg-[#003434]/[0.06]" : rowBg}`}
               >
+                {/* Select checkbox */}
+                {selectMode && (
+                  <div className="self-center hidden sm:flex items-center justify-center">
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => toggleSelectItem(item)}
+                      className="w-3.5 h-3.5 rounded border-zinc-300 accent-[#003434] cursor-pointer"
+                    />
+                  </div>
+                )}
+
                 {/* Subject */}
                 <div className="flex items-center gap-2 min-w-0">
+                  {selectMode && (
+                    <input
+                      type="checkbox"
+                      checked={isSelected}
+                      onChange={() => toggleSelectItem(item)}
+                      className="sm:hidden w-3.5 h-3.5 rounded border-zinc-300 accent-[#003434] cursor-pointer shrink-0"
+                    />
+                  )}
                   <span className={`shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded border ${item.type === "newsletter" ? "bg-violet-50 text-violet-600 border-violet-200" : "bg-sky-50 text-sky-600 border-sky-200"}`}>
                     {item.type === "newsletter" ? "NL" : "C"}
                   </span>
                   {isDup && <span className="shrink-0 text-[10px] font-bold px-1.5 py-0.5 rounded border bg-amber-50 text-amber-700 border-amber-200">D</span>}
-                  <button onClick={() => openEditItem(item)} className="text-sm font-medium text-zinc-800 hover:text-[#003434] hover:underline truncate transition-colors text-left">
+                  <button onClick={() => selectMode ? toggleSelectItem(item) : openEditItem(item)} className="text-sm font-medium text-zinc-800 hover:text-[#003434] hover:underline truncate transition-colors text-left">
                     {displaySubject}
                   </button>
                 </div>
@@ -1690,6 +1799,20 @@ export default function NewslettersPage() {
             <div className="flex gap-2">
               <button onClick={() => setDupTarget(null)} className="flex-1 border border-zinc-200 text-zinc-600 text-sm py-2.5 rounded-xl hover:bg-zinc-50 font-medium">Cancel</button>
               <button onClick={handleDuplicate} disabled={duping} className="flex-1 bg-[#003434] text-white text-sm py-2.5 rounded-xl hover:bg-[#004444] disabled:opacity-40 font-medium">{duping ? "Duplicating…" : "Duplicate"}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Bulk Delete Confirm ────────────────────────────────────────────────── */}
+      {bulkDeleteOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6">
+            <h3 className="text-base font-semibold text-zinc-800 mb-2">Delete {selectedIds.size} item{selectedIds.size !== 1 ? "s" : ""}?</h3>
+            <p className="text-sm text-zinc-500 mb-5">This will permanently delete the selected newsletters/campaigns and all their send logs.</p>
+            <div className="flex gap-2">
+              <button onClick={() => setBulkDeleteOpen(false)} className="flex-1 border border-zinc-200 text-zinc-600 text-sm py-2.5 rounded-xl hover:bg-zinc-50 font-medium">Cancel</button>
+              <button onClick={handleBulkDelete} disabled={bulkDeleting} className="flex-1 bg-red-600 text-white text-sm py-2.5 rounded-xl hover:bg-red-700 disabled:opacity-40 font-medium">{bulkDeleting ? "Deleting…" : "Delete"}</button>
             </div>
           </div>
         </div>
