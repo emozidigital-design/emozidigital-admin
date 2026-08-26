@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useCallback } from "react"
 import toast from "react-hot-toast"
 import { useClient } from "../client-context"
 import EmailEditorModal from "@/components/email/EmailEditorModal"
+import FareGeneratorPreview from "@/components/email/FareGeneratorPreview"
 
 // ─── Constants ──────────────────────────────────────────────────────────────────
 const AGENTBAZAR_CLIENT_ID = "d5104fcd-defe-4e3d-a4cf-1893dba7b931"
@@ -913,6 +914,14 @@ export default function NewslettersPage() {
   const [editItem, setEditItem]       = useState<UnifiedEmail | null>(null)
   const createDropRef = useRef<HTMLDivElement>(null)
 
+  // ── Campaign template preview/editor (⋮ Edit on a campaign row) ─────────────
+  const [campaignTemplatePreview, setCampaignTemplatePreview] = useState<UnifiedEmail | null>(null)
+  const [campaignEditorOpen, setCampaignEditorOpen] = useState(false)
+  const [campaignEditorHtml, setCampaignEditorHtml] = useState("")
+  const [campaignEditorName, setCampaignEditorName] = useState("")
+  const [campaignEditorSubject, setCampaignEditorSubject] = useState("")
+  const [campaignEditorTemplateId, setCampaignEditorTemplateId] = useState<string | undefined>(undefined)
+
   // ── 3-dot menu ──────────────────────────────────────────────────────────────
   const [openMenuId, setOpenMenuId] = useState<string | null>(null)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -1165,16 +1174,25 @@ export default function NewslettersPage() {
   }
 
   const openEditItem = (item: UnifiedEmail) => {
-    setEditItem(item)
     setOpenMenuId(null)
     if (item.type === "newsletter") {
+      setEditItem(item)
       setCreateMode("newsletter")
       loadPosts()
       loadNewsletterTemplates()
     } else {
-      setCreateMode("campaign")
-      loadCampaignData()
+      // Campaign ⋮ Edit: edit the underlying template's content directly —
+      // matches the ⋮ Edit flow on the Templates page. Sender/tags/schedule
+      // are edited separately via openEditCampaignDetails.
+      setCampaignTemplatePreview(item)
     }
+  }
+
+  const openEditCampaignDetails = (item: UnifiedEmail) => {
+    setOpenMenuId(null)
+    setEditItem(item)
+    setCreateMode("campaign")
+    loadCampaignData()
   }
 
   const closeOverlay = () => {
@@ -1648,8 +1666,11 @@ export default function NewslettersPage() {
                     <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20"><circle cx="10" cy="4" r="1.5" /><circle cx="10" cy="10" r="1.5" /><circle cx="10" cy="16" r="1.5" /></svg>
                   </button>
                   {openMenuId === item.id && (
-                    <div className="absolute right-0 top-8 z-50 bg-white border border-zinc-200 rounded-xl shadow-xl py-1.5 w-36 ring-1 ring-black/5">
+                    <div className="absolute right-0 top-8 z-50 bg-white border border-zinc-200 rounded-xl shadow-xl py-1.5 w-40 ring-1 ring-black/5">
                       <button onClick={() => openEditItem(item)} className="w-full text-left px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-50 font-medium">Edit</button>
+                      {item.type === "campaign" && (
+                        <button onClick={() => openEditCampaignDetails(item)} className="w-full text-left px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-50 font-medium">Edit details</button>
+                      )}
                       <button onClick={() => handleShare(item)} className="w-full text-left px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-50 font-medium">Share</button>
                       <button onClick={() => openResend(item)} className="w-full text-left px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-50 font-medium">Resend</button>
                       <button onClick={() => { setDupTarget(item); setOpenMenuId(null) }} className="w-full text-left px-4 py-2 text-sm text-zinc-700 hover:bg-zinc-50 font-medium">Duplicate</button>
@@ -1831,6 +1852,73 @@ export default function NewslettersPage() {
           </div>
         </div>
       )}
+
+      {/* Campaign ⋮ Edit — full-screen template preview, same flow as Templates page */}
+      {campaignTemplatePreview && campaignTemplatePreview.rawCampaign?.email_templates?.html_body && (
+        <FareGeneratorPreview
+          open={!!campaignTemplatePreview}
+          onClose={() => setCampaignTemplatePreview(null)}
+          html={campaignTemplatePreview.rawCampaign.email_templates.html_body}
+          templateName={campaignTemplatePreview.rawCampaign.email_templates.name}
+          subject={campaignTemplatePreview.subject}
+          clientId={clientId ?? ""}
+          tagIds={campaignTemplatePreview.rawCampaign.tag_ids ?? []}
+          tagNames={campaignTemplatePreview.tagNames}
+          existingTemplateId={campaignTemplatePreview.rawCampaign.template_id ?? undefined}
+          onSaved={() => refreshList()}
+          onEditRequested={(html, name, subject) => {
+            setCampaignEditorTemplateId(campaignTemplatePreview.rawCampaign?.template_id ?? undefined)
+            setCampaignTemplatePreview(null)
+            setCampaignEditorHtml(html)
+            setCampaignEditorName(name)
+            setCampaignEditorSubject(subject)
+            setCampaignEditorOpen(true)
+          }}
+        />
+      )}
+      {campaignTemplatePreview && !campaignTemplatePreview.rawCampaign?.email_templates?.html_body && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm p-4" onClick={() => setCampaignTemplatePreview(null)}>
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6" onClick={e => e.stopPropagation()}>
+            <h3 className="text-base font-semibold text-zinc-800 mb-2">No template content</h3>
+            <p className="text-sm text-zinc-500 mb-5">This campaign's template has no saved content yet.</p>
+            <div className="flex gap-2">
+              <button onClick={() => setCampaignTemplatePreview(null)} className="flex-1 border border-zinc-200 text-zinc-600 text-sm py-2.5 rounded-xl hover:bg-zinc-50 font-medium">Close</button>
+              <button
+                onClick={() => {
+                  setCampaignEditorTemplateId(campaignTemplatePreview.rawCampaign?.template_id ?? undefined)
+                  setCampaignEditorHtml("")
+                  setCampaignEditorName(campaignTemplatePreview.rawCampaign?.email_templates?.name ?? campaignTemplatePreview.subject)
+                  setCampaignEditorSubject(campaignTemplatePreview.subject)
+                  setCampaignTemplatePreview(null)
+                  setCampaignEditorOpen(true)
+                }}
+                className="flex-1 bg-[#003434] text-white text-sm py-2.5 rounded-xl hover:bg-[#004444] font-medium"
+              >
+                Create content
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Editor opened from the campaign template preview — closes back to the list after saving */}
+      <EmailEditorModal
+        open={campaignEditorOpen}
+        onClose={() => setCampaignEditorOpen(false)}
+        clientId={clientId ?? ""}
+        initialTemplate={{
+          id: campaignEditorTemplateId,
+          name: campaignEditorName,
+          subject: campaignEditorSubject,
+          html_body: campaignEditorHtml,
+          template_type: "campaign",
+        }}
+        onSaved={() => {
+          setCampaignEditorOpen(false)
+          refreshList()
+        }}
+        defaultTemplateType="campaign"
+      />
     </div>
   )
 }

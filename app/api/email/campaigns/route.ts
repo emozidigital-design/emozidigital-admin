@@ -11,7 +11,7 @@ export async function GET(req: NextRequest) {
 
   let query = supabaseAdmin
     .from("email_campaigns")
-    .select("id, client_id, subject, status, scheduled_at, sent_at, created_at, tag_ids, sent_count, opens_count, clicks_count, sender_id, template_id, email_senders(from_email, from_name), email_templates(name)")
+    .select("id, client_id, subject, status, scheduled_at, sent_at, created_at, tag_ids, sent_count, opens_count, clicks_count, sender_id, template_id, email_senders(from_email, from_name), email_templates(name, html_body)")
     .order("created_at", { ascending: false })
 
   if (clientId) query = query.eq("client_id", clientId)

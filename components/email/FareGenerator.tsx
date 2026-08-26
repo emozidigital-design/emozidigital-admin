@@ -132,7 +132,6 @@ export default function FareGenerator({ clientId, onGenerated }: FareGeneratorPr
     if (!fromDate)                 { toast.error("Select a From Date"); return }
     if (!toDate)                   { toast.error("Select a To Date"); return }
     if (fromDate > toDate)         { toast.error("From Date must be before To Date"); return }
-    if (selectedTagIds.length === 0) { toast.error("Select at least one tag"); return }
 
     setGenerating(true)
     try {
@@ -168,7 +167,7 @@ export default function FareGenerator({ clientId, onGenerated }: FareGeneratorPr
     setSelectedTagIds(prev => [...prev, tag.id])
   }
 
-  const canGenerate = !!sectorlist.trim() && !!fromDate && !!toDate && selectedTagIds.length > 0 && !generating
+  const canGenerate = !!sectorlist.trim() && !!fromDate && !!toDate && !generating
 
   return (
     <>
@@ -406,7 +405,6 @@ export default function FareGenerator({ clientId, onGenerated }: FareGeneratorPr
               disabled={!canGenerate}
               title={
                 !sectorlist.trim() ? "Enter sectors" :
-                selectedTagIds.length === 0 ? "Select at least one tag" :
                 "Generate fare email template"
               }
               className="w-full bg-[#1a56db] hover:bg-[#1e4fc0] disabled:bg-white/10 disabled:text-white/30 disabled:cursor-not-allowed text-white text-sm font-semibold px-5 py-2 rounded-lg transition-colors flex items-center justify-center gap-2"
