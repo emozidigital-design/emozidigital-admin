@@ -84,10 +84,10 @@ function buildAgentBazarDefaultHtml(params: BuildParams): string {
     return `
       <tr><td style="padding:0 0 20px 0;">
         <table width="100%" cellpadding="0" cellspacing="0" style="background:#fff;border:1px solid #eee;border-radius:8px;overflow:hidden;">
-          ${tpImg ? `<tr><td><img src="${tpImg}" alt="" width="600" style="display:block;width:100%;max-height:220px;object-fit:cover;" /></td></tr>` : ""}
+          ${tpImg ? `<tr><td><a href="${tpUrl}" style="display:block;"><img src="${tpImg}" alt="" width="600" style="display:block;width:100%;max-height:220px;object-fit:cover;" /></a></td></tr>` : ""}
           <tr><td style="padding:16px 20px;">
-            <p style="margin:0 0 12px;font-size:16px;font-weight:700;color:#F47920;line-height:1.4;">${tp.title}</p>
-            ${tp.excerpt ? `<p style="margin:0 0 14px;font-size:13px;color:#555;line-height:1.6;">${tp.excerpt}</p>` : ""}
+            <a href="${tpUrl}" style="text-decoration:none;"><p style="margin:0 0 12px;font-size:16px;font-weight:700;color:#F47920;line-height:1.4;">${tp.title}</p></a>
+            ${tp.excerpt ? `<a href="${tpUrl}" style="text-decoration:none;"><p style="margin:0 0 14px;font-size:13px;color:#555;line-height:1.6;">${tp.excerpt}</p></a>` : ""}
             <a href="${tpUrl}" style="display:inline-block;background:#F47920;color:#fff;font-size:13px;font-weight:700;font-style:italic;padding:8px 20px;border-radius:4px;text-decoration:none;">Read More...</a>
           </td></tr>
         </table>
@@ -114,12 +114,12 @@ function buildAgentBazarDefaultHtml(params: BuildParams): string {
       </td></tr>
 
       <!-- Hero image -->
-      ${coverUrl ? `<tr><td><img src="${coverUrl}" alt="" width="600" style="display:block;width:100%;max-height:320px;object-fit:cover;" /></td></tr>` : ""}
+      ${coverUrl ? `<tr><td><a href="${ctaUrl}" style="display:block;"><img src="${coverUrl}" alt="" width="600" style="display:block;width:100%;max-height:320px;object-fit:cover;" /></a></td></tr>` : ""}
 
       <!-- Hero content -->
       <tr><td style="padding:20px 24px 24px;">
-        <p style="color:#F47920;font-weight:700;font-size:18px;line-height:1.4;margin:0 0 10px;">${post.title}</p>
-        ${post.excerpt ? `<p style="color:#555;font-size:13px;line-height:1.6;margin:0 0 16px;">${post.excerpt}</p>` : ""}
+        <a href="${ctaUrl}" style="text-decoration:none;"><p style="color:#F47920;font-weight:700;font-size:18px;line-height:1.4;margin:0 0 10px;">${post.title}</p></a>
+        ${post.excerpt ? `<a href="${ctaUrl}" style="text-decoration:none;"><p style="color:#555;font-size:13px;line-height:1.6;margin:0 0 16px;">${post.excerpt}</p></a>` : ""}
         <a href="${ctaUrl}" style="display:inline-block;background:#F47920;color:#fff;font-size:13px;font-weight:700;font-style:italic;padding:10px 24px;border-radius:4px;text-decoration:none;">Read Full Blog...</a>
       </td></tr>
 
@@ -226,12 +226,12 @@ function buildDefaultHtml(params: BuildParams): string {
         <p style="color:#fff;font-size:14px;font-weight:600;margin:0;">${senderFromName}</p>
       </td></tr>
       <!-- Hero image -->
-      ${coverUrl ? `<tr><td><img src="${coverUrl}" alt="" width="600" style="display:block;width:100%;max-height:320px;object-fit:cover;" /></td></tr>` : ""}
+      ${coverUrl ? `<tr><td><a href="${ctaUrl}" style="display:block;"><img src="${coverUrl}" alt="" width="600" style="display:block;width:100%;max-height:320px;object-fit:cover;" /></a></td></tr>` : ""}
       <!-- Content -->
       <tr><td style="padding:24px;">
         <p style="font-size:11px;font-weight:600;color:#999;text-transform:uppercase;letter-spacing:2px;margin:0 0 8px;">${post.category ?? ""}</p>
-        <h2 style="font-size:22px;font-weight:700;color:#111;line-height:1.3;margin:0 0 12px;">${post.title}</h2>
-        ${post.excerpt ? `<p style="font-size:14px;color:#555;line-height:1.7;margin:0 0 20px;">${post.excerpt}</p>` : ""}
+        <a href="${ctaUrl}" style="text-decoration:none;"><h2 style="font-size:22px;font-weight:700;color:#111;line-height:1.3;margin:0 0 12px;">${post.title}</h2></a>
+        ${post.excerpt ? `<a href="${ctaUrl}" style="text-decoration:none;"><p style="font-size:14px;color:#555;line-height:1.7;margin:0 0 20px;">${post.excerpt}</p></a>` : ""}
         <a href="${ctaUrl}" style="display:inline-block;background:#003434;color:#fff;font-size:14px;font-weight:600;padding:12px 24px;border-radius:8px;text-decoration:none;">Read the full article →</a>
       </td></tr>
       <!-- Footer -->
